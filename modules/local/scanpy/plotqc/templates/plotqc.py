@@ -26,10 +26,10 @@ for name in ['gene_name', 'gene_symbol']:
 # make var names unique
 adata.var_names_make_unique()
 
-# get mito, ribo, hemoglobin genes -- TODO: add parameter for species
-adata.var["mt"] = adata.var_names.str.startswith("MT-")
-adata.var["ribo"] = adata.var_names.str.startswith(("RPS", "RPL"))
-adata.var["hb"] = adata.var_names.str.contains("^HB[^(P)]")
+# get mito, ribo, hemoglobin genes
+adata.var["mt"] = adata.var_names.str.lower().str.startswith("mt-")
+adata.var["ribo"] = adata.var_names.str.lower().str.startswith(("rps", "rpl"))
+adata.var["hb"] = adata.var_names.str.lower().str.contains("^hb[^(p)]")
 
 sc.pp.calculate_qc_metrics(
     adata, qc_vars=["mt", "ribo", "hb"], inplace=True, percent_top=None, log1p=True
@@ -42,7 +42,7 @@ adata.write_h5ad(f"{prefix}.h5ad")
 
 
 ## plots
-sc.pl.scatter(adata, x='total_counts', y='n_genes_by_counts', show=False)
+sc.pl.scatter(adata, x='total_counts', y='n_genes_by_counts', color="pct_counts_mt", show=False)
 path_plt_counts = "${prefix}_total_counts_vs_n_genes_by_counts.png"
 plt.savefig(path_plt_counts)
 
