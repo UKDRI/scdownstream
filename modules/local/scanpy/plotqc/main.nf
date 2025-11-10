@@ -14,6 +14,7 @@ process SCANPY_PLOTQC {
     tuple val(meta), path("*.png"), emit: plots
     path ("*_mqc.json"), emit: multiqc_files
     path "versions.yml", emit: versions
+    tuple val(meta), path("${prefix}.h5ad"), emit: h5ad
 
     when:
     task.ext.when == null || task.ext.when
@@ -32,5 +33,6 @@ process SCANPY_PLOTQC {
     touch ${prefix}_total_counts_vs_n_genes_by_counts.png
     touch ${prefix}_mqc.json
     touch versions.yml
+    touch "${prefix}.h5ad"
     """
 }
