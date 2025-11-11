@@ -102,9 +102,9 @@ workflow QUALITY_CONTROL {
         )
     }
 
-    QC_FILTERED(ch_h5ad)
-    ch_multiqc_files = ch_multiqc_files.mix(QC_FILTERED.out.multiqc_files)
-    ch_versions = ch_versions.mix(QC_FILTERED.out.versions)
+    // QC_FILTERED(ch_h5ad)
+    // ch_multiqc_files = ch_multiqc_files.mix(QC_FILTERED.out.multiqc_files)
+    // ch_versions = ch_versions.mix(QC_FILTERED.out.versions)
 
     ch_sizes = ch_sizes
         .collectFile(
