@@ -15,6 +15,7 @@ process SCANPY_SCRUBLET {
     tuple val(meta), path("*.h5ad"), emit: h5ad
     tuple val(meta), path("*.pkl") , emit: predictions
     path "versions.yml"            , emit: versions
+    path ("*_mqc.json"), emit: multiqc_files
 
     when:
     task.ext.when == null || task.ext.when
@@ -24,6 +25,8 @@ process SCANPY_SCRUBLET {
     if ("${h5ad}" == "${prefix}.h5ad") {
         error("Input and output names are the same, use \"task.ext.prefix\" to disambiguate!")
     }
+    section_name = task.ext.section_name ?: "Scrublet"
+    description = task.ext.description ?: "Doublet detection using scrublet. Scrublet simulates doublets by combining gene expression profiles of pairs of cells and trains a KNN classifier for predicting doublets."
     template('scrublet.py')
 
     stub:
@@ -39,6 +42,8 @@ process SCANPY_SCRUBLET {
 
     touch ${prefix}.h5ad
     touch ${prefix}.pkl
+    touch ${prefix}_scrublet_distributions.png
+    touch ${prefix}_mqc.json
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

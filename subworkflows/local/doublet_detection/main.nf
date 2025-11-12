@@ -38,6 +38,8 @@ workflow DOUBLET_DETECTION {
             SCANPY_SCRUBLET(ch_scrublet.input, ch_scrublet.batch_col)
             ch_predictions = ch_predictions.mix(SCANPY_SCRUBLET.out.predictions)
             ch_versions = SCANPY_SCRUBLET.out.versions
+	    ch_h5ad = SCANPY_SCRUBLET.out.h5ad
+	    ch_multiqc_files = ch_multiqc_files.mix(SCANPY_SCRUBLET.out.multiqc_files)
         }
 
         if (methods.contains('doubletdetection')) {
@@ -46,14 +48,14 @@ workflow DOUBLET_DETECTION {
             ch_versions = DOUBLETDETECTION.out.versions
         }
 
-        DOUBLET_REMOVAL(
-            ch_h5ad.join(ch_predictions.groupTuple()),
-            threshold,
-        )
+        // DOUBLET_REMOVAL(
+        //    ch_h5ad.join(ch_predictions.groupTuple()),
+        //threshold,
+        //)
 
-        ch_h5ad = DOUBLET_REMOVAL.out.h5ad
-        ch_multiqc_files = ch_multiqc_files.mix(DOUBLET_REMOVAL.out.multiqc_files)
-        ch_versions = ch_versions.mix(DOUBLET_REMOVAL.out.versions)
+        // ch_h5ad = DOUBLET_REMOVAL.out.h5ad
+        // ch_multiqc_files = ch_multiqc_files.mix(DOUBLET_REMOVAL.out.multiqc_files)
+	// ch_versions = ch_versions.mix(DOUBLET_REMOVAL.out.versions)	
     }
 
     emit:
