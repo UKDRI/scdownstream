@@ -48,7 +48,7 @@ selected_metrics = ['n_genes_by_counts', 'total_counts', 'pct_counts_mt']
 namds_metric = {
     'n_genes_by_counts': [2.5, 5],
     'total_counts': [2.5, 5],
-    'pct_counts_mt': [3,3]
+    'pct_counts_mt': [2.5,5]
 }
 
 dpi_plots = 120
@@ -140,11 +140,40 @@ with rc_context({'figure.figsize': (fig_width, fig_height)}):
 with open("${prefix}_mqc.json", "w") as f_json:
 
     image_html = ""    
-    for path in [path_plt_violin, path_plt_scatter, path_plt_hist]:
-        with open(path, "rb") as f_plot:
-            image_string = base64.b64encode(f_plot.read()).decode("utf-8")
-            image_html += f'<div class="mqc-custom-content-image"><img src="data:image/png;base64,{image_string}" /></div>'
-    
+
+    with open(path_plt_violin, "rb") as f_plot:
+        image_string = base64.b64encode(f_plot.read()).decode("utf-8")
+        image_html += f'<figure><div class="mqc-custom-content-image"><img src="data:image/png;base64,{image_string}" /></div>'
+        image_html += '<figcaption>The violin plots show the distribution of gene counts, total counts, percentage of mitochondrial (<i>mt</i>), ribosomal (<i>ribo</i>),'
+        image_html += 'and hemoglobin gene expression (<i>hb</i>) per cell. Low gene and total counts may indicate poor quality cells '
+        image_html += 'while high counts can be caused by artefacts. High mitochondrial, ribosmal and hemoglobin gene expression may indicate contamination, '
+        image_html += 'degradation, and artefacts.</figcaption></figure>'
+
+    with open(path_plt_scatter, "rb") as f_plot:
+        image_string = base64.b64encode(f_plot.read()).decode("utf-8")
+        image_html += f'<figure><div class="mqc-custom-content-image"><img src="data:image/png;base64,{image_string}" /></div>'
+        image_html += '<figcaption>The scatter plot shows the relationship between total counts, gene counts,  mitochondrial(<i>mt</i>) gene expression.</figcaption></figure>'
+
+    with open(path_plt_hist, "rb") as f_plot:
+        image_string = base64.b64encode(f_plot.read()).decode("utf-8")
+        image_html += f'<figure><div class="mqc-custom-content-image"><img src="data:image/png;base64,{image_string}" /></div>'
+        image_html +='<figcaption>The histograms show gene counts, total counts, and the percentage of mitochondrial gene expression per cell. '
+        image_html += 'Red lines indicate automatically determined thresholds based on N median absolute deviations (MADs).'
+        
+        image_html += 'Automatically determined thresholds:<br>'
+        for metric in ['n_genes_by_counts', 'total_counts', 'pct_counts_mt']: 
+            lower = thresholds_metric[metric][0]
+            upper = thresholds_metric[metric][1]
+            image_html += f'{metric}: ({lower}, {upper})<br>'
+
+        image_html += 'The thresholds were determined using the following number of MADs:<br>'
+        for metric in ['n_genes_by_counts', 'total_counts', 'pct_counts_mt']: 
+            lower = namds_metric[metric][0]
+            upper = namds_metric[metric][1]
+            image_html += f'{metric}: ({lower}, {upper})<br>'
+        image_html += '</figcaption></figure>'
+        
+        
     custom_json = {
         "id": "${prefix}",
         "parent_id": "${section_name}".replace(" ", "_"),
