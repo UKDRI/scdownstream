@@ -61,12 +61,25 @@ workflow QUALITY_CONTROL {
     )
 
     QC_RAW(ch_complete.map { meta, filtered, _unfiltered -> [meta, filtered] })
+    ch_h5ad = QC_RAW.out.h5ad
     ch_multiqc_files = ch_multiqc_files.mix(QC_RAW.out.multiqc_files)
     ch_versions = ch_versions.mix(QC_RAW.out.versions)
 
+    DOUBLET_DETECTION(ch_h5ad, doublet_detection_methods, doublet_detection_threshold)
+    ch_h5ad = DOUBLET_DETECTION.out.h5ad
+    ch_multiqc_files = ch_multiqc_files.mix(DOUBLET_DETECTION.out.multiqc_files)
+    ch_versions = ch_versions.mix(DOUBLET_DETECTION.out.versions)
+
+    if (doublet_detection_methods.size() > 0) {
+        GET_DEDOUBLETED_SIZE(ch_h5ad, "cells")
+        ch_versions = ch_versions.mix(GET_DEDOUBLETED_SIZE.out.versions)
+        ch_sizes = ch_sizes.mix(
+            GET_DEDOUBLETED_SIZE.out.size.map { meta, size -> [meta.id, 'dedoubleted', (size.text ?: "0").toInteger()] }
+        )
+    }
     
     //AMBIENT_CORRECTION(ch_complete, ambient_correction_method)    
-    AMBIENT_CORRECTION(QC_RAW.out.h5ad.join( ch_complete.map { meta, _filtered, unfiltered -> [meta, unfiltered] } ), ambient_correction_method)
+    AMBIENT_CORRECTION(ch_h5ad.join( ch_complete.map { meta, _filtered, unfiltered -> [meta, unfiltered] } ), ambient_correction_method)
     ch_h5ad = AMBIENT_CORRECTION.out.h5ad
     ch_versions = ch_versions.mix(AMBIENT_CORRECTION.out.versions)
 
@@ -88,19 +101,7 @@ workflow QUALITY_CONTROL {
     ch_sizes = ch_sizes.mix(
         GET_THRESHOLDED_SIZE.out.size.map { meta, size -> [meta.id, 'thresholded', (size.text ?: "0").toInteger()] }
     )
-
-    DOUBLET_DETECTION(ch_h5ad, doublet_detection_methods, doublet_detection_threshold)
-    ch_h5ad = DOUBLET_DETECTION.out.h5ad
-    ch_multiqc_files = ch_multiqc_files.mix(DOUBLET_DETECTION.out.multiqc_files)
-    ch_versions = ch_versions.mix(DOUBLET_DETECTION.out.versions)
-
-    if (doublet_detection_methods.size() > 0) {
-        GET_DEDOUBLETED_SIZE(ch_h5ad, "cells")
-        ch_versions = ch_versions.mix(GET_DEDOUBLETED_SIZE.out.versions)
-        ch_sizes = ch_sizes.mix(
-            GET_DEDOUBLETED_SIZE.out.size.map { meta, size -> [meta.id, 'dedoubleted', (size.text ?: "0").toInteger()] }
-        )
-    }
+    
 
     // QC_FILTERED(ch_h5ad)
     // ch_multiqc_files = ch_multiqc_files.mix(QC_FILTERED.out.multiqc_files)
