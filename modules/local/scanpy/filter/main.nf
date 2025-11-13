@@ -20,6 +20,7 @@ process SCANPY_FILTER {
 
     output:
     tuple val(meta), path("${prefix}.h5ad"), emit: h5ad
+    path ("*_mqc.json"), emit: multiqc_files
     path "versions.yml", emit: versions
 
     when:
@@ -30,12 +31,16 @@ process SCANPY_FILTER {
     if ("${prefix}.h5ad" == "${h5ad}") {
         error("Input and output names are the same, use \"task.ext.prefix\" to disambiguate!")
     }
+    section_name = task.ext.section_name ?: "Filtering"
+    description = task.ext.description ?: "Thresholds applied for filtering cells."
     template('filter.py')
 
     stub:
     prefix = task.ext.prefix ?: "${meta.id}"
     """
     touch ${prefix}.h5ad
+    touch ${prefix}_filtering_thresholds.png
+    touch ${prefix}_mqc.json
     touch versions.yml
     """
 }

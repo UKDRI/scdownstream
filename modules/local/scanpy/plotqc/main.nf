@@ -31,8 +31,9 @@ process SCANPY_PLOTQC {
     description = task.ext.description ?: "Quality control plots"
     """
     touch ${prefix}_total_counts_vs_n_genes_by_counts.png
+    touch ${prefix}_qc_violin_plots.png
     touch ${prefix}_mqc.json
     touch versions.yml
-    touch "${prefix}.h5ad"
+    touch ${prefix}.h5ad
     """
 }

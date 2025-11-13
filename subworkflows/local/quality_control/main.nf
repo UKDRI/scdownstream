@@ -95,6 +95,7 @@ workflow QUALITY_CONTROL {
     }
     SCANPY_FILTER(ch_filtering.h5ad, ch_filtering.symbol_col, ch_filtering.min_genes, ch_filtering.min_cells, ch_filtering.min_counts_gene, ch_filtering.min_counts_cell, ch_filtering.max_mito_percentage, ch_filtering.automatic_cell_filtering, mito_genes ?: []  )
     ch_h5ad = SCANPY_FILTER.out.h5ad
+    ch_multiqc_files = ch_multiqc_files.mix(SCANPY_FILTER.out.multiqc_files)
     ch_versions = ch_versions.mix(SCANPY_FILTER.out.versions)
 
     GET_THRESHOLDED_SIZE(ch_h5ad, "cells")
