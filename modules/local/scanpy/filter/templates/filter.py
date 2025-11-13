@@ -18,30 +18,51 @@ adata = sc.read_h5ad("${h5ad}")
 prefix = "${prefix}"
 symbol_col = "${symbol_col}"
 mito_genes = "${mito_genes}"
+automatic_filtering = "${automatic_cell_filtering}" == "true"
 
-symbols = adata.var_names if symbol_col == "index" else adata.var[symbol_col]
 
-if mito_genes:
-    with open(mito_genes, "r") as f:
-        mito_genes = {
-            line.strip().lower()
-            for line in f
-            if line.strip() and not line.startswith("#")
-        }
-    adata.var["mt"] = symbols.str.lower().isin(mito_genes)
-else:
-    adata.var["mt"] = symbols.str.lower().str.startswith("mt-")
+#  TODO: move custom mito genes to QC metric step
+#
+#symbols = adata.var_names if symbol_col == "index" else adata.var[symbol_col]
+#
+#
+# if mito_genes:
+#     with open(mito_genes, "r") as f:
+#         mito_genes = {
+#             line.strip().lower()
+#             for line in f
+#             if line.strip() and not line.startswith("#")
+#         }
+#     adata.var["mt"] = symbols.str.lower().isin(mito_genes)
+# else:
+#     adata.var["mt"] = symbols.str.lower().str.startswith("mt-")
 
-sc.pp.calculate_qc_metrics(
-    adata, qc_vars=["mt"], percent_top=None, log1p=False, inplace=True
-)
-adata = adata[adata.obs.pct_counts_mt < int("${max_mito_percentage}"), :].copy()
+# sc.pp.calculate_qc_metrics(
+#     adata, qc_vars=["mt"], percent_top=None, log1p=False, inplace=True
+# )
 
-sc.pp.filter_cells(adata, min_counts=int("${min_counts_cell}"))
+
+# filter genes
 sc.pp.filter_genes(adata, min_counts=int("${min_counts_gene}"))
-
-sc.pp.filter_cells(adata, min_genes=int("${min_genes}"))
 sc.pp.filter_genes(adata, min_cells=int("${min_cells}"))
+
+# filter cells
+if automatic_filtering:
+    
+    min_genes, max_genes = adata.uns['n_mads_obs_thresholds']['thresholds']['n_genes_by_counts']
+    min_counts, max_counts = adata.uns['n_mads_obs_thresholds']['thresholds']['total_counts']
+    _ , max_pct_mt = adata.uns['n_mads_obs_thresholds']['thresholds']['pct_counts_mt']
+
+    adata = adata[adata.obs.pct_counts_mt < max_pct_mt, :].copy()
+    sc.pp.filter_cells(adata, min_genes=min_genes)
+    sc.pp.filter_cells(adata, max_genes=max_genes)
+    sc.pp.filter_cells(adata, min_counts=min_counts)
+    sc.pp.filter_cells(adata, max_counts=max_counts)
+else:
+    adata = adata[adata.obs.pct_counts_mt < int("${max_mito_percentage}"), :].copy()
+    sc.pp.filter_cells(adata, min_counts=int("${min_counts_cell}"))
+    sc.pp.filter_cells(adata, min_genes=int("${min_genes}"))
+
 
 adata.write_h5ad(f"{prefix}.h5ad")
 

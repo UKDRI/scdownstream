@@ -73,6 +73,12 @@
                 "errorMessage": "Counts layer needs to start with a letter and can contain letters, numbers, underlines and dashes.",
                 "meta": ["counts_layer"]
             },
+	    "automatic_cell_filtering": {
+		"type": "boolean",
+		"default": true,
+		"errorMessage": "'automatic_cell_filtering' must be a boolean.",
+		"meta": ["automatic_cell_filtering"]
+	    },
             "min_genes": {
                 "type": "integer",
                 "minimum": 0,

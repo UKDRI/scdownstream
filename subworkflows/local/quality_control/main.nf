@@ -91,8 +91,9 @@ workflow QUALITY_CONTROL {
         min_counts_gene: meta.min_counts_gene ?: 0
         min_counts_cell: meta.min_counts_cell ?: 0
         max_mito_percentage: meta.max_mito_percentage ?: 100
+	automatic_cell_filtering: meta.automatic_cell_filtering
     }
-    SCANPY_FILTER(ch_filtering.h5ad, ch_filtering.symbol_col, ch_filtering.min_genes, ch_filtering.min_cells, ch_filtering.min_counts_gene, ch_filtering.min_counts_cell, ch_filtering.max_mito_percentage, mito_genes ?: [])
+    SCANPY_FILTER(ch_filtering.h5ad, ch_filtering.symbol_col, ch_filtering.min_genes, ch_filtering.min_cells, ch_filtering.min_counts_gene, ch_filtering.min_counts_cell, ch_filtering.max_mito_percentage, ch_filtering.automatic_cell_filtering, mito_genes ?: []  )
     ch_h5ad = SCANPY_FILTER.out.h5ad
     ch_versions = ch_versions.mix(SCANPY_FILTER.out.versions)
 
