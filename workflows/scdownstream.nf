@@ -20,6 +20,11 @@ include { paramsSummaryMap                     } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc                 } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML               } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { methodsDescriptionText               } from '../subworkflows/local/utils_nfcore_scdownstream_pipeline'
+include { SCANPY_HVGS                          } from '../modules/local/scanpy/hvgs'
+include { SCANPY_PCA                           } from '../modules/local/scanpy/pca'
+include { SCANPY_NEIGHBORS                     } from '../modules/local/scanpy/neighbors'
+include { SCANPY_UMAP                          } from '../modules/local/scanpy/umap'
+include { SCANPY_LOG_NORMALIZE                 } from '../modules/local/scanpy/normalization'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -125,6 +130,28 @@ workflow SCDOWNSTREAM {
         ch_label_grouping = ch_base
         grouping_col = params.base_label_col
     }
+
+
+    //
+    // Compute embeddings
+    //
+    if (!params.qc_only) {
+
+        ch_h5ad = ch_finalization_base
+        SCANPY_LOG_NORMALIZE(ch_h5ad)
+        ch_h5ad = SCANPY_LOG_NORMALIZE.out.h5ad
+        SCANPY_HVGS(ch_h5ad, 3000 )
+        ch_h5ad = SCANPY_HVGS.out.h5ad
+        SCANPY_PCA(ch_h5ad, 'X_pca' )
+        ch_h5ad = SCANPY_PCA.out.h5ad
+        SCANPY_NEIGHBORS(ch_h5ad, 'X_pca' )
+        ch_h5ad = SCANPY_NEIGHBORS.out.h5ad
+        SCANPY_UMAP(ch_h5ad)
+        ch_h5ad = SCANPY_UMAP.out.h5ad
+        
+        ch_finalization_base = ch_h5ad
+    }
+
 
     //
     // Perform clustering and per-cluster analysis

@@ -73,12 +73,12 @@
                 "errorMessage": "Counts layer needs to start with a letter and can contain letters, numbers, underlines and dashes.",
                 "meta": ["counts_layer"]
             },
-	    "automatic_cell_filtering": {
-		"type": "boolean",
-		"default": true,
-		"errorMessage": "'automatic_cell_filtering' must be a boolean.",
-		"meta": ["automatic_cell_filtering"]
-	    },
+	        "automatic_cell_filtering": {
+                "type": "boolean",
+                "default": true,
+                "errorMessage": "'automatic_cell_filtering' must be a boolean.",
+                "meta": ["automatic_cell_filtering"]
+	        },
             "min_genes": {
                 "type": "integer",
                 "minimum": 0,
@@ -132,6 +132,13 @@
                 "type": "boolean",
                 "errorMessage": "'ambient_corrected_integration' must be a boolean.",
                 "meta": ["ambient_corrected_integration"]
+            },
+            "n_hvgs": {
+                "type": "integer",
+                "minimum": 10,
+                "default": 3000,
+                "errorMessage": "Number of hyper variable genes must be an integer larger than 10.",
+                "meta": ["n_hvgs"]
             }
         },
         "anyOf": [
