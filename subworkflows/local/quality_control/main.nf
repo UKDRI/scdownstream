@@ -70,13 +70,13 @@ workflow QUALITY_CONTROL {
     ch_multiqc_files = ch_multiqc_files.mix(DOUBLET_DETECTION.out.multiqc_files)
     ch_versions = ch_versions.mix(DOUBLET_DETECTION.out.versions)
 
-    if (doublet_detection_methods.size() > 0) {
-        GET_DEDOUBLETED_SIZE(ch_h5ad, "cells")
-        ch_versions = ch_versions.mix(GET_DEDOUBLETED_SIZE.out.versions)
-        ch_sizes = ch_sizes.mix(
-            GET_DEDOUBLETED_SIZE.out.size.map { meta, size -> [meta.id, 'dedoubleted', (size.text ?: "0").toInteger()] }
-        )
-    }
+    // if (doublet_detection_methods.size() > 0) {
+    //     GET_DEDOUBLETED_SIZE(ch_h5ad, "cells")
+    //     ch_versions = ch_versions.mix(GET_DEDOUBLETED_SIZE.out.versions)
+    //     ch_sizes = ch_sizes.mix(
+    //         GET_DEDOUBLETED_SIZE.out.size.map { meta, size -> [meta.id, 'dedoubleted', (size.text ?: "0").toInteger()] }
+    //     )
+    // }
     
     //AMBIENT_CORRECTION(ch_complete, ambient_correction_method)    
     AMBIENT_CORRECTION(ch_h5ad.join( ch_complete.map { meta, _filtered, unfiltered -> [meta, unfiltered] } ), ambient_correction_method)
