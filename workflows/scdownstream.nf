@@ -25,6 +25,8 @@ include { SCANPY_PCA                           } from '../modules/local/scanpy/p
 include { SCANPY_NEIGHBORS                     } from '../modules/local/scanpy/neighbors'
 include { SCANPY_UMAP                          } from '../modules/local/scanpy/umap'
 include { SCANPY_LOG_NORMALIZE                 } from '../modules/local/scanpy/normalization'
+include {SCANPY_LEIDEN                         } from '../modules/local/scanpy/leiden'
+include {SCANPY_RANKGENESGROUPS                } from '../modules/local/scanpy/rankgenesgroups'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -111,7 +113,8 @@ workflow SCDOWNSTREAM {
             ch_var = ch_var.mix(COMBINE.out.var)
             ch_obsm = ch_obsm.mix(COMBINE.out.obsm)
             ch_integrations = ch_integrations.mix(COMBINE.out.integrations)
-            ch_finalization_base = COMBINE.out.h5ad
+            //ch_finalization_base = COMBINE.out.h5ad
+            ch_h5ad = COMBINE.out.h5ad
 
             ch_label_grouping = COMBINE.out.h5ad_inner
             grouping_col = "label"
@@ -137,7 +140,7 @@ workflow SCDOWNSTREAM {
     //
     if (!params.qc_only) {
 
-        ch_h5ad = ch_finalization_base
+        //ch_h5ad = ch_finalization_base
         SCANPY_LOG_NORMALIZE(ch_h5ad)
         ch_h5ad = SCANPY_LOG_NORMALIZE.out.h5ad
         SCANPY_HVGS(ch_h5ad, 3000 )
@@ -152,47 +155,60 @@ workflow SCDOWNSTREAM {
         ch_finalization_base = ch_h5ad
     }
 
+    //
+    // Perform clustering
+    //
+    if (!params.qc_only) {
+        //ch_h5ad = ch_finalization_base
+        
+        // write multi clustering leiden worflow --> just combine h5ad obs instead of current implementation
+        SCANPY_LEIDEN(ch_h5ad, 1, "leiden", false)
+        ch_h5ad = SCANPY_LEIDEN.out.h5ad
+        SCANPY_RANKGENESGROUPS(ch_h5ad)
+
+        ch_finalization_base = ch_h5ad
+    }
 
     //
     // Perform clustering and per-cluster analysis
     //
-    if (!params.qc_only) {
-        CLUSTER(
-            ch_integrations,
-            params.cluster_per_label,
-            params.cluster_global,
-            params.input ? "label" : params.base_label_col,
-            params.clustering_resolutions.split(','),
-            "batch",
-            "X_emb",
-        )
-        ch_versions = ch_versions.mix(CLUSTER.out.versions)
-        ch_obs = ch_obs.mix(CLUSTER.out.obs)
-        ch_obsm = ch_obsm.mix(CLUSTER.out.obsm)
-        ch_multiqc_files = ch_multiqc_files.mix(CLUSTER.out.multiqc_files)
+    // if (!params.qc_only) {
+    //    CLUSTER(
+    //        ch_integrations,
+    //        params.cluster_per_label,
+    //        params.cluster_global,
+    //        params.input ? "label" : params.base_label_col,
+    //        params.clustering_resolutions.split(','),
+    //        "batch",
+    //        "X_emb",
+    //    )
+    //    ch_versions = ch_versions.mix(CLUSTER.out.versions)
+    //    ch_obs = ch_obs.mix(CLUSTER.out.obs)
+    //    ch_obsm = ch_obsm.mix(CLUSTER.out.obsm)
+    //    ch_multiqc_files = ch_multiqc_files.mix(CLUSTER.out.multiqc_files)
 
-        if (params.pseudobulk) {
-            PSEUDOBULKING(
-                CLUSTER.out.h5ad_clustering,
-                params.pseudobulk_groupby_labels.split(','),
-                params.pseudobulk_min_num_cells,
-                "X",
-            )
-            ch_versions = ch_versions.mix(PSEUDOBULKING.out.versions)
-        }
+    //    if (params.pseudobulk) {
+    //        PSEUDOBULKING(
+    //            CLUSTER.out.h5ad_clustering,
+    //            params.pseudobulk_groupby_labels.split(','),
+    //            params.pseudobulk_min_num_cells,
+    //            "X",
+    //        )
+    //        ch_versions = ch_versions.mix(PSEUDOBULKING.out.versions)
+    //    }
 
-        PER_GROUP(
-            CLUSTER.out.h5ad_clustering.map { meta, h5ad -> [meta + [obs_key: "${meta.id}_leiden"], h5ad] },
-            CLUSTER.out.h5ad_neighbors.map { meta, h5ad -> [meta + [obs_key: grouping_col], h5ad] },
-            ch_label_grouping.map { meta, h5ad -> [meta + [obs_key: grouping_col], h5ad] },
-        )
-        ch_versions = ch_versions.mix(PER_GROUP.out.versions)
-        ch_uns = ch_uns.mix(PER_GROUP.out.uns)
-        ch_multiqc_files = ch_multiqc_files.mix(PER_GROUP.out.multiqc_files)
+    //    PER_GROUP(
+    //        CLUSTER.out.h5ad_clustering.map { meta, h5ad -> [meta + [obs_key: "${meta.id}_leiden"], h5ad] },
+    //        CLUSTER.out.h5ad_neighbors.map { meta, h5ad -> [meta + [obs_key: grouping_col], h5ad] },
+    //        ch_label_grouping.map { meta, h5ad -> [meta + [obs_key: grouping_col], h5ad] },
+    //    )
+    //    ch_versions = ch_versions.mix(PER_GROUP.out.versions)
+    //    ch_uns = ch_uns.mix(PER_GROUP.out.uns)
+    //    ch_multiqc_files = ch_multiqc_files.mix(PER_GROUP.out.multiqc_files)
 
-        FINALIZE(ch_finalization_base, ch_obs, ch_var, ch_obsm, ch_obsp, ch_uns, ch_layers)
-        ch_versions = ch_versions.mix(FINALIZE.out.versions)
-    }
+    //    FINALIZE(ch_finalization_base, ch_obs, ch_var, ch_obsm, ch_obsp, ch_uns, ch_layers)
+    //    ch_versions = ch_versions.mix(FINALIZE.out.versions)
+    //}
 
     //
     // Collate and save software versions

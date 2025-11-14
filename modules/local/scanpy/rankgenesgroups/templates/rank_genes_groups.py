@@ -27,7 +27,7 @@ kwargs = {
 }
 
 if adata.obs["${obs_key}"].value_counts().size > 1:
-    sc.pp.log1p(adata)
+    # sc.pp.log1p(adata)
     sc.tl.rank_genes_groups(adata, **kwargs)
 
     rgg_dict = adata.uns["rank_genes_groups"]
@@ -36,27 +36,27 @@ if adata.obs["${obs_key}"].value_counts().size > 1:
     adata.write_h5ad(f"{prefix}.h5ad")
 
     # Plot
-    sc.pl.rank_genes_groups(adata, show=False)
-    path = f"{prefix}.png"
-    plt.savefig(path)
+    # sc.pl.rank_genes_groups(adata, show=False)
+    # path = f"{prefix}.png"
+    # plt.savefig(path)
 
     # MultiQC
-    with open(path, "rb") as f_plot, open("${prefix}_mqc.json", "w") as f_json:
-        image_string = base64.b64encode(f_plot.read()).decode("utf-8")
-        image_html = f'<div class="mqc-custom-content-image"><img src="data:image/png;base64,{image_string}" /></div>'
+    # with open(path, "rb") as f_plot, open("${prefix}_mqc.json", "w") as f_json:
+    #    image_string = base64.b64encode(f_plot.read()).decode("utf-8")
+    #    image_html = f'<div class="mqc-custom-content-image"><img src="data:image/png;base64,{image_string}" /></div>'
 
-        custom_json = {
-            "id": "${prefix}",
-            "parent_id": "${meta.integration}",
-            "parent_name": "${meta.integration}",
-            "parent_description": "Results of the ${meta.integration} integration.",
+    #    custom_json = {
+    #        "id": "${prefix}",
+    #        "parent_id": "${meta.integration}",
+    #       "parent_name": "${meta.integration}",
+    #        "parent_description": "Results of the ${meta.integration} integration.",
+    #
+    #        "section_name": "${meta.id} characteristic genes",
+    #        "plot_type": "image",
+    #        "data": image_html,
+    #    }
 
-            "section_name": "${meta.id} characteristic genes",
-            "plot_type": "image",
-            "data": image_html,
-        }
-
-        json.dump(custom_json, f_json)
+    #    json.dump(custom_json, f_json)
 else:
     print("Skipping rank_genes_groups computation as the group has less than 2 unique values.")
 
