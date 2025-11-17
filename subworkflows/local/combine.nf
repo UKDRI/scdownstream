@@ -44,7 +44,8 @@ workflow COMBINE {
             .combine(
                 ch_base.map{ _meta, base -> base }
             ).combine(
-                ADATA_MERGE.out.inner.map{ _meta, inner -> inner }
+                //ADATA_MERGE.out.inner.map{ _meta, inner -> inner }
+                ADATA_MERGE.out.outer.map{ _meta, outer -> outer }
             )
         )
         ch_versions      = ch_versions.mix(ADATA_MERGEEMBEDDINGS.out.versions)

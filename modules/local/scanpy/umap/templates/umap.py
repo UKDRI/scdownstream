@@ -17,8 +17,10 @@ sc.settings.n_jobs = int("${task.cpus}")
 
 adata = sc.read_h5ad("${h5ad}", backed='r')
 prefix = "${prefix}"
+neighbors_key = "${neighbors_key}"
+key_added = "${key_added}"
 
-sc.tl.umap(adata, random_state=0)
+sc.tl.umap(adata, random_state=0, key_added=key_added, neighbors_key=neighbors_key)
 
 # Round to 10 decimal places
 # This ensures hashes are stable

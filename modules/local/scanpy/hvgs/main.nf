@@ -10,6 +10,7 @@ process SCANPY_HVGS {
     input:
     tuple val(meta), path(h5ad)
     val n_hvgs
+    val subset_to_hvgs
 
     output:
     tuple val(meta), path("${prefix}.h5ad"), emit: h5ad
@@ -22,6 +23,7 @@ process SCANPY_HVGS {
     script:
     prefix = task.ext.prefix ?: "${meta.id}"
     batch_key = task.ext.batch_key ?: ""
+    
     template('hvgs.py')
 
     stub:

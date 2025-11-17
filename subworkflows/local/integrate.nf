@@ -1,14 +1,15 @@
-include { SCANPY_HVGS        } from '../../modules/local/scanpy/hvgs'
-include { SCANPY_FILTER      } from '../../modules/local/scanpy/filter'
-include { ADATA_TORDS        } from '../../modules/local/adata/tords'
-include { SCVITOOLS_SCVI     } from '../../modules/local/scvitools/scvi'
-include { SCVITOOLS_SCANVI   } from '../../modules/local/scvitools/scanvi'
-include { SCANPY_HARMONY     } from '../../modules/local/scanpy/harmony'
-include { INTEGRATION_BBKNN  } from '../../modules/local/integration/bbknn'
-include { SCANPY_COMBAT      } from '../../modules/local/scanpy/combat'
-include { SEURAT_INTEGRATION } from '../../modules/local/seurat/integration'
-include { ADATA_READRDS      } from '../../modules/local/adata/readrds'
-include { SCIMILARITY        } from './scimilarity'
+include { SCANPY_HVGS          } from '../../modules/local/scanpy/hvgs'
+include { SCANPY_FILTER        } from '../../modules/local/scanpy/filter'
+include { SCANPY_LOG_NORMALIZE } from '../../modules/local/scanpy/normalization'
+include { ADATA_TORDS          } from '../../modules/local/adata/tords'
+include { SCVITOOLS_SCVI       } from '../../modules/local/scvitools/scvi'
+include { SCVITOOLS_SCANVI     } from '../../modules/local/scvitools/scanvi'
+include { SCANPY_HARMONY       } from '../../modules/local/scanpy/harmony'
+include { INTEGRATION_BBKNN    } from '../../modules/local/integration/bbknn'
+include { SCANPY_COMBAT        } from '../../modules/local/scanpy/combat'
+include { SEURAT_INTEGRATION   } from '../../modules/local/seurat/integration'
+include { ADATA_READRDS        } from '../../modules/local/adata/readrds'
+include { SCIMILARITY          } from './scimilarity'
 
 workflow INTEGRATE {
     take:
@@ -32,7 +33,10 @@ workflow INTEGRATE {
     // If a reference model is provided, only the genes in the reference model are used
     // Otherwise, we would intersect the HVGs, which is not what we want
     if (!is_extension && n_hvgs >= 0) {
-        SCANPY_HVGS(ch_h5ad, n_hvgs)
+
+        SCANPY_LOG_NORMALIZE(ch_h5ad)
+        ch_h5ad = SCANPY_LOG_NORMALIZE.out.h5ad
+        SCANPY_HVGS(ch_h5ad, n_hvgs, true)
         ch_versions = ch_versions.mix(SCANPY_HVGS.out.versions)
         ch_h5ad_hvg = SCANPY_HVGS.out.h5ad
 

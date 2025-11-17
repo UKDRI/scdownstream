@@ -25,8 +25,9 @@ include { SCANPY_PCA                           } from '../modules/local/scanpy/p
 include { SCANPY_NEIGHBORS                     } from '../modules/local/scanpy/neighbors'
 include { SCANPY_UMAP                          } from '../modules/local/scanpy/umap'
 include { SCANPY_LOG_NORMALIZE                 } from '../modules/local/scanpy/normalization'
-include {SCANPY_LEIDEN                         } from '../modules/local/scanpy/leiden'
-include {SCANPY_RANKGENESGROUPS                } from '../modules/local/scanpy/rankgenesgroups'
+include { SCANPY_LEIDEN                        } from '../modules/local/scanpy/leiden'
+include { SCANPY_RANKGENESGROUPS               } from '../modules/local/scanpy/rankgenesgroups'
+include { ADATA_ADD_OBS_OBSM                   } from '../modules/local/adata/add_obs_obsm'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -132,28 +133,34 @@ workflow SCDOWNSTREAM {
         ch_finalization_base = ch_base
         ch_label_grouping = ch_base
         grouping_col = params.base_label_col
+        ch_h5ad = ch_integrations
     }
-
 
     //
     // Compute embeddings
     //
     if (!params.qc_only) {
 
-        //ch_h5ad = ch_finalization_base
+        //ch_h5ad = ch_integrations
         SCANPY_LOG_NORMALIZE(ch_h5ad)
         ch_h5ad = SCANPY_LOG_NORMALIZE.out.h5ad
-        SCANPY_HVGS(ch_h5ad, 3000 )
+        SCANPY_HVGS(ch_h5ad, params.n_hvgs, false)
         ch_h5ad = SCANPY_HVGS.out.h5ad
         SCANPY_PCA(ch_h5ad, 'X_pca' )
         ch_h5ad = SCANPY_PCA.out.h5ad
-        SCANPY_NEIGHBORS(ch_h5ad, 'X_pca' )
+        SCANPY_NEIGHBORS(ch_h5ad, 'X_pca', 'neighbors_pca' )
         ch_h5ad = SCANPY_NEIGHBORS.out.h5ad
-        SCANPY_UMAP(ch_h5ad)
+        SCANPY_UMAP(ch_h5ad, 'neighbors_pca', 'X_umap')
         ch_h5ad = SCANPY_UMAP.out.h5ad
-        
-        ch_finalization_base = ch_h5ad
+        // add tSNE
     }
+
+    // combine with integration obs, embedding
+    if (!params.qc_only) {
+        ADATA_ADD_OBS_OBSM(ch_h5ad.join(ch_integrations) )
+        ch_h5ad = ADATA_ADD_OBS_OBSM.out.h5ad
+    }
+
 
     //
     // Perform clustering
@@ -165,9 +172,11 @@ workflow SCDOWNSTREAM {
         SCANPY_LEIDEN(ch_h5ad, 1, "leiden", false)
         ch_h5ad = SCANPY_LEIDEN.out.h5ad
         SCANPY_RANKGENESGROUPS(ch_h5ad)
-
-        ch_finalization_base = ch_h5ad
+        ch_h5ad = SCANPY_RANKGENESGROUPS.out.h5ad
     }
+
+
+
 
     //
     // Perform clustering and per-cluster analysis

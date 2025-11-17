@@ -9,6 +9,9 @@ process SCANPY_UMAP {
 
     input:
     tuple val(meta), path(h5ad, arity: 1)
+    val(neighbors_key)
+    val(key_added)
+
 
     output:
     tuple val(meta), path("${prefix}.h5ad"), emit: h5ad

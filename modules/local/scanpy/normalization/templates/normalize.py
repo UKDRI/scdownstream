@@ -16,8 +16,11 @@ sc.settings.n_jobs = int("${task.cpus}")
 adata = sc.read_h5ad("${h5ad}")
 prefix = "${prefix}"
 
-# Saving count data
-adata.layers["counts"] = adata.X.copy()
+# Saving count data in layer or restoring it to avoid double normalization
+if 'counts' not in adata.layers:
+    adata.layers["counts"] = adata.X.copy()
+else:
+    adata.X = adata.layers["counts"].copy()
 
 # Normalizing to median total counts
 sc.pp.normalize_total(adata)

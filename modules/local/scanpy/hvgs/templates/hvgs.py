@@ -17,6 +17,8 @@ adata = sc.read_h5ad("${h5ad}")
 prefix = "${prefix}"
 n_hvgs = int("${n_hvgs}")
 batch_key = "${batch_key}"
+subset_to_hvgs = "${subset_to_hvgs}" == "true"
+
 
 if adata.n_vars > n_hvgs and n_hvgs >= 0:
     kwargs = {}
@@ -29,15 +31,12 @@ if adata.n_vars > n_hvgs and n_hvgs >= 0:
     if n_hvgs > 0:
         kwargs["n_top_genes"] = n_hvgs
 
-    raw_counts = adata.X.copy()
-
-    sc.pp.log1p(adata)
     sc.pp.highly_variable_genes(adata, **kwargs)
 
     adata.var[["highly_variable"]].to_pickle(f"{prefix}.pkl")
-
-    adata.X = raw_counts
-    adata = adata[:, adata.var["highly_variable"]]
+    
+    if subset_to_hvgs:
+        adata = adata[:, adata.var["highly_variable"]]
 
 adata.write_h5ad(f"{prefix}.h5ad")
 

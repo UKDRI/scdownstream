@@ -77,7 +77,7 @@
                 }
             }
         },
-        "quality_conrol_options": {
+        "quality_control_options": {
             "title": "Quality control options",
             "type": "object",
             "fa_icon": "fas fa-check-circle",
@@ -117,6 +117,12 @@
                     "type": "integer",
                     "default": 150,
                     "description": "Number of epochs to train the CellBender model"
+                },
+                "automatic_cell_filtering":{
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Perform automatic filtering of cells based.",
+                    "help_text": "automatic_cell_filtering must be a boolean."
                 }
             }
         },
@@ -135,7 +141,7 @@
                 },
                 "integration_hvgs": {
                     "type": "integer",
-                    "default": 0,
+                    "default": 5000,
                     "description": "Number of highly variable genes to use for integration. If set to 0, the number of highly variable genes will be automatically determined. If set to a negative number, all genes will be used.",
                     "help_text": "If a reference model is provided, this does not have any effect. This is because the reference model defines the set of genes that will be used for integration."
                 },
@@ -161,6 +167,18 @@
                     "description": "Path to a pre-trained scimilarity model, only relevant if scimilarity is selected in `integration_methods`. If provided, the model will be used for integration. Otherwise, a new model will be trained.",
                     "help_text": "The file can be a .tar.gz file or the corresponding unzipped directory. The official models are shared via [Zenodo](https://zenodo.org/record/10685499).",
                     "exists": true
+                }
+            }
+        },
+        "processing_options": {
+            "title": "Processing options",
+            "type": "object",
+            "properties": {
+                    "n_hvgs": {
+                    "type": "integer",
+                    "default": 3000,
+                    "description": "Number of highly variable genes to use for data processing. If set to 0, the number of highly variable genes will be automatically determined. If set to a negative number, all genes will be used.",
+                    "help_text": "This is the number of HVGs for single sample processing and after data integration."
                 }
             }
         },
@@ -511,10 +529,13 @@
             "$ref": "#/$defs/unify_options"
         },
         {
-            "$ref": "#/$defs/quality_conrol_options"
+            "$ref": "#/$defs/quality_control_options"
         },
         {
             "$ref": "#/$defs/integration_options"
+        },
+        {
+            "$ref": "#/$defs/processing_options"
         },
         {
             "$ref": "#/$defs/extension_options"

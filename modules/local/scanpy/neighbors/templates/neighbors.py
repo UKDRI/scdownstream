@@ -35,7 +35,8 @@ adata = sc.read_h5ad("${h5ad}", backed='r')
 prefix = "${prefix}"
 
 kwargs = {
-    "use_rep": "${rep}"
+    "use_rep": "${rep}",
+    "key_added": "${key_added}"
 }
 
 sc.pp.neighbors(adata, **kwargs)

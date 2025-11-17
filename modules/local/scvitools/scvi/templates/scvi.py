@@ -25,10 +25,14 @@ adata = ad.read_h5ad("${h5ad}")
 reference_model_path = "reference_model"
 reference_model_type = "${meta2.id}"
 
+# raw counts should be stored in 'counts' layer if not copy X
+if 'counts' not in adata.layers:
+    adata.layers["counts"] = adata.X.copy()
+
 if reference_model_type == "scanvi":
     raise ValueError("scVI does not support scANVI models.")
 elif reference_model_type == "scvi":
-    SCVI.prepare_query_anndata(adata, reference_model_path)
+    SCVI.prepare_query_anndata(adata, reference_model_path, )
     model = SCVI.load_query_data(adata, reference_model_path)
 else:
     categorical_covariates = "${categorical_covariates}"
@@ -46,6 +50,7 @@ else:
         batch_key="${batch_col}",
         categorical_covariate_keys=categorical_covariates,
         continuous_covariate_keys=continuous_covariates,
+        layer='counts'
     )
 
     model = SCVI(
@@ -67,6 +72,8 @@ model.train(
 
 # Round to ensure hashes are stable
 adata.obsm["X_emb"] = model.get_latent_representation()
+adata.obsm["X_scvi"] = model.get_latent_representation()
+
 
 del adata.uns["_scvi_manager_uuid"]
 del adata.uns["_scvi_uuid"]
