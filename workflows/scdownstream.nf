@@ -27,6 +27,7 @@ include { SCANPY_UMAP                          } from '../modules/local/scanpy/u
 include { SCANPY_LOG_NORMALIZE                 } from '../modules/local/scanpy/normalization'
 include { SCANPY_LEIDEN                        } from '../modules/local/scanpy/leiden'
 include { SCANPY_RANKGENESGROUPS               } from '../modules/local/scanpy/rankgenesgroups'
+include { SCANPY_ENRICH                        } from '../modules/local/scanpy/enrich'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -152,6 +153,8 @@ workflow SCDOWNSTREAM {
         ch_h5ad = SCANPY_LEIDEN.out.h5ad
         SCANPY_RANKGENESGROUPS(ch_h5ad, "leiden")
         ch_h5ad = SCANPY_RANKGENESGROUPS.out.h5ad
+        SCANPY_ENRICH(ch_h5ad, "rank_genes_groups", "hsapiens")
+        ch_h5ad = SCANPY_ENRICH.out.h5ad
     }
 
     //
