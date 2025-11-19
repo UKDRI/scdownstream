@@ -11,6 +11,7 @@ process SCANPY_LEIDEN {
     tuple val(meta), path(h5ad, arity: 1)
     val(resolution)
     val(key_added)
+    val(neighbors_key)
     val(plot_umap)
 
     output:

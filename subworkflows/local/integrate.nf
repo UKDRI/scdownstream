@@ -10,6 +10,7 @@ include { SCANPY_COMBAT        } from '../../modules/local/scanpy/combat'
 include { SEURAT_INTEGRATION   } from '../../modules/local/seurat/integration'
 include { ADATA_READRDS        } from '../../modules/local/adata/readrds'
 include { SCIMILARITY          } from './scimilarity'
+include { ADATA_ADD_OBS_OBSM   } from '../../modules/local/adata/add_obs_obsm'
 
 workflow INTEGRATE {
     take:
@@ -29,6 +30,7 @@ workflow INTEGRATE {
     ch_var = Channel.empty()
     ch_obsm = Channel.empty()
     ch_integrations = Channel.empty()
+    ch_h5ad_out = Channel.empty()
 
     // If a reference model is provided, only the genes in the reference model are used
     // Otherwise, we would intersect the HVGs, which is not what we want
@@ -71,6 +73,12 @@ workflow INTEGRATE {
         ch_versions = ch_versions.mix(SCVITOOLS_SCVI.out.versions)
         ch_integrations = ch_integrations.mix(SCVITOOLS_SCVI.out.h5ad)
         ch_obsm = ch_obsm.mix(SCVITOOLS_SCVI.out.obsm)
+ 
+        // add embedding and obs to input h5ad channel
+        ADATA_ADD_OBS_OBSM(ch_h5ad.map{ _meta1, h5ad1 ->[ [id:'integrated_scvi'], h5ad1] }.join(
+                SCVITOOLS_SCVI.out.h5ad.map{ _meta2, h5ad2 -> [ [id:'integrated_scvi'], h5ad2]})
+                )
+        ch_h5ad_out = ADATA_ADD_OBS_OBSM.out.h5ad
     }
 
     if (methods.contains('scanvi')) {
@@ -125,6 +133,7 @@ workflow INTEGRATE {
 
     emit:
     integrations = ch_integrations // channel: [ integration, h5ad ]
+    h5ad         = ch_h5ad_out // base channel updated
     obs          = ch_obs // channel: [ pkl ]
     var          = ch_var // channel: [ pkl ]
     obsm         = ch_obsm // channel: [ pkl ]

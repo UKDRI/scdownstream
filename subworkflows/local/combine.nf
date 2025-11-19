@@ -37,6 +37,7 @@ workflow COMBINE {
     )
     ch_versions      = ch_versions.mix(INTEGRATE.out.versions)
     ch_var           = ch_var.mix(INTEGRATE.out.var)
+    ch_h5ad_out      = INTEGRATE.out.h5ad
 
     if (params.base_adata) {
         ADATA_MERGEEMBEDDINGS(
@@ -44,8 +45,7 @@ workflow COMBINE {
             .combine(
                 ch_base.map{ _meta, base -> base }
             ).combine(
-                //ADATA_MERGE.out.inner.map{ _meta, inner -> inner }
-                ADATA_MERGE.out.outer.map{ _meta, outer -> outer }
+                ADATA_MERGE.out.inner.map{ _meta, inner -> inner }
             )
         )
         ch_versions      = ch_versions.mix(ADATA_MERGEEMBEDDINGS.out.versions)
@@ -62,7 +62,8 @@ workflow COMBINE {
         .map{meta, file -> [meta + [integration: meta.id], file]}
 
     emit:
-    h5ad             = ch_outer         // channel: [ merged, h5ad ]
+    //h5ad             = ch_outer         // channel: [ merged, h5ad ]
+    h5ad             = ch_h5ad_out      // channel: [merged, h5ad]
     h5ad_inner       = ch_inner         // channel: [ merged, h5ad ]
     integrations     = ch_integrations  // channel: [ integration, h5ad ]
     var              = ch_var           // channel: [ pkl ]

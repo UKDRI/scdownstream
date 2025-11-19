@@ -27,7 +27,6 @@ include { SCANPY_UMAP                          } from '../modules/local/scanpy/u
 include { SCANPY_LOG_NORMALIZE                 } from '../modules/local/scanpy/normalization'
 include { SCANPY_LEIDEN                        } from '../modules/local/scanpy/leiden'
 include { SCANPY_RANKGENESGROUPS               } from '../modules/local/scanpy/rankgenesgroups'
-include { ADATA_ADD_OBS_OBSM                   } from '../modules/local/adata/add_obs_obsm'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -51,89 +50,77 @@ workflow SCDOWNSTREAM {
     ch_uns = Channel.empty()
     ch_layers = Channel.empty()
     ch_multiqc_files = Channel.empty()
+    ch_h5ad = Channel.empty()
+    ch_combined = Channel.empty()
 
-    if (params.input) {
-        ch_obs_per_sample = Channel.empty()
-        ch_var_per_sample = Channel.empty()
-        ch_obsm_per_sample = Channel.empty()
-        ch_obsp_per_sample = Channel.empty()
-        ch_uns_per_sample = Channel.empty()
-        ch_layers_per_sample = Channel.empty()
 
-        //
-        // Load/Convert input to h5ad
-        //
-        LOAD_H5AD(ch_samplesheet)
-        ch_h5ad = LOAD_H5AD.out.h5ad
-        ch_versions = ch_versions.mix(LOAD_H5AD.out.versions)
+    ch_obs_per_sample = Channel.empty()
+    ch_var_per_sample = Channel.empty()
+    ch_obsm_per_sample = Channel.empty()
+    ch_obsp_per_sample = Channel.empty()
+    ch_uns_per_sample = Channel.empty()
+    ch_layers_per_sample = Channel.empty()
 
-        //
-        // Quality control per sample
-        //
-        QUALITY_CONTROL(
-            ch_h5ad,
-            params.ambient_correction,
-            !params.doublet_detection || params.doublet_detection == 'none' ? [] : params.doublet_detection.split(',').collect { it -> it.trim().toLowerCase() },
-            params.doublet_detection_threshold,
-            params.mito_genes,
-        )
-        ch_versions = ch_versions.mix(QUALITY_CONTROL.out.versions)
-        ch_multiqc_files = ch_multiqc_files.mix(QUALITY_CONTROL.out.multiqc_files)
-        ch_h5ad = QUALITY_CONTROL.out.h5ad
+    //
+    // Load/Convert input to h5ad
+    //
+    LOAD_H5AD(ch_samplesheet)
+    ch_h5ad = LOAD_H5AD.out.h5ad
+    ch_versions = ch_versions.mix(LOAD_H5AD.out.versions)
 
-        //
-        // Perform automated celltype assignment
-        //
-        CELLTYPE_ASSIGNMENT(ch_h5ad.map { meta, h5ad -> [meta, h5ad, meta.symbol_col] })
-        ch_versions = ch_versions.mix(CELLTYPE_ASSIGNMENT.out.versions)
-        ch_obs_per_sample = ch_obs_per_sample.mix(CELLTYPE_ASSIGNMENT.out.obs)
+    //
+    // Quality control per sample
+    //
+    QUALITY_CONTROL(
+        ch_h5ad,
+        params.ambient_correction,
+        !params.doublet_detection || params.doublet_detection == 'none' ? [] : params.doublet_detection.split(',').collect { it -> it.trim().toLowerCase() },
+        params.doublet_detection_threshold,
+        params.mito_genes,
+    )
+    ch_versions = ch_versions.mix(QUALITY_CONTROL.out.versions)
+    ch_multiqc_files = ch_multiqc_files.mix(QUALITY_CONTROL.out.multiqc_files)
+    ch_h5ad = QUALITY_CONTROL.out.h5ad
 
-        FINALIZE_QC_ANNDATAS(
-            ch_h5ad.join(ch_obs_per_sample.groupTuple(), remainder: true).join(ch_var_per_sample.groupTuple(), remainder: true).join(ch_obsm_per_sample.groupTuple(), remainder: true).join(ch_obsp_per_sample.groupTuple(), remainder: true).join(ch_uns_per_sample.groupTuple(), remainder: true).join(ch_layers_per_sample.groupTuple(), remainder: true).map { meta, h5ad, obs, var, obsm, obsp, uns, layers ->
-                [meta, h5ad, obs ?: [], var ?: [], obsm ?: [], obsp ?: [], uns ?: [], layers ?: []]
-            }
-        )
-        ch_h5ad = FINALIZE_QC_ANNDATAS.out.h5ad
-        ch_versions = ch_versions.mix(FINALIZE_QC_ANNDATAS.out.versions)
+    //
+    // Perform automated celltype assignment
+    //
+    CELLTYPE_ASSIGNMENT(ch_h5ad.map { meta, h5ad -> [meta, h5ad, meta.symbol_col] })
+    ch_versions = ch_versions.mix(CELLTYPE_ASSIGNMENT.out.versions)
+    ch_obs_per_sample = ch_obs_per_sample.mix(CELLTYPE_ASSIGNMENT.out.obs)
 
-        if (!params.qc_only) {
-            //
-            // Unify samples to make them compatible for integration
-            //
-            UNIFY(ch_h5ad)
-            ch_versions = ch_versions.mix(UNIFY.out.versions)
-            ch_multiqc_files = ch_multiqc_files.mix(UNIFY.out.multiqc_files)
-            ch_h5ad = UNIFY.out.h5ad
-
-            //
-            // Combine samples and perform integration
-            //
-            COMBINE(ch_h5ad, ch_base)
-            ch_versions = ch_versions.mix(COMBINE.out.versions)
-            ch_obs = ch_obs.mix(COMBINE.out.obs)
-            ch_var = ch_var.mix(COMBINE.out.var)
-            ch_obsm = ch_obsm.mix(COMBINE.out.obsm)
-            ch_integrations = ch_integrations.mix(COMBINE.out.integrations)
-            //ch_finalization_base = COMBINE.out.h5ad
-            ch_h5ad = COMBINE.out.h5ad
-
-            ch_label_grouping = COMBINE.out.h5ad_inner
-            grouping_col = "label"
+    FINALIZE_QC_ANNDATAS(
+        ch_h5ad.join(ch_obs_per_sample.groupTuple(), remainder: true).join(ch_var_per_sample.groupTuple(), remainder: true).join(ch_obsm_per_sample.groupTuple(), remainder: true).join(ch_obsp_per_sample.groupTuple(), remainder: true).join(ch_uns_per_sample.groupTuple(), remainder: true).join(ch_layers_per_sample.groupTuple(), remainder: true).map { meta, h5ad, obs, var, obsm, obsp, uns, layers ->
+            [meta, h5ad, obs ?: [], var ?: [], obsm ?: [], obsp ?: [], uns ?: [], layers ?: []]
         }
-    }
-    else {
-        ch_embeddings = Channel.value(params.base_embeddings.split(',').collect { it -> it.trim() })
+    )
+    ch_h5ad = FINALIZE_QC_ANNDATAS.out.h5ad
+    ch_versions = ch_versions.mix(FINALIZE_QC_ANNDATAS.out.versions)
 
-        ADATA_SPLITEMBEDDINGS(ch_base, ch_embeddings)
-        ch_versions = ch_versions.mix(ADATA_SPLITEMBEDDINGS.out.versions)
-        ch_integrations = ch_integrations.mix(
-            ADATA_SPLITEMBEDDINGS.out.h5ad.map { _meta, h5ads -> h5ads }.flatten().map { h5ad -> [[id: h5ad.simpleName, integration: h5ad.simpleName], h5ad] }
-        )
+    if (!params.qc_only) {
+        //
+        // Unify samples to make them compatible for integration
+        //
+        UNIFY(ch_h5ad)
+        ch_versions = ch_versions.mix(UNIFY.out.versions)
+        ch_multiqc_files = ch_multiqc_files.mix(UNIFY.out.multiqc_files)
+        ch_h5ad = UNIFY.out.h5ad
 
-        ch_finalization_base = ch_base
-        ch_label_grouping = ch_base
-        grouping_col = params.base_label_col
-        ch_h5ad = ch_integrations
+        //
+        // Combine samples and perform integration
+        //
+        COMBINE(ch_h5ad, ch_base)
+        ch_versions = ch_versions.mix(COMBINE.out.versions)
+        ch_obs = ch_obs.mix(COMBINE.out.obs)
+        ch_var = ch_var.mix(COMBINE.out.var)
+        ch_obsm = ch_obsm.mix(COMBINE.out.obsm)
+        ch_integrations = ch_integrations.mix(COMBINE.out.integrations)
+        //ch_finalization_base = COMBINE.out.h5ad
+        ch_combined = COMBINE.out.h5ad
+        ch_combined.view()
+
+        ch_label_grouping = COMBINE.out.h5ad_inner
+        grouping_col = "label"
     }
 
     //
@@ -141,7 +128,7 @@ workflow SCDOWNSTREAM {
     //
     if (!params.qc_only) {
 
-        //ch_h5ad = ch_integrations
+        ch_h5ad = ch_combined
         SCANPY_LOG_NORMALIZE(ch_h5ad)
         ch_h5ad = SCANPY_LOG_NORMALIZE.out.h5ad
         SCANPY_HVGS(ch_h5ad, params.n_hvgs, false)
@@ -152,13 +139,7 @@ workflow SCDOWNSTREAM {
         ch_h5ad = SCANPY_NEIGHBORS.out.h5ad
         SCANPY_UMAP(ch_h5ad, 'neighbors_pca', 'X_umap')
         ch_h5ad = SCANPY_UMAP.out.h5ad
-        // add tSNE
-    }
 
-    // combine with integration obs, embedding
-    if (!params.qc_only) {
-        ADATA_ADD_OBS_OBSM(ch_h5ad.join(ch_integrations) )
-        ch_h5ad = ADATA_ADD_OBS_OBSM.out.h5ad
     }
 
 
@@ -166,17 +147,12 @@ workflow SCDOWNSTREAM {
     // Perform clustering
     //
     if (!params.qc_only) {
-        //ch_h5ad = ch_finalization_base
-        
         // write multi clustering leiden worflow --> just combine h5ad obs instead of current implementation
-        SCANPY_LEIDEN(ch_h5ad, 1, "leiden", false)
+        SCANPY_LEIDEN(ch_h5ad, 1, "leiden", 'neighbors_pca', false)
         ch_h5ad = SCANPY_LEIDEN.out.h5ad
-        SCANPY_RANKGENESGROUPS(ch_h5ad)
+        SCANPY_RANKGENESGROUPS(ch_h5ad, "leiden")
         ch_h5ad = SCANPY_RANKGENESGROUPS.out.h5ad
     }
-
-
-
 
     //
     // Perform clustering and per-cluster analysis

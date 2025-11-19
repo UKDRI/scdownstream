@@ -24,10 +24,10 @@ sc.tl.umap(adata, random_state=0, key_added=key_added, neighbors_key=neighbors_k
 
 # Round to 10 decimal places
 # This ensures hashes are stable
-adata.obsm["X_umap"] = np.round(adata.obsm["X_umap"], 10)
+adata.obsm[key_added] = np.round(adata.obsm[key_added], 10)
 
 adata.write_h5ad(f"{prefix}.h5ad")
-df = pd.DataFrame(adata.obsm["X_umap"], index=adata.obs_names)
+df = pd.DataFrame(adata.obsm[key_added], index=adata.obs_names)
 df.to_pickle(f"X_{prefix}.pkl")
 
 # Versions

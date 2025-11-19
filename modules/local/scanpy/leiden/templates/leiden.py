@@ -37,11 +37,14 @@ def format_yaml_like(data: dict, indent: int = 0) -> str:
 
 adata = sc.read_h5ad("${h5ad}", backed='r')
 prefix = "${prefix}"
+resolution = float("${resolution}")
 key_added = "${key_added}"
+neighbors_key = "${neighbors_key}"
 
 kwargs = {
-    "resolution": float("${resolution}"),
-    "key_added": key_added
+    "resolution": resolution,
+    "key_added": key_added,
+    "neighbors_key": neighbors_key
 }
 
 sc.tl.leiden(adata, **kwargs)
