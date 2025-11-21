@@ -28,6 +28,8 @@ include { SCANPY_LOG_NORMALIZE                 } from '../modules/local/scanpy/n
 include { SCANPY_LEIDEN                        } from '../modules/local/scanpy/leiden'
 include { SCANPY_RANKGENESGROUPS               } from '../modules/local/scanpy/rankgenesgroups'
 include { SCANPY_ENRICH                        } from '../modules/local/scanpy/enrich'
+include { SCANPY_GENERATE_REPORT               } from '../modules/local/scanpy/report'
+include { SCANPY_REPORT_TO_HTML                } from '../modules/local/scanpy/report'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -149,12 +151,20 @@ workflow SCDOWNSTREAM {
     //
     if (!params.qc_only) {
         // write multi clustering leiden worflow --> just combine h5ad obs instead of current implementation
-        SCANPY_LEIDEN(ch_h5ad, 1, "leiden", 'neighbors_pca', false)
+        SCANPY_LEIDEN(ch_h5ad, params.clustering_resolution, "leiden", 'neighbors_pca', false)
         ch_h5ad = SCANPY_LEIDEN.out.h5ad
         SCANPY_RANKGENESGROUPS(ch_h5ad, "leiden")
         ch_h5ad = SCANPY_RANKGENESGROUPS.out.h5ad
-        SCANPY_ENRICH(ch_h5ad, "rank_genes_groups", "hsapiens")
+        SCANPY_ENRICH(ch_h5ad, "rank_genes_groups", params.species)
         ch_h5ad = SCANPY_ENRICH.out.h5ad
+    }
+
+    //
+    // Summary report
+    //
+    if (!params.qc_only) {
+        SCANPY_GENERATE_REPORT(ch_h5ad, "${projectDir}/modules/local/scanpy/report/templates/scdownstream_report.ipynb")
+        SCANPY_REPORT_TO_HTML(SCANPY_GENERATE_REPORT.out.ipynp)
     }
 
     //
