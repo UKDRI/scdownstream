@@ -11,6 +11,8 @@ include { SEURAT_INTEGRATION   } from '../../modules/local/seurat/integration'
 include { ADATA_READRDS        } from '../../modules/local/adata/readrds'
 include { SCIMILARITY          } from './scimilarity'
 include { ADATA_ADD_OBS_OBSM   } from '../../modules/local/adata/add_obs_obsm'
+include { SCANPY_NEIGHBORS     } from '../../modules/local/scanpy/neighbors'
+include { SCANPY_UMAP          } from '../../modules/local/scanpy/umap'
 
 workflow INTEGRATE {
     take:
@@ -79,6 +81,12 @@ workflow INTEGRATE {
                 SCVITOOLS_SCVI.out.h5ad.map{ _meta2, h5ad2 -> [ [id:'integrated_scvi'], h5ad2]})
                 )
         ch_h5ad_out = ADATA_ADD_OBS_OBSM.out.h5ad
+
+        // compute UMAP
+        SCANPY_NEIGHBORS(ch_h5ad_out, 'X_scvi', 'neighbors_scvi' )
+        ch_h5ad_out = SCANPY_NEIGHBORS.out.h5ad
+        SCANPY_UMAP(ch_h5ad_out, 'neighbors_scvi', 'X_umap_scvi')
+        ch_h5ad_out = SCANPY_UMAP.out.h5ad
     }
 
     if (methods.contains('scanvi')) {

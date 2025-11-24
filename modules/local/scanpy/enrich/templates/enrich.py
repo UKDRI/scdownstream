@@ -9,6 +9,7 @@ os.environ["NUMBA_CACHE_DIR"] = "./tmp/numba"
 os.environ["MPLCONFIGDIR"] = "./tmp/matplotlib"
 
 import scanpy as sc
+import pandas as pd
 import yaml
 
 from threadpoolctl import threadpool_limits
@@ -21,12 +22,14 @@ prefix = "${prefix}"
 species = "${species}"
 uns_key = "${uns_key}"
 
+min_in_group_fraction=float("${min_in_group_fraction}")
+min_fold_change=float("${min_fold_change}")
+max_out_group_fraction=float("${max_out_group_fraction}")
+
 # TODO: add to parameters/command-line
 uns_key_fil = uns_key + '_filtered'
 
-min_in_group_fraction=0.25
-min_fold_change=1
-max_out_group_fraction=0.5
+
 
 dict_species = {
     'human': 'hsapiens',
@@ -51,9 +54,15 @@ sc.tl.filter_rank_genes_groups(adata_temp, key=uns_key, key_added=uns_key_fil,
 dict_enrich = {}
 
 for grp in adata_temp.uns['rank_genes_groups']['names'].dtype.names:
-    dict_enrich[grp] = sc.queries.enrich(adata_temp, grp, key=uns_key_fil, org=species)
-    dict_enrich[grp]['significant'] = [str(val) for val in dict_enrich[grp]['significant']]
-    dict_enrich[grp]['parents'] = [",".join(golist) for golist in dict_enrich[grp]['parents']]
+    
+    try:
+        enrichment = sc.queries.enrich(adata_temp, grp, key=uns_key_fil, org=species)
+        enrichment['significant'] = [str(val) for val in enrichment['significant']]
+        enrichment['parents'] = [",".join(golist) for golist in enrichment['parents']]
+        dict_enrich[grp] = enrichment.copy()
+    except:
+        print(f"WARNING. 'enrich' query failed for '{grp}'.")
+        dict_enrich[grp]  = pd.DataFrame({ 'query': ['empty set'] })
 
 # store in uns
 adata.uns[uns_key]['enrich'] = dict_enrich.copy()

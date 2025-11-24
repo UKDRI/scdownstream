@@ -120,7 +120,6 @@ workflow SCDOWNSTREAM {
         ch_integrations = ch_integrations.mix(COMBINE.out.integrations)
         //ch_finalization_base = COMBINE.out.h5ad
         ch_combined = COMBINE.out.h5ad
-        ch_combined.view()
 
         ch_label_grouping = COMBINE.out.h5ad_inner
         grouping_col = "label"
@@ -155,7 +154,7 @@ workflow SCDOWNSTREAM {
         ch_h5ad = SCANPY_LEIDEN.out.h5ad
         SCANPY_RANKGENESGROUPS(ch_h5ad, "leiden")
         ch_h5ad = SCANPY_RANKGENESGROUPS.out.h5ad
-        SCANPY_ENRICH(ch_h5ad, "rank_genes_groups", params.species)
+        SCANPY_ENRICH(ch_h5ad, "rank_genes_groups", params.species, params.enrich_min_in_group_fraction, params.enrich_min_fold_change, params.enrich_max_out_group_fraction)
         ch_h5ad = SCANPY_ENRICH.out.h5ad
     }
 

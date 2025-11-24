@@ -13,6 +13,13 @@ adata_add = ad.read_h5ad("${adata_add}")
 prefix = "${prefix}"
 
 
+# subset to overlapping cells
+shared_bcs = [bc for bc in adata.obs_names if bc in adata_add.obs_names ]
+
+adata = adata[shared_bcs].copy()
+adata_add = adata_add[shared_bcs].copy()
+
+
 for col in adata_add.obs:
     if col not in adata.obs:
         adata.obs[col] = adata_add.obs[col].copy()

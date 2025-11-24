@@ -9,6 +9,10 @@ process SCANPY_ENRICH {
     tuple val(meta), path(h5ad)
     val(uns_key)
     val(species)
+    val(min_in_group_fraction)
+    val(min_fold_change)
+    val(max_out_group_fraction)
+
 
     output:
     tuple val(meta), path("*.h5ad"), emit: h5ad
