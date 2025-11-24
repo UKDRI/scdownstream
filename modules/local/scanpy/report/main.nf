@@ -23,6 +23,9 @@ process SCANPY_GENERATE_REPORT {
     """
     export NUMBA_CACHE_DIR=./tmp/numba
     export MPLCONFIGDIR=./tmp/matplotlib
+    export XDG_CACHE_HOME=./tmp/matplotlib/cache
+
+    export HOME=`readlink -f .`
 
     papermill ${ipynb_template} \
             --report-mode \
