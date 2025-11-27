@@ -30,6 +30,7 @@ include { SCANPY_RANKGENESGROUPS               } from '../modules/local/scanpy/r
 include { SCANPY_ENRICH                        } from '../modules/local/scanpy/enrich'
 include { SCANPY_GENERATE_REPORT               } from '../modules/local/scanpy/report'
 include { SCANPY_REPORT_TO_HTML                } from '../modules/local/scanpy/report'
+include { LIANA_RANKAGGREGATE                  } from '../modules/local/liana/rankaggregate'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -135,7 +136,7 @@ workflow SCDOWNSTREAM {
         ch_h5ad = SCANPY_LOG_NORMALIZE.out.h5ad
         SCANPY_HVGS(ch_h5ad, params.n_hvgs, false)
         ch_h5ad = SCANPY_HVGS.out.h5ad
-        SCANPY_PCA(ch_h5ad, 'X_pca' )
+        SCANPY_PCA(ch_h5ad)
         ch_h5ad = SCANPY_PCA.out.h5ad
         SCANPY_NEIGHBORS(ch_h5ad, 'X_pca', 'neighbors_pca' )
         ch_h5ad = SCANPY_NEIGHBORS.out.h5ad
@@ -146,16 +147,17 @@ workflow SCDOWNSTREAM {
 
 
     //
-    // Perform clustering
+    // Perform clustering and related analysis
     //
     if (!params.qc_only) {
-        // write multi clustering leiden worflow --> just combine h5ad obs instead of current implementation
-        SCANPY_LEIDEN(ch_h5ad, params.clustering_resolution, "leiden", 'neighbors_pca', false)
+        SCANPY_LEIDEN(ch_h5ad, params.clustering_resolution, "leiden", params.cluster_neighbors, false)
         ch_h5ad = SCANPY_LEIDEN.out.h5ad
         SCANPY_RANKGENESGROUPS(ch_h5ad, "leiden")
         ch_h5ad = SCANPY_RANKGENESGROUPS.out.h5ad
         SCANPY_ENRICH(ch_h5ad, "rank_genes_groups", params.species, params.enrich_min_in_group_fraction, params.enrich_min_fold_change, params.enrich_max_out_group_fraction)
         ch_h5ad = SCANPY_ENRICH.out.h5ad
+        LIANA_RANKAGGREGATE(ch_h5ad)
+        ch_h5ad = LIANA_RANKAGGREGATE.out.h5ad
     }
 
     //

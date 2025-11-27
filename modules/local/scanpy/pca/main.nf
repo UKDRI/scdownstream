@@ -9,7 +9,6 @@ process SCANPY_PCA {
 
     input:
     tuple val(meta), path(h5ad)
-    val key_added
 
     output:
     tuple val(meta), path("${prefix}.h5ad"), emit: h5ad

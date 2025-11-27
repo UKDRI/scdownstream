@@ -17,13 +17,14 @@ sc.settings.n_jobs = int("${task.cpus}")
 
 adata = sc.read_h5ad("${h5ad}")
 prefix = "${prefix}"
-key_added = "${key_added}"
+
 
 # Run PCA
-sc.pp.pca(adata, random_state=0, key_added=key_added)
+sc.pp.pca(adata, random_state=0)
 
 # Round to 8 decimal places
 # This ensures hashes are stable
+key_added = 'X_pca'
 adata.obsm[key_added] = np.round(adata.obsm[key_added], 8)
 
 adata.write_h5ad(f"{prefix}.h5ad")
