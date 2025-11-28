@@ -156,7 +156,7 @@ workflow SCDOWNSTREAM {
         ch_h5ad = SCANPY_RANKGENESGROUPS.out.h5ad
         SCANPY_ENRICH(ch_h5ad, "rank_genes_groups", params.species, params.enrich_min_in_group_fraction, params.enrich_min_fold_change, params.enrich_max_out_group_fraction)
         ch_h5ad = SCANPY_ENRICH.out.h5ad
-        LIANA_RANKAGGREGATE(ch_h5ad)
+        LIANA_RANKAGGREGATE(ch_h5ad, params.species)
         ch_h5ad = LIANA_RANKAGGREGATE.out.h5ad
     }
 

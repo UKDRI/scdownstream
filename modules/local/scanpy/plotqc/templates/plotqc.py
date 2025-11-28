@@ -22,9 +22,9 @@ dpi_plots = 120
 
 
 # check for gene name, symbol etc.
-for name in ['gene_name', 'gene_symbol']:
+for name in ['gene_name', 'gene_names', 'gene_symbol', 'gene_symbols']:
     if name in adata.var:
-        adata.var.index = adata.var[name]
+        adata.var.index = [str(gene) for gene in adata.var[name]]
         break
 
 # make var names unique
