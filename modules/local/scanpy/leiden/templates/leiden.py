@@ -37,17 +37,38 @@ def format_yaml_like(data: dict, indent: int = 0) -> str:
 
 adata = sc.read_h5ad("${h5ad}", backed='r')
 prefix = "${prefix}"
-resolution = float("${resolution}")
+resolution = "${resolution}"
 key_added = "${key_added}"
 neighbors_key = "${neighbors_key}"
 
 kwargs = {
-    "resolution": resolution,
-    "key_added": key_added,
-    "neighbors_key": neighbors_key
-}
+            "resolution": 1.0,
+            "key_added": key_added,
+            "neighbors_key": neighbors_key,
+            "flavor": "igraph",
+            "n_iterations": 2
+        }
 
-sc.tl.leiden(adata, **kwargs)
+# check whether it contains multiple resolutions
+if ',' in resolution:
+    resolutions = [res for res in resolution.split(',')]
+
+    default_clustering = key_added + "_" + resolutions[0]
+
+    for res in resolutions:
+            
+            resolution = float(res)
+            kwargs["resolution"] = resolution
+            kwargs["key_added"] = key_added + "_" + res
+            
+            sc.tl.leiden(adata, **kwargs)
+
+    adata.obs[key_added] = adata.obs[default_clustering].copy()
+else:
+
+    kwargs["resolution"] = float(resolution)
+    
+    sc.tl.leiden(adata, **kwargs)
 
 adata.obs[[key_added]].to_pickle(f"{prefix}.pkl")
 adata.write_h5ad(f"{prefix}.h5ad")

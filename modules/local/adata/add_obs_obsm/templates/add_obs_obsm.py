@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 
 import platform
-import os
-
 import anndata as ad
 import pandas as pd
 import numpy as np
