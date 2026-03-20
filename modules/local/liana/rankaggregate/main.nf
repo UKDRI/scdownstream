@@ -10,6 +10,7 @@ process LIANA_RANKAGGREGATE {
     input:
     tuple val(meta), path(h5ad)
     val(species)
+    val(obs_key)
 
     output:
     tuple val(meta), path("*.h5ad"), emit: h5ad, optional: true
@@ -20,7 +21,6 @@ process LIANA_RANKAGGREGATE {
     task.ext.when == null || task.ext.when
 
     script:
-    obs_key = meta.obs_key ?: "leiden"
     prefix = task.ext.prefix ?: "${meta.id}"
     template 'rank_aggregate.py'
 }

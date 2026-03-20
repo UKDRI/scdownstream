@@ -8,6 +8,7 @@ process SCANPY_GENERATE_REPORT {
     input:
     tuple val(meta), path(h5ad)
     path(ipynb_template)
+    val(clustering_name)
     
     output:
     tuple val(meta), path("*.ipynb"), emit: ipynp
@@ -30,7 +31,8 @@ process SCANPY_GENERATE_REPORT {
     papermill ${ipynb_template} \
             --report-mode \
             ${prefix}.ipynb \
-            -p FILE ${h5ad}
+            -p FILE ${h5ad} \
+            -p CLUSTERING_NAME ${clustering_name}
     """
 }
 
@@ -46,7 +48,7 @@ process SCANPY_REPORT_TO_HTML {
     tuple val(meta), path(notebook)
     
     output:
-    tuple val(meta), path("*.html"), emit: h5ad
+    tuple val(meta), path("*.html"), emit: html
     //path "versions.yml", emit: versions
 
     when:

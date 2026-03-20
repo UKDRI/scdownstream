@@ -17,6 +17,7 @@
 
 include { SCDOWNSTREAM            } from './workflows/scdownstream'
 include { QC_CLUSTER              } from './workflows/qc_clustering'
+include { DOWNSTREAM_ANALYSIS     } from './workflows/downstream'
 include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_scdownstream_pipeline'
 include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_scdownstream_pipeline'
 /*
@@ -49,7 +50,7 @@ workflow NFCORE_SCDOWNSTREAM {
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    RUN QC and CLUSTRING WORKFLOW
+    RUN QC and CLUSTERING WORKFLOW
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 workflow qc_clustering {
@@ -89,6 +90,38 @@ workflow qc_clustering {
         params.hook_url,
         QC_CLUSTER.out.multiqc_report
     )
+}
+
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    RUN DOWNSTREAM WORKFLOW
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+workflow downstream {
+
+    main:
+    //
+    // SUBWORKFLOW: Run initialisation tasks
+    //
+    PIPELINE_INITIALISATION (
+        params.version,
+        params.validate_params,
+        params.monochrome_logs,
+        args,
+        params.outdir,
+        params.input
+    )
+
+    //
+    // WORKFLOW: Run main workflow
+    //
+    DOWNSTREAM_ANALYSIS (
+        PIPELINE_INITIALISATION.out.samplesheet,
+        params.base_adata
+            ? Channel.value([[id: "base"], file(params.base_adata, checkIfExists: true)])
+            : Channel.value([[], []])
+    )
+
 }
 
 /*
