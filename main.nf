@@ -74,7 +74,7 @@ workflow qc_clustering {
     QC_CLUSTER (
         PIPELINE_INITIALISATION.out.samplesheet,
         params.base_adata
-            ? Channel.value([[id: "base"], file(params.base_adata, checkIfExists: true)])
+            ? Channel.value([[id: params.name ? params.name : "qc_clustering" ], file(params.base_adata, checkIfExists: true)])
             : Channel.value([[], []])
     )
 
@@ -118,7 +118,7 @@ workflow downstream {
     DOWNSTREAM_ANALYSIS (
         PIPELINE_INITIALISATION.out.samplesheet,
         params.base_adata
-            ? Channel.value([[id: "base"], file(params.base_adata, checkIfExists: true)])
+            ? Channel.value([[id: params.name ? params.name : "downstream" ], file(params.base_adata, checkIfExists: true)])
             : Channel.value([[], []])
     )
 
