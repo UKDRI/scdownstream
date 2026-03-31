@@ -22,8 +22,9 @@ include { SCANPY_NEIGHBORS                     } from '../modules/local/scanpy/n
 include { SCANPY_UMAP                          } from '../modules/local/scanpy/umap'
 include { SCANPY_LOG_NORMALIZE                 } from '../modules/local/scanpy/normalization'
 include { SCANPY_LEIDEN                        } from '../modules/local/scanpy/leiden'
-include { SCANPY_GENERATE_REPORT               } from '../modules/local/scanpy/report'
+include { SCANPY_GENERATE_REPORT_QC            } from '../modules/local/scanpy/report'
 include { SCANPY_REPORT_TO_HTML                } from '../modules/local/scanpy/report'
+include { FINALIZE_H5AD                        } from '../subworkflows/local/finalize'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -114,7 +115,7 @@ workflow QC_CLUSTER {
         ch_obsm = ch_obsm.mix(COMBINE.out.obsm)
         ch_integrations = ch_integrations.mix(COMBINE.out.integrations)
         //ch_finalization_base = COMBINE.out.h5ad
-        ch_combined = COMBINE.out.h5ad
+        ch_h5ad = COMBINE.out.h5ad
 
         ch_label_grouping = COMBINE.out.h5ad_inner
         grouping_col = "label"
@@ -125,7 +126,6 @@ workflow QC_CLUSTER {
     //
     if (!params.qc_only) {
 
-        ch_h5ad = ch_combined
         SCANPY_LOG_NORMALIZE(ch_h5ad)
         ch_h5ad = SCANPY_LOG_NORMALIZE.out.h5ad
         SCANPY_HVGS(ch_h5ad, params.n_hvgs, false)
@@ -147,12 +147,15 @@ workflow QC_CLUSTER {
         ch_h5ad = SCANPY_LEIDEN.out.h5ad
     }
 
+    // create output final output files
+    FINALIZE_H5AD(ch_h5ad)
+
     //
     // Summary report
     //
     if (!params.qc_only) {
-        SCANPY_GENERATE_REPORT(ch_h5ad, "${projectDir}/modules/local/scanpy/report/templates/scdownstream_qc_clustering_report.ipynb")
-        SCANPY_REPORT_TO_HTML(SCANPY_GENERATE_REPORT.out.ipynp)
+        SCANPY_GENERATE_REPORT_QC(ch_h5ad, "${projectDir}/modules/local/scanpy/report/templates/scdownstream_qc_clustering_report.ipynb")
+        SCANPY_REPORT_TO_HTML(SCANPY_GENERATE_REPORT_QC.out.ipynp)
     }
 
     //
