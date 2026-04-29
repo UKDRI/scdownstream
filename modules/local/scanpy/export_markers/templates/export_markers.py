@@ -47,8 +47,8 @@ cluster_markers = {}
 
 for cluster in np.unique(adata.obs[obs_key]):
 
-    name_short = 'markers_cluster_' + cluster
-    name_long= 'Marker genes - ' + obs_key + ' - cluster ' + cluster
+    name_short = 'genes_cluster_' + cluster
+    name_long= 'Differential genes - ' + obs_key + ' - cluster ' + cluster
 
     df_markers = sc.get.rank_genes_groups_df(adata, cluster, key=uns_key)
     df_markers.sort_values('scores', ascending=False, inplace=True)
@@ -72,7 +72,8 @@ for cluster in np.unique(adata.obs[obs_key]):
 marker_sets = {
     'project_name': project_name,
     'sets': cluster_markers,
-    'params': params
+    'params': params,
+    'method_summary': 'scdownstream - Differential genes are detected by comparing the expression inside cells of the cluster against all other cells.'
 }
 
 # write output json

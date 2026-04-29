@@ -41,6 +41,29 @@ workflow FINALIZE {
 }
 
 
+workflow FINALIZE_H5AD_SIMPLE {
+    take:
+        ch_h5ad
+
+    main:
+    ch_versions = Channel.empty()
+
+    ADATA_TORDS(ch_h5ad)
+    ch_versions = ch_versions.mix(ADATA_TORDS.out.versions)
+
+    if (params.prep_cellxgene) {
+        ADATA_PREPCELLXGENE(ADATA_EXTEND.out.h5ad)
+        ch_versions = ch_versions.mix(ADATA_PREPCELLXGENE.out.versions)
+    }
+
+    ADATA_PUBLISH(ch_h5ad)
+
+    emit:
+    ch_h5ad
+    versions = ch_versions // channel: [ versions.yml ]
+}
+
+
 workflow FINALIZE_H5AD {
     take:
         ch_h5ad

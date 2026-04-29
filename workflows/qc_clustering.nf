@@ -24,7 +24,7 @@ include { SCANPY_LOG_NORMALIZE                 } from '../modules/local/scanpy/n
 include { SCANPY_LEIDEN                        } from '../modules/local/scanpy/leiden'
 include { SCANPY_GENERATE_REPORT_QC            } from '../modules/local/scanpy/report'
 include { SCANPY_REPORT_TO_HTML                } from '../modules/local/scanpy/report'
-include { FINALIZE_H5AD                        } from '../subworkflows/local/finalize'
+include { FINALIZE_H5AD_SIMPLE                 } from '../subworkflows/local/finalize'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -148,7 +148,7 @@ workflow QC_CLUSTER {
     }
 
     // create output final output files
-    FINALIZE_H5AD(ch_h5ad)
+    FINALIZE_H5AD_SIMPLE(ch_h5ad)
 
     //
     // Summary report
