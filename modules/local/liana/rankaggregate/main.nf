@@ -9,8 +9,9 @@ process LIANA_RANKAGGREGATE {
 
     input:
     tuple val(meta), path(h5ad)
-    val(species)
     val(obs_key)
+    val(species)
+    path(hcop_dir)
 
     output:
     tuple val(meta), path("*.h5ad"), emit: h5ad, optional: true

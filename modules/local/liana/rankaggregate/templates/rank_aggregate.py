@@ -36,9 +36,11 @@ def format_yaml_like(data: dict, indent: int = 0) -> str:
 
 
 adata = sc.read_h5ad("${h5ad}")
+hcop_dir = "${hcop_dir}"
 prefix = "${prefix}"
 obs_key = "${obs_key}"
 species = "${species}"
+min_evidence = 3
 
 dict_species = {
     'homo_sapiens': 'human',
@@ -55,13 +57,17 @@ species = dict_species[species] if species in dict_species.keys() else species
 resource = None
 if species != "human":
     try:
+        path_ortho = hcop_dir + "/human_" + species + "_hcop_fifteen_column.txt.gz"
+        source_colname = species + "_symbol"
+
         resource = li.rs.select_resource('consensus')
-        map_df = li.rs.get_hcop_orthologs(url=f'https://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_{species}_hcop_fifteen_column.txt.gz',
-                                   columns=['human_symbol', 'mouse_symbol'],
-                                   # NOTE: HCOP integrates multiple resource, so we can filter out mappings in at least 3 of them for confidence
-                                   min_evidence=3
-                                   )
-        map_df = map_df.rename(columns={'human_symbol':'source', 'mouse_symbol':'target'})
+
+        # code adpated from https://github.com/saezlab/liana-py/blob/main/src/liana/resource/_orthology.py
+        map_df = pd.read_csv(path_ortho, sep='\t', low_memory=False)
+        map_df['evidence'] = map_df['support'].apply(lambda x: len(x.split(',')))
+        map_df = map_df[map_df['evidence'] >= min_evidence]
+        map_df = map_df.rename(columns={'human_symbol':'source', source_colname:'target'})
+        map_df = map_df[['source', 'target']].copy()
 
         resource = li.rs.translate_resource(resource,
                                  map_df=map_df,
@@ -71,7 +77,7 @@ if species != "human":
                                  one_to_many=1
                                  )
     except:
-        print(f"WARNING. Failed to download or create HCOP orthlog mapping for {species}. Treating gene names as human gene names.")
+        print(f"WARNING. Failed to load or create HCOP orthlog mapping for {species}. Treating gene names as human gene names.")
         resource = None
 
 
