@@ -80,15 +80,26 @@ if species != "human":
         print(f"WARNING. Failed to load or create HCOP orthlog mapping for {species}. Treating gene names as human gene names.")
         resource = None
 
+# assign default resource if none
+if resource == None:
+    resource = resource = li.rs.select_resource('consensus')
 
-if adata.obs[obs_key].nunique() > 1:
+# get  all genes
+liana_genes = list(set(resource['ligand']).union(set(resource['receptor'])))
+shared_genes = [gene for gene in liana_genes if gene in adata.var_names]
+
+# subset anndata
+adata_liana =  adata[:, shared_genes].copy()
+
+if adata_liana.obs[obs_key].nunique() > 1:
     #if (adata.X < 0).nnz == 0:
     #    sc.pp.log1p(adata)
     try:
         li.mt.rank_aggregate(
-            adata, obs_key, use_raw=False, resource=resource, verbose=True, n_jobs=int("${task.cpus}")
+            adata_liana, obs_key, use_raw=False, resource=resource, verbose=True, n_jobs=int("${task.cpus}")
         )
-        df: pd.DataFrame = adata.uns["liana_res"]
+        adata.uns["liana_res"] =  adata_liana.uns["liana_res"].copy()
+        df: pd.DataFrame = adata_liana.uns["liana_res"]
 
         df.to_pickle(f"{prefix}.pkl")
         adata.write_h5ad(f"{prefix}.h5ad")
