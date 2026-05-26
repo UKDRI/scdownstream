@@ -227,6 +227,116 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Create a global UMAP and clustering (for each integration method)"
+                },
+                "cluster_neighbors": {
+                    "type": "string",
+                    "default": "neighbors_scvi",
+                    "description": "Specify uns key for storing neighborhood graph.",
+                    "help_text": "Any uns key for storing neighborhood graph can be used."
+                }
+            }
+        },
+        "downstream_options": {
+            "title": "Downstream options",
+            "type": "object",
+            "fa_icon": "fas fa-users",
+            "description": "Options for downstream analysis.",
+            "properties": {
+                "selected_clustering": {
+                    "type": "string",
+                    "default": "leiden",
+                    "description": "Specify clustering for downstream analysis",
+                    "help_text": "Select the clustering for downstream analysis. Any label in the obs table can be used."
+                },
+                "species": {
+                    "type": "string",
+                    "default": "mouse",
+                    "enum": ["human", "mouse"],
+                    "description": "Specify species for downstream analysis",
+                    "help_text": "Species for gene set enrichment and ligand-receptor interactions analysis."
+                }
+            }
+        },
+        "marker_genes_options": {
+            "title": "Marker genes options",
+            "type": "object",
+            "fa_icon": "fas fa-users",
+            "description": "Options for marker genes.",
+            "properties": {
+                "markers_uns_key": {
+                    "type": "string",
+                    "default": "rank_genes_groups",
+                    "description": "Specify uns key for storing marker genes",
+                    "help_text": "Any uns key for storing marker genes can be used."
+                },
+                "markers_thr_adj_pvalue": {
+                    "type": "number",
+                    "default": 0.05,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Adjusted P-value threshold for detecting marker genes."
+                },
+                "markers_pct_nz": {
+                    "type": "number",
+                    "default": 0.1,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Minimum fraction of cells expressing gene in group to consider it as marker gene."
+                },
+                "markers_min_logfc": {
+                    "type": "number",
+                    "default": 0,
+                    "minimum:": 0,
+                    "description": "Minimum log-fold change to consider gene as marker gene."
+                },
+                "markers_n_top": {
+                    "type": "integer",
+                    "default": 100,
+                    "minimum:": 1,
+                    "description": "Number of N top genes to pick as marker genes.",
+                    "help": "If more than N genes satisfy the marker gene thresholds the top N are saved in the marker gene json file."
+                }
+            }
+        },
+        "geneset_enrichment_options": {
+            "title": "Gene set enrichment options",
+            "type": "object",
+            "fa_icon": "fas fa-users",
+            "description": "Options for gene set enrichmnet analysis. Currently, the scanpy gProfiler wrapper is used.",
+            "properties": {
+                "enrich_max_out_group_fraction": {
+                    "type": "number",
+                    "default": 0.5,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Maximum fraction of cells outside of group expressing gene to consider it."
+                },
+                "enrich_min_in_group_fraction": {
+                    "type": "number",
+                    "default": 0.25,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Minimum fraction of cells in group expressing gene to consider it."
+                },
+                "enrich_min_fold_change": {
+                    "type": "number",
+                    "default": 1.0,
+                    "minimum": 0,
+                    "description": "Log-fold change threshold to consider gene."
+                }
+            }
+        },
+        "liana_options": {
+            "title": "LIANA+ options",
+            "type": "object",
+            "fa_icon": "fas fa-tools",
+            "description": "Options for LIANA+ ligand receptor analysis.",
+            "properties": {
+                "ortholog_hcop_directory": {
+                    "type": "string",
+                    "default": "/nfsdata/genome/hcop/",
+                    "description": "Specify direcory path to HCOP ortholog files.",
+                    "help_text": "Files are assumed to be gzipped and follow the HCOP file naming conventions."
                 }
             }
         },
@@ -560,6 +670,18 @@
         },
         {
             "$ref": "#/$defs/generic_options"
+        },
+        {
+            "$ref": "#/$defs/liana_options"
+        },
+        {
+            "$ref": "#/$defs/geneset_enrichment_options"
+        },
+        {
+            "$ref": "#/$defs/marker_genes_options"
+        },
+        {
+            "$ref": "#/$defs/downstream_options"
         }
     ]
 }

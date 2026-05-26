@@ -76,13 +76,13 @@ if species != "human":
                                  # Here, we will be harsher and only keep mappings that don't map to more than 1 mouse gene
                                  one_to_many=1
                                  )
-    except:
+    except(RuntimeWarning):
         print(f"WARNING. Failed to load or create HCOP orthlog mapping for {species}. Treating gene names as human gene names.")
         resource = None
 
 # assign default resource if none
-if resource == None:
-    resource = resource = li.rs.select_resource('consensus')
+if resource is None:
+    resource = li.rs.select_resource('consensus')
 
 # get  all genes
 liana_genes = list(set(resource['ligand']).union(set(resource['receptor'])))
