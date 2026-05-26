@@ -23,7 +23,8 @@ prefix = "${prefix}"
 
 kwargs = {
     "groupby": "${obs_key}",
-    "pts": True
+    "pts": True,
+    "method": "wilcoxon"
 }
 
 if adata.obs["${obs_key}"].value_counts().size > 1:

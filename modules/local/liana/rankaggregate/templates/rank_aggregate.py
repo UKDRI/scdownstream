@@ -36,9 +36,11 @@ def format_yaml_like(data: dict, indent: int = 0) -> str:
 
 
 adata = sc.read_h5ad("${h5ad}")
+hcop_dir = "${hcop_dir}"
 prefix = "${prefix}"
 obs_key = "${obs_key}"
 species = "${species}"
+min_evidence = 3
 
 dict_species = {
     'homo_sapiens': 'human',
@@ -55,13 +57,17 @@ species = dict_species[species] if species in dict_species.keys() else species
 resource = None
 if species != "human":
     try:
+        path_ortho = hcop_dir + "/human_" + species + "_hcop_fifteen_column.txt.gz"
+        source_colname = species + "_symbol"
+
         resource = li.rs.select_resource('consensus')
-        map_df = li.rs.get_hcop_orthologs(url=f'https://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_{species}_hcop_fifteen_column.txt.gz',
-                                   columns=['human_symbol', 'mouse_symbol'],
-                                   # NOTE: HCOP integrates multiple resource, so we can filter out mappings in at least 3 of them for confidence
-                                   min_evidence=3
-                                   )
-        map_df = map_df.rename(columns={'human_symbol':'source', 'mouse_symbol':'target'})
+
+        # code adpated from https://github.com/saezlab/liana-py/blob/main/src/liana/resource/_orthology.py
+        map_df = pd.read_csv(path_ortho, sep='\t', low_memory=False)
+        map_df['evidence'] = map_df['support'].apply(lambda x: len(x.split(',')))
+        map_df = map_df[map_df['evidence'] >= min_evidence]
+        map_df = map_df.rename(columns={'human_symbol':'source', source_colname:'target'})
+        map_df = map_df[['source', 'target']].copy()
 
         resource = li.rs.translate_resource(resource,
                                  map_df=map_df,
@@ -70,19 +76,30 @@ if species != "human":
                                  # Here, we will be harsher and only keep mappings that don't map to more than 1 mouse gene
                                  one_to_many=1
                                  )
-    except:
-        print(f"WARNING. Failed to download or create HCOP orthlog mapping for {species}. Treating gene names as human gene names.")
+    except(RuntimeWarning):
+        print(f"WARNING. Failed to load or create HCOP orthlog mapping for {species}. Treating gene names as human gene names.")
         resource = None
 
+# assign default resource if none
+if resource is None:
+    resource = li.rs.select_resource('consensus')
 
-if adata.obs[obs_key].nunique() > 1:
+# get  all genes
+liana_genes = list(set(resource['ligand']).union(set(resource['receptor'])))
+shared_genes = [gene for gene in liana_genes if gene in adata.var_names]
+
+# subset anndata
+adata_liana =  adata[:, shared_genes].copy()
+
+if adata_liana.obs[obs_key].nunique() > 1:
     #if (adata.X < 0).nnz == 0:
     #    sc.pp.log1p(adata)
     try:
         li.mt.rank_aggregate(
-            adata, obs_key, use_raw=False, resource=resource, verbose=True, n_jobs=int("${task.cpus}")
+            adata_liana, obs_key, use_raw=False, resource=resource, verbose=True, n_jobs=int("${task.cpus}")
         )
-        df: pd.DataFrame = adata.uns["liana_res"]
+        adata.uns["liana_res"] =  adata_liana.uns["liana_res"].copy()
+        df: pd.DataFrame = adata_liana.uns["liana_res"]
 
         df.to_pickle(f"{prefix}.pkl")
         adata.write_h5ad(f"{prefix}.h5ad")
