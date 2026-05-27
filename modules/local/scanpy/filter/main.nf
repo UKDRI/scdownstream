@@ -10,10 +10,12 @@ process SCANPY_FILTER {
     input:
     tuple val(meta), path(h5ad)
     val symbol_col
-    val min_genes
     val min_cells
+    val min_genes
+    val max_genes
+    val min_counts
+    val max_counts
     val min_counts_gene
-    val min_counts_cell
     val max_mito_percentage
     val automatic_cell_filtering
     path mito_genes

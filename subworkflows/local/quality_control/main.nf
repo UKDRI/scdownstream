@@ -86,14 +86,29 @@ workflow QUALITY_CONTROL {
     ch_filtering = ch_h5ad.multiMap { meta, h5ad ->
         h5ad: [meta, h5ad]
         symbol_col: meta.symbol_col ?: "index"
-        min_genes: meta.min_genes ?: 0
         min_cells: meta.min_cells ?: 0
+        min_genes: meta.min_genes ?: 0
+        max_genes: meta.max_genes ?: false
+        min_counts: meta.min_counts ?: 0
+        max_counts: meta.max_counts ?: false
         min_counts_gene: meta.min_counts_gene ?: 0
-        min_counts_cell: meta.min_counts_cell ?: 0
         max_mito_percentage: meta.max_mito_percentage ?: 100
-	automatic_cell_filtering: meta.automatic_cell_filtering
+	    automatic_cell_filtering: meta.automatic_cell_filtering
     }
-    SCANPY_FILTER(ch_filtering.h5ad, ch_filtering.symbol_col, ch_filtering.min_genes, ch_filtering.min_cells, ch_filtering.min_counts_gene, ch_filtering.min_counts_cell, ch_filtering.max_mito_percentage, ch_filtering.automatic_cell_filtering, mito_genes ?: []  )
+
+    SCANPY_FILTER(ch_filtering.h5ad, 
+        params.symbol_col ?: "index",
+        params.min_cells, 
+        params.min_genes, 
+        params.max_genes,
+        params.min_counts,
+        params.max_counts,
+        params.min_counts_gene,
+        params.max_mito_percentage,
+        params.automatic_cell_filtering,
+        mito_genes ?: []
+    )
+
     ch_h5ad = SCANPY_FILTER.out.h5ad
     ch_multiqc_files = ch_multiqc_files.mix(SCANPY_FILTER.out.multiqc_files)
     ch_versions = ch_versions.mix(SCANPY_FILTER.out.versions)

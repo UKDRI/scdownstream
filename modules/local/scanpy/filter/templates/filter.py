@@ -97,10 +97,16 @@ if automatic_filtering:
 else:
     max_pct_mt = int("${max_mito_percentage}")
     min_pct_mt = 0
-    min_counts = int("${min_counts_cell}")
-    max_counts = np.max(adata.obs['total_counts']) + 1
+    min_counts = int("${min_counts}")
+    if "${max_counts}" != "false":
+        max_counts = int("${max_counts}")
+    else:   
+        max_counts = np.max(adata.obs['total_counts']) + 1
     min_genes = int("${min_genes}")
-    max_genes = np.max(adata.obs['n_genes_by_counts']) + 1
+    if "${max_genes}" != "false":
+        max_genes = int("${max_genes}")
+    else:   
+        max_genes = np.max(adata.obs['n_genes_by_counts']) + 1
 
     adata = adata[adata.obs.pct_counts_mt < max_pct_mt, :].copy()
     sc.pp.filter_cells(adata, min_counts=min_counts)

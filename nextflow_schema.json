@@ -124,9 +124,63 @@
                 },
                 "automatic_cell_filtering":{
                     "type": "boolean",
-                    "default": true,
+                    "default": false,
                     "description": "Perform automatic filtering of cells based.",
                     "help_text": "automatic_cell_filtering must be a boolean."
+                },
+                "min_cells":{
+                    "type": "integer",
+                    "default": 5,
+                    "minimum": 0,
+                    "description": "Required minimum number of cells that express gene.",
+                    "help_text": "Genes that are expressed in less cells are removed."
+                },
+                "min_counts_gene":{
+                    "type": "integer",
+                    "default": 0,
+                    "minimum": 0,
+                    "description": "Required minimum number of counts for a gene.",
+                    "help_text": "Genes with less counts are removed."
+                },
+                "min_genes":{
+                    "type": "integer",
+                    "default": 200,
+                    "minimum": 0,
+                    "description": "Required minimum number of genes that are expressed in cell.",
+                    "help_text": "Cells with less expressed genes are removed."
+                },
+                "max_genes":{
+                    "type": ["integer", "boolean"],
+                    "default": false,
+                    "description": "Maximum number of genes that are expressed in cell.",
+                    "help_text": "Cells with more expressed genes are removed. Use 'false' to not filter by maximum number of genes."
+                },
+                "min_counts":{
+                    "type": "integer",
+                    "default": 0,
+                    "minimum": 0,
+                    "description": "Required minimum number of counts per cell.",
+                    "help_text": "Cells with less expressed counts are removed."
+                },
+                "max_counts":{
+                    "type": ["integer", "boolean"],
+                    "default": false,
+                    "description": "Maximum number of counts per cell.",
+                    "help_text": "Cells with more counts are removed. Use 'false' to not filter by maximum counts."
+                },
+                "max_mito_percentage":{
+                    "type": "number",
+                    "default": 25,
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Maximum number of mitochindrial genes.",
+                    "help_text": "Cells that have a higher percentage will be removed."
+                },
+                "symbol_col": {
+                    "type": "string",
+                    "default": "index",
+                    "description": "Gene symbol column used for filtering.",
+                    "help_text":  "This is usually the 'index' of the anndata object."
                 }
             }
         },
@@ -164,6 +218,13 @@
                     "help_text": "The file should be in the .pt format.",
                     "pattern": "^\\S+\\.pt$",
                     "exists": true
+                },
+                "scimilarity_model": {
+                    "type": "string",
+                    "format": "file-path",
+                    "default": "https://zenodo.org/records/10685499/files/model_v1.1.tar.gz",
+                    "description": "Path to a pre-trained scimilarity model, only relevant if scimilarity is selected in `integration_methods`. If provided, the model will be used for integration. Otherwise, a new model will be trained.",
+                    "help_text": "The file can be a .tar.gz file or the corresponding unzipped directory. The official models are shared via [Zenodo](https://zenodo.org/record/10685499)."
                 }
             }
         },

@@ -143,7 +143,7 @@ workflow QC_CLUSTER {
     // Perform clustering and related analysis
     //
     if (!params.qc_only) {
-        SCANPY_LEIDEN(ch_h5ad, params.clustering_resolution, "leiden", params.cluster_neighbors, false)
+        SCANPY_LEIDEN(ch_h5ad, params.clustering_resolutions, "leiden", params.cluster_neighbors, false)
         ch_h5ad = SCANPY_LEIDEN.out.h5ad
     }
 
