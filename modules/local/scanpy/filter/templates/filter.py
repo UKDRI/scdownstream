@@ -182,19 +182,30 @@ with open("${prefix}_mqc.json", "w") as f_json:
         image_string = base64.b64encode(f_plot.read()).decode("utf-8")
         image_html += f'<figure><div class="mqc-custom-content-image"><img src="data:image/png;base64,{image_string}" /></div>'
         image_html +='<figcaption>The histograms show gene counts, total counts, and the percentage of mitochondrial gene expression per cell. '
-        image_html += 'Red lines indicate automatically determined thresholds based on N median absolute deviations (MADs).'
+        if automatic_filtering:
+            image_html += 'Red lines indicate automatically determined thresholds based on N median absolute deviations (MADs).'
+        else:
+            image_html += 'Red lines indicate default or user specified thresholds.'
         
-        image_html += 'Automatically determined thresholds:<br>'
+        image_html += "Thresholds:<br>"
+        image_html += "<table style='border-collapse: separate; border-spacing: 0.5em;'>"
+        image_html += "<tr style='background-color: #F3F4F6'><th>Metric</th><th>lower bound</th><th>upper bound</th></tr>"
         for metric in ['n_genes_by_counts', 'total_counts', 'pct_counts_mt']: 
             lower = thresholds_metric[metric][0]
             upper = thresholds_metric[metric][1]
-            image_html += f'{metric}: ({lower}, {upper})<br>'
-
-        image_html += 'The thresholds were determined using the following number of MADs:<br>'
-        for metric in ['n_genes_by_counts', 'total_counts', 'pct_counts_mt']: 
-            lower = namds_metric[metric][0]
-            upper = namds_metric[metric][1]
-            image_html += f'{metric}: ({lower}, {upper})<br>'
+            image_html += f"<tr style='background-color: #E0F2FE'><td>{metric}</td><td>{lower}</td><td>{upper}</td></tr>"
+        image_html += '</table><br>'
+        
+        if automatic_filtering:
+            image_html += 'The thresholds were determined using the following number of MADs:<br>'
+            image_html += "<table style='border-collapse: separate; border-spacing: 0.5em;'>"
+            image_html += "<tr style='background-color: #F3F4F6'><th>Metric</th><th>lower bound</th><th>upper bound</th></tr>"
+            for metric in ['n_genes_by_counts', 'total_counts', 'pct_counts_mt']: 
+                lower = namds_metric[metric][0]
+                upper = namds_metric[metric][1]
+                image_html += f"<tr style='background-color: #E0F2FE'><td>{metric}</td><td>{lower}</td><td>{upper}</td></tr>"
+            image_html += '</table><br>'
+        
         image_html += '</figcaption></figure>'
 
 
