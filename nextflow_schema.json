@@ -315,6 +315,13 @@
                     "enum": ["human", "mouse"],
                     "description": "Specify species for downstream analysis",
                     "help_text": "Species for gene set enrichment and ligand-receptor interactions analysis."
+                },
+                "report_table_row_limit": {
+                    "type": "integer",
+                    "default": 250,
+                    "minimum": 1,
+                    "description": "Table row limit for downstream analysis report.",
+                    "help_text": "The top N entries will be displayed in the report to avoid overly large or slow HTML files."
                 }
             }
         },

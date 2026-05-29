@@ -9,6 +9,7 @@ process SCANPY_GENERATE_REPORT {
     tuple val(meta), path(h5ad)
     path(ipynb_template)
     val(clustering_name)
+    val(ntop)
     
     output:
     tuple val(meta), path("*.ipynb"), emit: ipynp
@@ -32,7 +33,8 @@ process SCANPY_GENERATE_REPORT {
             --report-mode \
             ${prefix}.ipynb \
             -p FILE ${h5ad} \
-            -p CLUSTERING_NAME ${clustering_name}
+            -p CLUSTERING_NAME ${clustering_name} \
+            -p NTOP ${ntop}
     """
 }
 

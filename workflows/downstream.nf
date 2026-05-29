@@ -54,7 +54,7 @@ workflow DOWNSTREAM_ANALYSIS {
     //
     // Summary report
     //
-    SCANPY_GENERATE_REPORT(ch_h5ad, "${projectDir}/modules/local/scanpy/report/templates/scdownstream_analysis_report.ipynb", clustering_name)
+    SCANPY_GENERATE_REPORT(ch_h5ad, "${projectDir}/modules/local/scanpy/report/templates/scdownstream_analysis_report.ipynb", clustering_name, params.report_table_row_limit)
     SCANPY_REPORT_TO_HTML(SCANPY_GENERATE_REPORT.out.ipynp)
 
 
