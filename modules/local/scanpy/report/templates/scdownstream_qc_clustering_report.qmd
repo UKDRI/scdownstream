@@ -1,5 +1,5 @@
 ---
-title: '<font color=''green''><b><u>Single-cell downstream: QC & clustering report<u></b></font>'
+title: '<font color=''green''><b><u>Single-cell downstream: QC & clustering report</u></b></font>'
 jupyter: python3
 execute:
   echo: false
@@ -138,7 +138,7 @@ for label in predicted_labels:
     if not label.endswith(':conf'):
         html = f'<font color="black"><details><summary>Click to expand {label} table</summary>'
         df = adata.obs.value_counts(label).rename_axis(label).reset_index(name='number of cells')
-        html += '<div style="overflow-y: scroll; overflow-x: scroll; max-height: 400px">' + df.to_html() + '</div></details>'
+        html += '<div style="overflow-y: scroll; overflow-x: scroll; max-height: 400px">' + df.to_html() + '</div></details></font>'
         display(HTML(html))
 ```
 
@@ -236,7 +236,7 @@ with rc_context({'figure.figsize': (fig_width, fig_height)}):
 
 ---
 
-## <font color='green'><b>Citations</b></font>
+## <font color='green'>Citations</font>
 
 ### <font color='green'>[Nextflow](https://www.nextflow.io/)</font>
 

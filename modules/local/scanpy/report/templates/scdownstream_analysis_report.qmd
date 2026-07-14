@@ -1,5 +1,5 @@
 ---
-title: <font color='green'><b><u>Single-cell downstream report<u></b></font>
+title: <font color='green'><b><u>Single-cell downstream report</u></b></font>
 jupyter: python3
 execute:
   echo: false
@@ -70,7 +70,7 @@ for label in predicted_labels:
     if not label.endswith(':conf'):
         html = f'<font color="black"><details><summary>Click to expand {label} table</summary>'
         df = adata.obs.value_counts(label).rename_axis(label).reset_index(name='number of cells')
-        html += '<div style="overflow-y: scroll; overflow-x: scroll; max-height: 400px">' + df.to_html() + '</div></details>'
+        html += '<div style="overflow-y: scroll; overflow-x: scroll; max-height: 400px">' + df.to_html() + '</div></details></font>'
         display(HTML(html))
 ```
 
@@ -170,13 +170,13 @@ for label in predicted_labels:
         
         html = "<h3><font color='green'>Cluster annotation - " + label
         html += '</font></h3><font color="black"><details><summary>Click to expand table</summary>'
-        html += '<div style="overflow-y: scroll; overflow-x: scroll; max-height: 400px">' + df_overlap.to_html() + '</div></details>'
+        html += '<div style="overflow-y: scroll; overflow-x: scroll; max-height: 400px">' + df_overlap.to_html() + '</div></details></font>'
         display(HTML(html))
 ```
 
 ---
 
-## <font color='green'><b>Differential genes</b></font>
+## <font color='green'>Differential genes</font>
 
 Differential genes per clusters are identified based on a Wilcoxon rank-sum test by comparing the gene expression between cells of a cluster against all other cells.
 
@@ -275,7 +275,7 @@ for clus in list_clusters:
 
 ---
 
-## <font color='green'><b>Gene Set Enrichment</b></font>
+## <font color='green'>Gene Set Enrichment</font>
 
 g:Profiler gene set enrichment per cluster. Differential genes per cluster are further filtered by their expression inside and outside of the cluster before computing enrichment.
 
@@ -304,7 +304,7 @@ for clus in list_clusters:
 
 ---
 
-## <font color='green'><b>Cell-cell interaction</b></font>
+## <font color='green'>Cell-cell interaction</font>
 
 LIANA+ consensus ligand-receptor interactions. LIANA+ uses ranking and aggregating to compute a `magnitude rank`. A lower `magnitude rank` indicates that an interaction is more likely to occur.
 
@@ -361,7 +361,7 @@ if 'liana_res' in adata.uns:
         with open(path, "rb") as f_plot:
             # dotplot
             image_string = base64.b64encode(f_plot.read()).decode("utf-8")
-            image_html = f'<h3><font color="green">Interactions cluster {clus}</h3></font>'
+            image_html = f'<h3><font color="green">Interactions cluster {clus}</font></h3>'
             image_html += '<details><summary>Click to expand dotplot</summary>'
             image_html += f'<figure><img alt="liana image" src="data:image/png;base64,{image_string}" />'
             image_html += f'<figcaption>Shown are the top {ntop_liana_dotplot} interactions between cluster {clus} and the other clusters. '
@@ -377,7 +377,7 @@ if 'liana_res' in adata.uns:
             html = create_search_table_html(df_liana_clus, text, box_name, table_name, ntop)
             image_html += '<font color="black"><details><summary>Click to expand table</summary>'
             image_html += html
-            image_html += f"<p>Results in tables are limited to the top {ntop} interactions.</p></details>"
+            image_html += f"<p>Results in tables are limited to the top {ntop} interactions.</p></details></font>"
             display(HTML(image_html))
             
             tableid += 1
@@ -385,7 +385,7 @@ if 'liana_res' in adata.uns:
 
 ---
 
-## <font color='green'><b>Citations</b></font>
+## <font color='green'>Citations</font>
 
 ### <font color='green'>[Nextflow](https://www.nextflow.io/)</font>
 
