@@ -29,7 +29,6 @@ include { SCANPY_LEIDEN                        } from '../modules/local/scanpy/l
 include { SCANPY_RANKGENESGROUPS               } from '../modules/local/scanpy/rankgenesgroups'
 include { SCANPY_ENRICH                        } from '../modules/local/scanpy/enrich'
 include { SCANPY_GENERATE_REPORT               } from '../modules/local/scanpy/report'
-include { SCANPY_REPORT_TO_HTML                } from '../modules/local/scanpy/report'
 include { LIANA_RANKAGGREGATE                  } from '../modules/local/liana/rankaggregate'
 
 /*
@@ -166,7 +165,6 @@ workflow SCDOWNSTREAM {
     //
     if (!params.qc_only) {
         SCANPY_GENERATE_REPORT(ch_h5ad, "${projectDir}/modules/local/scanpy/report/templates/scdownstream_report.ipynb")
-        SCANPY_REPORT_TO_HTML(SCANPY_GENERATE_REPORT.out.ipynp)
     }
 
     //

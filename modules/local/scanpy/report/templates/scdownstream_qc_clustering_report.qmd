@@ -1,0 +1,262 @@
+---
+title: '<font color=''green''><b><u>Single-cell downstream: QC & clustering report<u></b></font>'
+jupyter: python3
+execute:
+  echo: false
+format: 
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    embed-resources: true
+---
+
+```{python}
+#| tags: [parameters]
+
+FILE = "scdownstream.h5ad"
+```
+
+
+```{python}
+import warnings
+warnings.filterwarnings('ignore')
+```
+
+```{python}
+import scanpy as sc
+```
+
+```{python}
+path_adata = FILE
+```
+
+```{python}
+adata = sc.read(path_adata)
+```
+
+```{python}
+from IPython.display import display, HTML
+
+display(HTML("<p>After filtering, the data set contains " + str(adata.n_obs) + " cells and " + str(adata.n_vars) 
+             + " genes or transcripts. The number of cells per sample are listed below:</p>"))
+```
+
+```{python}
+adata.obs.value_counts('sample').rename_axis('samples').reset_index(name='number of cells')
+```
+
+## <font color='green'>Highly variable genes</font>
+
+```{python}
+sc.pl.highly_variable_genes(adata)
+```
+
+## <font color='green'>PCA</font>
+
+Sample distribution
+
+```{python}
+sc.pl.pca(
+    adata,
+    color="sample",
+    dimensions=[(0, 1)],
+)
+```
+
+QC metrics
+
+```{python}
+sc.pl.pca(
+    adata,
+    color=["total_counts", "pct_counts_mt", "pct_counts_ribo"],
+    dimensions=[(0, 1)],
+)
+```
+
+Loadings indicate the most informative genes across the first PCs
+
+```{python}
+n_pcs = 6
+n_pcs =  adata.obsm['X_pca'].shape[1] if n_pcs > adata.obsm['X_pca'].shape[1] else n_pcs
+list_pcs = list(range(1, n_pcs+1))
+sc.pl.pca_loadings(adata, include_lowest=False, components=list_pcs)
+```
+
+---
+
+## <font color='green'>UMAP</font>
+
+```{python}
+adata.obsm['X_pca_umap'] =  adata.obsm['X_umap'].copy()
+```
+
+Samples distribution
+
+```{python}
+sc.pl.umap(adata, color=['sample'])
+```
+
+```{python}
+if 'X_umap_scvi' in adata.obsm:
+    sc.pl.embedding(adata, basis='X_umap_scvi', color=['sample'], title='scvi UMAP')
+```
+
+QC metrics
+
+```{python}
+sc.pl.umap(adata, color=['n_genes_by_counts', 'pct_counts_mt'])
+```
+
+```{python}
+sc.pl.umap(adata, color=['pct_counts_ribo', 'total_counts_hb'])
+```
+
+Distribution of predicted doublets
+
+```{python}
+sc.pl.umap(adata, color=['predicted_doublet', 'doublet_score'])
+```
+
+---
+
+## <font color='green'>Predicted labels</font>
+
+Celltypist uses pre-trained logistic regression models for predicting labels such as cell types for each cell. Predicted labels of the selected model(s) and the confidence of the predictions are displayed in the UMAPs below. Counts for the predicted labels are summarised in the table(s).
+
+```{python}
+predicted_labels = [ colname for colname in adata.obs.columns if colname.startswith('celltypist:') ]
+for label in predicted_labels:
+    sc.pl.umap(adata, color=label)
+```
+
+```{python}
+from IPython.display import display, HTML
+import base64
+
+for label in predicted_labels:
+    if not label.endswith(':conf'):
+        html = f'<font color="black"><details><summary>Click to expand {label} table</summary>'
+        df = adata.obs.value_counts(label).rename_axis(label).reset_index(name='number of cells')
+        html += '<div style="overflow-y: scroll; overflow-x: scroll; max-height: 400px">' + df.to_html() + '</div></details>'
+        display(HTML(html))
+```
+
+---
+
+## <font color='green'>Clusters</font>
+
+```{python}
+clustering_label = 'leiden'
+
+# find clusterings
+clustering_labels = [ obsname for obsname in adata.obs.columns if obsname.startswith(clustering_label) ]
+```
+
+```{python}
+# define order of clusters numerically
+import numpy as np
+
+list_clusters = np.unique(adata.obs[clustering_label])
+list_clusters = sorted([int(x) for x in list_clusters])
+list_clusters = [str(x) for x in list_clusters]
+```
+
+Clusterings on PCA-based UMAP 
+
+```{python}
+import matplotlib.pyplot as plt
+import math
+from matplotlib.pyplot import rc_context
+
+embedding = 'X_umap'
+title = "UMAP (PCA)"
+ncols = 3
+nrows = math.ceil(len(clustering_labels) / ncols)
+
+fig_width = ncols * 6
+fig_height = nrows * 5
+
+with rc_context({'figure.figsize': (fig_width, fig_height)}):
+    if embedding in adata.obsm:
+        fig, axs = plt.subplots(nrows, ncols)
+
+        cur_col = 0
+        cur_row = 0
+    
+        for clustering_label in clustering_labels:
+    
+            if cur_col == ncols:
+                cur_col = 0
+                cur_row += 1
+    
+            sc.pl.embedding(adata, basis=embedding, color=clustering_label, legend_loc='on data', show=False,
+                            title=f"{embedding} - {clustering_label}", ax=axs[cur_row, cur_col])
+    
+            cur_col += 1
+    else:
+        display(HTML(f"<p>No {title} was found.</p>"))
+```
+
+Clusterings on scvi-based UMAP
+
+```{python}
+import matplotlib.pyplot as plt
+import math
+from matplotlib.pyplot import rc_context
+
+embedding = 'X_umap_scvi'
+title = "UMAP (scvi)"
+ncols = 3
+nrows = math.ceil(len(clustering_labels) / ncols)
+
+fig_width = ncols * 6
+fig_height = nrows * 5
+
+with rc_context({'figure.figsize': (fig_width, fig_height)}):
+    if embedding in adata.obsm:
+        fig, axs = plt.subplots(nrows, ncols)
+
+        cur_col = 0
+        cur_row = 0
+    
+        for clustering_label in clustering_labels:
+    
+            if cur_col == ncols:
+                cur_col = 0
+                cur_row += 1
+    
+            sc.pl.embedding(adata, basis=embedding, color=clustering_label, legend_loc='on data', show=False,
+                            title=f"{embedding} - {clustering_label}", ax=axs[cur_row, cur_col])
+    
+            cur_col += 1
+    else:
+        display(HTML(f"<p>No {title} was found.</p>"))
+```
+
+---
+
+## <font color='green'><b>Citations</b></font>
+
+### <font color='green'>[Nextflow](https://www.nextflow.io/)</font>
+
+_Di Tommaso P, Chatzou M, Floden EW, Barja PP, Palumbo E, Notredame C. (2017). Nextflow enables reproducible computational workflows. Nat Biotechnol., 35(4):316-319._
+
+### <font color='green'>[Nfcore](https://nf-co.re/)</font>
+This pipelines is a substantially modified version of [nfcore:scdowntream](https://github.com/nf-core/scdownstream), which was originally written by Nico Trummer, and uses [nfcore modules](https://github.com/nf-core/modules): 
+
+_Ewels PA, Peltzer A, Fillinger S, Patel H, Alneberg J, Wilm A, Garcia MU, Di Tommaso P, Nahnsen S. (2020). The nf-core framework for community-curated bioinformatics pipelines. Nat Biotechnol., 38(3):276-278_
+
+### <font color='green'>[Scanpy](https://scanpy.readthedocs.io/en/stable/)</font>
+
+_Wolf FA, Angerer P, & Theis, FJ. (2018). SCANPY: large-scale single-cell gene expression data analysis. Genome Biol., 19(1):15._
+
+### <font color='green'>[scVI](https://scvi-tools.org/)</font>
+_Lopez R, Regier J, Cole MB, Jordan MI, & Yosef N. (2018). Deep generative modeling for single-cell transcriptomics. Nature methods, 15(12):1053-1058._
+
+### <font color='green'>[Leiden clustering](https://scanpy.readthedocs.io/en/stable/generated/scanpy.tl.leiden.html)</font>
+_Traag VA, Waltman L, & Van Eck NJ. (2019). From Louvain to Leiden: guaranteeing well-connected communities., Sci. Rep., 9(1):5233._
+
+### <font color='green'>[Celltypist](https://www.celltypist.org/)</font>
+_Domínguez Conde C, Xu C, Jarvis LB, Rainbow DB, Wells SB, Gomes T, ... & Teichmann, SA (2022). Cross-tissue immune cell analysis reveals tissue-specific features in humans. Science, 376(6594):eabl5197._
+

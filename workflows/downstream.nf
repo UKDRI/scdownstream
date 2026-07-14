@@ -13,7 +13,6 @@ include { methodsDescriptionText               } from '../subworkflows/local/uti
 include { SCANPY_RANKGENESGROUPS               } from '../modules/local/scanpy/rankgenesgroups'
 include { SCANPY_ENRICH                        } from '../modules/local/scanpy/enrich'
 include { SCANPY_GENERATE_REPORT               } from '../modules/local/scanpy/report'
-include { SCANPY_REPORT_TO_HTML                } from '../modules/local/scanpy/report'
 include { LIANA_RANKAGGREGATE                  } from '../modules/local/liana/rankaggregate'
 include { FINALIZE_H5AD                        } from '../subworkflows/local/finalize'
 
@@ -54,8 +53,7 @@ workflow DOWNSTREAM_ANALYSIS {
     //
     // Summary report
     //
-    SCANPY_GENERATE_REPORT(ch_h5ad, "${projectDir}/modules/local/scanpy/report/templates/scdownstream_analysis_report.ipynb", clustering_name, params.report_table_row_limit)
-    SCANPY_REPORT_TO_HTML(SCANPY_GENERATE_REPORT.out.ipynp)
+    SCANPY_GENERATE_REPORT(ch_h5ad, "${projectDir}/modules/local/scanpy/report/templates/scdownstream_analysis_report.qmd", clustering_name, params.report_table_row_limit)
 
 
     emit:

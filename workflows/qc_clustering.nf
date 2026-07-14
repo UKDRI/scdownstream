@@ -23,7 +23,6 @@ include { SCANPY_UMAP                          } from '../modules/local/scanpy/u
 include { SCANPY_LOG_NORMALIZE                 } from '../modules/local/scanpy/normalization'
 include { SCANPY_LEIDEN                        } from '../modules/local/scanpy/leiden'
 include { SCANPY_GENERATE_REPORT_QC            } from '../modules/local/scanpy/report'
-include { SCANPY_REPORT_TO_HTML                } from '../modules/local/scanpy/report'
 include { FINALIZE_H5AD_SIMPLE                 } from '../subworkflows/local/finalize'
 
 /*
@@ -154,8 +153,7 @@ workflow QC_CLUSTER {
     // Summary report
     //
     if (!params.qc_only) {
-        SCANPY_GENERATE_REPORT_QC(ch_h5ad, "${projectDir}/modules/local/scanpy/report/templates/scdownstream_qc_clustering_report.ipynb")
-        SCANPY_REPORT_TO_HTML(SCANPY_GENERATE_REPORT_QC.out.ipynp)
+        SCANPY_GENERATE_REPORT_QC(ch_h5ad, "${projectDir}/modules/local/scanpy/report/templates/scdownstream_qc_clustering_report.qmd")
     }
 
     //
