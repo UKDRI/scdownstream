@@ -3,6 +3,7 @@ title: '<font color=''green''><b><u>Single-cell downstream: QC & clustering repo
 jupyter: python3
 execute:
   echo: false
+  warning: false
 format: 
   html:
     toc: true
@@ -32,7 +33,7 @@ path_adata = FILE
 ```
 
 ```{python}
-adata = sc.read(path_adata)
+adata = sc.read(path_adata, backed="r")
 ```
 
 ```{python}
@@ -232,6 +233,10 @@ with rc_context({'figure.figsize': (fig_width, fig_height)}):
             cur_col += 1
     else:
         display(HTML(f"<p>No {title} was found.</p>"))
+```
+
+```{python}
+adata.file.close()
 ```
 
 ---

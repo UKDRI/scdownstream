@@ -3,6 +3,7 @@ title: <font color='green'><b><u>Single-cell downstream report</u></b></font>
 jupyter: python3
 execute:
   echo: false
+  warning: false
 format: 
   html:
     toc: true
@@ -381,6 +382,10 @@ if 'liana_res' in adata.uns:
             display(HTML(image_html))
             
             tableid += 1
+```
+
+```{python}
+adata.file.close()
 ```
 
 ---
