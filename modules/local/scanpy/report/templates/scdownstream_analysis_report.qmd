@@ -1,0 +1,423 @@
+---
+title: <font color='green'><b><u>Single-cell downstream report</u></b></font>
+jupyter: python3
+execute:
+  echo: false
+  warning: false
+format: 
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    embed-resources: true
+---
+
+
+```{python}
+#| tags: [parameters]
+
+FILE = "scdownstream.h5ad"
+CLUSTERING_NAME = "leiden"
+NTOP = 250
+```
+
+```{python}
+import warnings
+warnings.filterwarnings('ignore')
+```
+
+```{python}
+import scanpy as sc
+```
+
+```{python}
+path_adata = FILE
+selected_clustering = CLUSTERING_NAME
+ntop = NTOP
+```
+
+```{python}
+adata = sc.read(path_adata)
+```
+
+```{python}
+from IPython.display import display, HTML
+
+display(HTML("<p>After filtering, the data set contains " + str(adata.n_obs) + " cells and " + str(adata.n_vars) 
+             + " genes or transcripts. The number of cells per sample are listed below:</p>"))
+```
+
+```{python}
+adata.obs.value_counts('sample').rename_axis('samples').reset_index(name='number of cells')
+```
+
+---
+
+## <font color='green'>Predicted labels</font>
+
+Celltypist uses pre-trained logistic regression models for predicting labels such as cell types for each cell. Predicted labels of the selected model(s) and the confidence of the predictions are displayed in the UMAPs below. Counts for the predicted labels are summarised in the table(s).
+
+```{python}
+predicted_labels = [ colname for colname in adata.obs.columns if colname.startswith('celltypist:') ]
+for label in predicted_labels:
+    sc.pl.umap(adata, color=label)
+```
+
+```{python}
+from IPython.display import display, HTML
+import base64
+
+for label in predicted_labels:
+    if not label.endswith(':conf'):
+        html = f'<font color="black"><details><summary>Click to expand {label} table</summary>'
+        df = adata.obs.value_counts(label).rename_axis(label).reset_index(name='number of cells')
+        html += '<div style="overflow-y: scroll; overflow-x: scroll; max-height: 400px">' + df.to_html() + '</div></details></font>'
+        display(HTML(html))
+```
+
+---
+
+## <font color='green'>Clusters</font>
+
+```{python}
+import numpy as np
+from IPython.display import display, HTML
+
+display(HTML(f"Cells are grouped by {selected_clustering}. The number of cells per cluster are listed below:"))
+```
+
+```{python}
+adata.obs.value_counts(selected_clustering).rename_axis(selected_clustering).reset_index(name='number of cells')
+```
+
+```{python}
+sc.pl.umap(adata, color=[selected_clustering])
+```
+
+```{python}
+if 'X_umap_scvi' in adata.obsm:
+    sc.pl.embedding(adata, basis='X_umap_scvi', color=[selected_clustering], title='scvi UMAP')
+```
+
+```{python}
+# define order of clusters numerically
+import numpy as np
+
+list_clusters = np.unique(adata.obs[selected_clustering])
+list_clusters = sorted([int(x) for x in list_clusters])
+list_clusters = [str(x) for x in list_clusters]
+```
+
+```{python}
+# overlap with annotation
+import pandas as pd
+import anndata as ann
+
+def create_overlap_pct_label(adata: ann.AnnData, list_clusters: list, clustering: str, annotation: str, 
+                             ntop: int=5, min_overlap_ratio: float=0.05) -> pd.DataFrame:
+    """
+    Computes the overlap with a given annotation for each cluster
+
+    Parameters
+    ----------
+    adata: ann.AnnData
+        AnnData object containing the clusters and annotation labels
+    list_clusters: list 
+        A list of cluster IDs defining the order of rows in the output table
+    clustering: str
+        Name of clustering entry
+    annotation: str
+        Name of the annotation, e.g. celltypist annotation
+    ntop: int
+        Number of top annotations to be displayed
+    min_overlap_ratio: float
+        Minimum ration of cells to consider annotation label for output
+
+    Returns
+    -------
+    pd.DataFrame
+        Table listing the top N annotations per cluster including the percentage of cells
+    """
+    dict_clus_overlap = {}
+
+    for clus in list_clusters:
+        size = adata[ adata.obs[clustering] == clus ].shape[0]
+        list_topn = adata[ adata.obs[clustering] == clus ].obs.value_counts(annotation)[0:ntop]
+        
+        ratios = list_topn / size
+        ratios = ratios[ ratios >= min_overlap_ratio]
+        list_str = [ label + ' (' + str(round(ratio* 100, 2)) + '%)' for label, ratio in zip(ratios.index, ratios.values) ]
+        
+        if len(list_str) < ntop:
+            nmissing = ntop - len(list_str)
+            list_str = list_str + nmissing * ['-']
+        dict_clus_overlap[clus] = list_str
+
+    df_overlap = pd.DataFrame(dict_clus_overlap).T
+    df_overlap.index.name = 'Cluster'
+    df_overlap.columns = ['top ' +  str(i+1) for i in list(range(ntop)) ]
+
+    return df_overlap
+```
+
+```{python}
+from IPython.display import display, HTML
+import base64
+
+for label in predicted_labels:
+    if not label.endswith(':conf'):
+        
+        df_overlap = create_overlap_pct_label(adata, list_clusters, selected_clustering, label)
+        
+        html = "<h3><font color='green'>Cluster annotation - " + label
+        html += '</font></h3><font color="black"><details><summary>Click to expand table</summary>'
+        html += '<div style="overflow-y: scroll; overflow-x: scroll; max-height: 400px">' + df_overlap.to_html() + '</div></details></font>'
+        display(HTML(html))
+```
+
+---
+
+## <font color='green'>Differential genes</font>
+
+Differential genes per clusters are identified based on a Wilcoxon rank-sum test by comparing the gene expression between cells of a cluster against all other cells.
+
+```{python}
+sc.pl.rank_genes_groups_dotplot(adata, groupby=selected_clustering, standard_scale="var", swap_axes=True, n_genes=3)
+```
+
+```{python}
+# add table search function
+from IPython.display import display, HTML
+
+html = """
+<script>
+function searchTable(inputId, containerId) {
+    let input = document.getElementById(inputId).value.toLowerCase();
+    let rows = document.querySelectorAll('#' + containerId + ' tbody tr');
+    rows.forEach(row => {
+        let rowText = row.textContent.toLowerCase();
+        
+        if (rowText.includes(input)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+</script>
+"""
+display(HTML(html))
+```
+
+```{python}
+# helper function for creating HTML table
+import pandas as pd
+
+def create_search_table_html(df: pd.DataFrame, search_text: str, 
+                             sbox_name: str, table_name: str, ntop: int=100,
+                             lookupFunction: str="searchTable") -> str:
+    """
+    Creates HTML string for searchable table
+
+    Parameters
+    ----------
+    df: pd.DataFrame
+        Pandas DataFrame to be turned into searchable table
+    search_text: str
+        Text that will be displayed in search box before typing
+    sbox_name: str
+        Unique searchbox ID that will be assigned
+    table_name: str
+        Unique table ID that will be assigned
+    ntop: int
+        Limit the number of rows to this number to avoid giant HTMLs
+    lookupFunction: str
+        JavaScript function for text search, has to be defined beforehand. 
+
+    Returns
+    -------
+    str
+        HTML table string trhat can be disaplyed with IPython.display.HTML
+    """
+
+    # input search box
+    table_html = "<input type='text' id='" + box_name + "' onkeyup=\"" + lookupFunction  + "('" + box_name + "', '" + table_name + "')\" "
+    table_html += "placeholder='"  + search_text + "'"
+    table_html += "style='width: 100%; max-width: 300px; padding: 10px; margin-top: 12px; font-family: sans-serif; border: 1px solid #D1D5DB; border-radius: 4px;'>"
+
+    # table
+    table_html += "<div id=" + table_name + " style='overflow-y: scroll; max-height: 400px'>" + df.to_html(index=False, max_rows=ntop) + "</div>"
+
+    return table_html
+```
+
+```{python}
+from IPython.display import display, HTML
+
+display(HTML(f"<p>Results in tables are limited to the top {ntop} genes.</p>"))
+```
+
+```{python}
+import numpy as np
+from IPython.display import display, HTML
+
+tableid = 0
+for clus in list_clusters:
+    
+    box_name = 'sboxDiff' + str(tableid)
+    table_name = 'tableDiff' + str(tableid)
+    text = "Search gene..."
+    
+    html = create_search_table_html(sc.get.rank_genes_groups_df(adata, group=clus), text, box_name, table_name, ntop)
+    display(HTML("<h3><font color='green'>Differential genes cluster" + clus +  "</font></h3><details>" + html + "</details>"))
+    
+    tableid += 1
+```
+
+---
+
+## <font color='green'>Gene Set Enrichment</font>
+
+g:Profiler gene set enrichment per cluster. Differential genes per cluster are further filtered by their expression inside and outside of the cluster before computing enrichment.
+
+```{python}
+from IPython.display import display, HTML
+
+display(HTML(f"<p>Results in tables are limited to the top {ntop} terms.</p>"))
+```
+
+```{python}
+import numpy as np
+from IPython.display import display, HTML
+
+tableid = 0
+for clus in list_clusters:
+    
+    box_name = 'sboxEnrich' + str(tableid)
+    table_name = 'tableEnrich' + str(tableid)
+    text = "Search term..."
+    
+    html = create_search_table_html(adata.uns['rank_genes_groups']['enrich'][clus], text, box_name, table_name, ntop)
+    display(HTML("<h3><font color='green'>Enrichment cluster " + clus +  "</font></h3><details>" + html + "</details>"))
+    
+    tableid += 1
+```
+
+---
+
+## <font color='green'>Cell-cell interaction</font>
+
+LIANA+ consensus ligand-receptor interactions. LIANA+ uses ranking and aggregating to compute a `magnitude rank`. A lower `magnitude rank` indicates that an interaction is more likely to occur.
+
+Following methods are currently implemented in the LIANA+ framework:
+
+```{python}
+import liana as li
+
+li.mt.show_methods()
+```
+
+```{python}
+# create images
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+
+ntop_liana_dotplot = 20
+
+paths_images = {}
+
+if 'liana_res' in adata.uns:
+    for clus in list_clusters:
+        
+        path_img = f"./dotplot_test_clus{clus}.png"
+        paths_images[clus] = path_img
+                        
+        fig = li.pl.dotplot(adata = adata, 
+              colour='magnitude_rank',
+              size='specificity_rank',
+              inverse_size=True,
+              inverse_colour=True,
+              source_labels=[clus],
+              target_labels=list_clusters,
+              top_n=ntop_liana_dotplot, 
+              orderby='magnitude_rank',
+              orderby_ascending=True,
+              return_fig=True)
+
+        fig.save(path_img, bbox_inches='tight')
+```
+
+```{python}
+# HTML output
+from IPython.display import display, HTML
+import base64
+
+if 'liana_res' in adata.uns:
+    df_liana = adata.uns['liana_res'].copy()
+
+    tableid = 0
+    
+    for clus, path in paths_images.items():
+        with open(path, "rb") as f_plot:
+            # dotplot
+            image_string = base64.b64encode(f_plot.read()).decode("utf-8")
+            image_html = f'<h3><font color="green">Interactions cluster {clus}</font></h3>'
+            image_html += '<details><summary>Click to expand dotplot</summary>'
+            image_html += f'<figure><img alt="liana image" src="data:image/png;base64,{image_string}" />'
+            image_html += f'<figcaption>Shown are the top {ntop_liana_dotplot} interactions between cluster {clus} and the other clusters. '
+            image_html += 'The color gradient and dot size indicate the -log10 <i>magnitude rank</i> and <i>specificity rank</i>, respectively. Higher values are better.</figcaption></figure></details>'
+            
+            # table
+            df_liana_clus = df_liana[ df_liana['source'] == clus]
+            
+            box_name = 'sboxLiana' + str(tableid)
+            table_name = 'tableLiana' + str(tableid)
+            text = "Search gene..."
+            
+            html = create_search_table_html(df_liana_clus, text, box_name, table_name, ntop)
+            image_html += '<font color="black"><details><summary>Click to expand table</summary>'
+            image_html += html
+            image_html += f"<p>Results in tables are limited to the top {ntop} interactions.</p></details></font>"
+            display(HTML(image_html))
+            
+            tableid += 1
+```
+
+```{python}
+adata.file.close()
+```
+
+---
+
+## <font color='green'>Citations</font>
+
+### <font color='green'>[Nextflow](https://www.nextflow.io/)</font>
+
+_Di Tommaso P, Chatzou M, Floden EW, Barja PP, Palumbo E, Notredame C. (2017). Nextflow enables reproducible computational workflows. Nat Biotechnol., 35(4):316-319._
+
+### <font color='green'>[Nfcore](https://nf-co.re/)</font>
+This pipelines is a substantially modified version of [nfcore:scdowntream](https://github.com/nf-core/scdownstream), which was originally written by Nico Trummer, and uses [nfcore modules](https://github.com/nf-core/modules): 
+
+_Ewels PA, Peltzer A, Fillinger S, Patel H, Alneberg J, Wilm A, Garcia MU, Di Tommaso P, Nahnsen S. (2020). The nf-core framework for community-curated bioinformatics pipelines. Nat Biotechnol., 38(3):276-278_
+
+### <font color='green'>[Scanpy](https://scanpy.readthedocs.io/en/stable/)</font>
+
+_Wolf FA, Angerer P, & Theis, FJ. (2018). SCANPY: large-scale single-cell gene expression data analysis. Genome Biol., 19(1):15._
+
+### <font color='green'>[Leiden clustering](https://scanpy.readthedocs.io/en/stable/generated/scanpy.tl.leiden.html)</font>
+_Traag VA, Waltman L, & Van Eck NJ. (2019). From Louvain to Leiden: guaranteeing well-connected communities., Sci. Rep., 9(1):5233._
+
+### <font color='green'>[scVI](https://scvi-tools.org/)</font>
+_Lopez R, Regier J, Cole MB, Jordan MI, & Yosef N. (2018). Deep generative modeling for single-cell transcriptomics. Nature methods, 15(12):1053-1058._
+
+### <font color='green'>[Celltypist](https://www.celltypist.org/)</font>
+_Domínguez Conde C, Xu C, Jarvis LB, Rainbow DB, Wells SB, Gomes T, ... & Teichmann, SA (2022). Cross-tissue immune cell analysis reveals tissue-specific features in humans. Science, 376(6594):eabl5197._
+
+### <font color='green'>[gProfiler](https://biit.cs.ut.ee/gprofiler/gost)</font>
+_Kolberg L, Raudvere U, Kuzmin I, Adler P, Vilo J, & Peterson H. (2023). g: Profiler—interoperable web service for functional enrichment analysis and gene identifier mapping (2023 update). Nucleic Acids Res., 51(W1):W207-W212._
+
+### <font color='green'>[LIANA+](https://github.com/saezlab/liana-py)</font>
+
+_Dimitrov D, Schäfer PSL, Farr E, Rodriguez-Mier P, Lobentanzer S, Badia-i-Mompel P, ... & Saez-Rodriguez J. (2024). LIANA+ provides an all-in-one framework for cell–cell communication inference. Nat. Cell Biol., 26(9):1613-1622._
+
