@@ -19,14 +19,14 @@ group_cols = "${group_cols}"
 pb_col = "pseudobulk_label"
 separator = "___"  
 
-list_condition_cols = condition_cols.split(',')
-required_cols = [sample_col] + list_condition_cols
+list_group_cols = group_cols.split(',')
+required_cols = [sample_col] + list_group_cols
 
 missing = [col for col in required_cols if col not in adata.obs.columns]
 if missing:
     raise ValueError(f"Missing required obs columns: {missing}")
 
-adata.obs[pb_col] = adata.obs[list_condition_cols].astype(str).agg(separator.join, axis=1)
+adata.obs[pb_col] = adata.obs[list_group_cols].astype(str).agg(separator.join, axis=1)
 
 
 # decoupler's pseudobulk helper expects a single grouping key.
@@ -38,6 +38,9 @@ pseudobulk_adata = dc.pp.pseudobulk(
     layer='counts',
     mode="sum"
 )
+
+# re-assign label with separator
+pseudobulk_adata.obs_names = pseudobulk_adata.obs[sample_col].astype(str) + separator + pseudobulk_adata.obs[pb_col].astype(str)
 
 
 pseudobulk_adata.write_h5ad(f"{prefix}.h5ad")
