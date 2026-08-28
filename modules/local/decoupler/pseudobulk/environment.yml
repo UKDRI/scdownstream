@@ -1,0 +1,15 @@
+name: decoupler_pseudobulk
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+    - anndata>=0.10
+    - pandas>=2.0
+    - numpy>=1.24
+    - scipy>=1.11
+    - scanpy>=1.10
+    - decoupler>=1.6
+    - pyyaml

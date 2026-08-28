@@ -550,6 +550,56 @@
                 }
             }
         },
+        "differential_genes_options": {
+            "title": "Differential genes options",
+            "type": "object",
+            "fa_icon": "fas fa-balance-scale",
+            "description": "Options for pseudobulk differential gene expression analysis.",
+            "properties": {
+                "diffgenes_contrasts": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "schema": "assets/schema_contrasts.json",
+                    "mimetype": "text/tsv",
+                    "pattern": "^\\S+\\.tsv$",
+                    "description": "Path to the TSV file describing the contrasts to test",
+                    "help_text": "Tab-separated file following the nf-core/differentialabundance contrasts definition. Required columns are `id`, `variable`, `reference` and `target`; the optional columns are `blocking`, `exclude_samples_col` and `exclude_samples_values`. Because the file is tab-separated, `blocking` and `exclude_samples_values` take **comma**-separated values (nf-core/differentialabundance uses semicolons there; this pipeline requires TSV and commas). One differential expression test is run per row, for every instance of the group label. See `assets/contrasts.tsv` for an example.",
+                    "fa_icon": "fas fa-file-csv"
+                },
+                "diffgenes_group_col": {
+                    "type": "string",
+                    "description": "Obs column holding the group label to test within",
+                    "help_text": "Name of the obs column that holds the cluster or cell type label. Differential genes are computed separately for every instance of this label. The column must exist in the obs table of the input AnnData object."
+                },
+                "diffgenes_sample_col": {
+                    "type": "string",
+                    "description": "Obs column identifying the biological sample",
+                    "help_text": "Name of the obs column that identifies the biological sample or replicate. Counts are summed per sample within each combination of the group label and the contrast variables to form the pseudobulk profiles."
+                },
+                "diffgenes_min_counts": {
+                    "type": "integer",
+                    "default": 1000,
+                    "minimum": 0,
+                    "description": "Minimum number of counts per pseudobulk sample",
+                    "help_text": "Pseudobulk samples with fewer total counts are discarded before the differential expression test."
+                },
+                "diffgenes_min_cells": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 0,
+                    "description": "Minimum number of cells per pseudobulk sample",
+                    "help_text": "Pseudobulk samples aggregated from fewer cells are discarded before the differential expression test."
+                },
+                "diffgenes_min_samples": {
+                    "type": "integer",
+                    "default": 2,
+                    "minimum": 2,
+                    "description": "Minimum number of pseudobulk samples per side of a contrast",
+                    "help_text": "The threshold applies to each side of the contrast independently: both the target level and the reference level must be backed by at least this many pseudobulk samples. It is evaluated after the object has been split per instance of the group label, so a group label with too few samples on either side is skipped and produces no results table, rather than failing the run. Values below 2 are rejected because a contrast with a single sample on one side cannot be tested at all."
+                }
+            }
+        },
         "institutional_config_options": {
             "title": "Institutional config options",
             "type": "object",
@@ -673,6 +723,14 @@
                     "description": "Custom MultiQC yaml file containing HTML including a methods description.",
                     "fa_icon": "fas fa-cog"
                 },
+                "singularity_cache_dir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Directory containing locally built Singularity/Apptainer .sif images.",
+                    "help_text": "When running with the `singularity` or `apptainer` profile and this parameter is set, modules use `<singularity_cache_dir>/<image>.sif` instead of pulling the remote container. Defaults to `$NXF_SINGULARITY_CACHEDIR` (or `$NXF_APPTAINER_CACHEDIR`) when either is set in the environment.",
+                    "fa_icon": "fas fa-folder-open",
+                    "hidden": true
+                },
                 "validate_params": {
                     "type": "boolean",
                     "description": "Boolean whether to validate parameters against the schema at runtime",
@@ -732,6 +790,9 @@
         },
         {
             "$ref": "#/$defs/pseudobulking_options"
+        },
+        {
+            "$ref": "#/$defs/differential_genes_options"
         },
         {
             "$ref": "#/$defs/institutional_config_options"
