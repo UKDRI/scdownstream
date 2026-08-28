@@ -35,7 +35,9 @@ workflow DIFFERENTIAL_GENES {
 
     // Every column that has to survive the pseudobulk aggregation: the group label plus
     // the variable and the blocking variables of every contrast. DECOUPLER_PSEUDOBULK
-    // expects a single comma-separated string because its template splits on ','.
+    // expects a single comma-separated string because its template splits on ','; the
+    // report reuses the same string to decide which columns to break the profiles down by.
+    // It is a value channel, so both consumers can read it.
     ch_group_cols = ch_contrasts
         .flatMap { contrast ->
             [contrast.variable] + (contrast.list_of_blocked_variables ? contrast.list_of_blocked_variables.split(',').collect { it.trim() } : [])
@@ -89,6 +91,12 @@ workflow DIFFERENTIAL_GENES {
         .map { meta, tsv -> "${tsv.name}\t${meta.subset}\t${meta.contrast}" }
         .collectFile(name: 'de_manifest.tsv', newLine: true, sort: true)
 
+    // Versions of the modules that produced the results above, collated into a single file
+    // so the report can list them. The report's own versions are mixed into ch_versions
+    // only afterwards - feeding them back in here would close a cycle.
+    ch_module_versions = softwareVersionsToYAML(ch_versions)
+        .collectFile(name: 'differential_genes_versions.yml', sort: true, newLine: true)
+
     //
     // MODULE: Quarto report over all differential expression results
     //
@@ -97,7 +105,12 @@ workflow DIFFERENTIAL_GENES {
         ch_de_tsvs,
         ch_de_manifest,
         "${projectDir}/modules/local/pydeseq2/report/templates/scdownstream_differential_genes_report.qmd",
+        sample_col,
+        ch_group_cols,
+        params.report_table_row_limit,
+        ch_module_versions,
     )
+    ch_versions = ch_versions.mix(PYDESEQ2_GENERATE_REPORT.out.versions)
 
     //
     // Collate and save software versions

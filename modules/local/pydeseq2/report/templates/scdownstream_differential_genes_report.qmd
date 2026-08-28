@@ -18,10 +18,17 @@ format:
 
 PSEUDOBULK_FILE = "pseudobulk.h5ad"
 MANIFEST = "de_manifest.tsv"
+# .obs column identifying the biological sample.
+SAMPLE_COLUMN = ""
+# Comma-separated: the group label column followed by the variable and the blocking
+# variables of every contrast, as passed to the pseudobulk aggregation.
+GROUP_COLUMNS = ""
 PADJ_THRESHOLD = 0.05
 LFC_THRESHOLD = 1.0
 N_LABEL_GENES = 10
 MAX_CATEGORIES = 50
+NTOP = 250
+VERSIONS_FILE = "differential_genes_versions.yml"
 ```
 
 ```{python}
@@ -32,7 +39,9 @@ warnings.filterwarnings('ignore')
 ```{python}
 import base64
 import io
+import itertools
 import os
+import re
 
 import anndata as ad
 import matplotlib
@@ -47,10 +56,13 @@ from IPython.display import display, HTML
 ```{python}
 path_pseudobulk = PSEUDOBULK_FILE
 path_manifest = MANIFEST
+sample_column = str(SAMPLE_COLUMN).strip()
+group_columns = [column.strip() for column in str(GROUP_COLUMNS).split(',') if column.strip()]
 padj_threshold = float(PADJ_THRESHOLD)
 lfc_threshold = float(LFC_THRESHOLD)
 n_label_genes = int(N_LABEL_GENES)
 max_categories = int(MAX_CATEGORIES)
+ntop = int(NTOP)
 
 # padj is floored before the log so that padj == 0 does not produce an infinite y value.
 MIN_PADJ = 1e-300
@@ -64,7 +76,9 @@ RESULT_COLUMNS = ['feature', 'baseMean', 'log2FoldChange', 'lfcSE', 'stat', 'pva
 ## <font color='green'>Pseudobulk summary</font>
 
 Counts were aggregated per sample and per group label before testing for differential
-expression with pydeseq2. The pseudobulk object below is the input to those tests.
+expression with pydeseq2. The pseudobulk object below is the input to those tests. The
+profiles are broken down by the columns this analysis is defined by: the sample column, the
+group label column, and the variable and blocking variables of the contrasts.
 
 ```{python}
 adata = ad.read_h5ad(path_pseudobulk)
@@ -85,21 +99,21 @@ def summarise_column(obs: pd.DataFrame, column: str) -> pd.DataFrame:
     )
 
 
-def describable_columns(obs: pd.DataFrame, max_levels: int) -> list:
+def requested_columns(sample_column: str, group_columns: list) -> list:
     """
-    Pick the .obs columns worth tabulating.
+    The .obs columns this analysis is defined by, in the order they are reported.
 
-    The columns present depend on how the pseudobulk was built (the sample column plus
-    whichever columns were used for grouping), so nothing is hardcoded here: any
-    non-numeric column with a manageable number of levels is summarised.
+    That is the sample column, then the group label column, then the variable and the
+    blocking variables of every contrast - the columns the pipeline aggregated the
+    pseudobulk over. Nothing else in .obs is tabulated. The order is the order they were
+    passed in, and a column named twice (a contrast variable that is also the group label,
+    say) is kept only at its first position.
     """
+    seen = set()
     columns = []
-    for column in obs.columns:
-        values = obs[column]
-        if pd.api.types.is_numeric_dtype(values) and not isinstance(values.dtype, pd.CategoricalDtype):
-            continue
-        n_levels = values.astype(str).nunique(dropna=False)
-        if 0 < n_levels <= max_levels:
+    for column in ([sample_column] if sample_column else []) + list(group_columns):
+        if column and column not in seen:
+            seen.add(column)
             columns.append(column)
     return columns
 ```
@@ -107,27 +121,46 @@ def describable_columns(obs: pd.DataFrame, max_levels: int) -> list:
 ```{python}
 obs = adata.obs.copy()
 
-# 'pseudobulk_label' is written by the decoupler pseudobulk module and is the most
-# informative breakdown when it is there, so it is shown first. It may be absent for a
-# pseudobulk object built elsewhere, hence the membership test rather than a direct lookup.
-preferred = [column for column in ['pseudobulk_label'] if column in obs.columns]
-columns_to_show = preferred + [
-    column for column in describable_columns(obs, max_categories) if column not in preferred
-]
+requested = requested_columns(sample_column, group_columns)
+columns_to_show = [column for column in requested if column in obs.columns]
+missing_columns = [column for column in requested if column not in obs.columns]
 
-if not columns_to_show:
+if not requested:
     display(HTML(
-        "<p>No categorical metadata column with a manageable number of levels was found in "
-        "<code>.obs</code>, so no breakdown of the pseudobulk profiles is shown.</p>"
+        "<p>No sample or group column was passed to the report, so no breakdown of the "
+        "pseudobulk profiles is shown.</p>"
     ))
-else:
-    for column in columns_to_show:
-        table = summarise_column(obs, column)
-        html = "<h3><font color='green'>Pseudobulk profiles per " + str(column) + "</font></h3>"
-        html += '<font color="black"><details><summary>Click to expand table</summary>'
-        html += '<div style="overflow-y: scroll; overflow-x: scroll; max-height: 400px">'
-        html += table.to_html(index=False) + '</div></details></font>'
-        display(HTML(html))
+
+# The requested columns come from the pipeline parameters, so a column may be absent from a
+# pseudobulk object that was built with different settings. That is reported rather than
+# raised on, so the rest of the report is still produced.
+if missing_columns:
+    display(HTML(
+        "<p>The following column(s) of this analysis are not present in <code>.obs</code> of "
+        "the pseudobulk object and are therefore not broken down below: <code>"
+        + ", ".join(missing_columns) + "</code>.</p>"
+    ))
+
+for column in columns_to_show:
+    header = "<h3><font color='green'>Pseudobulk profiles per " + str(column) + "</font></h3>"
+    n_levels = obs[column].astype(str).nunique(dropna=False)
+
+    # A column such as the sample one can have thousands of levels; the table would be as
+    # long as the object itself and tells the reader nothing, so only its size is reported.
+    if n_levels > max_categories:
+        display(HTML(
+            header + "<p>Column <code>" + str(column) + "</code> has " + str(n_levels)
+            + " distinct values, more than the " + str(max_categories)
+            + " tabulated here, so no table is shown for it.</p>"
+        ))
+        continue
+
+    table = summarise_column(obs, column)
+    html = header
+    html += '<font color="black"><details><summary>Click to expand table</summary>'
+    html += '<div style="overflow-y: scroll; overflow-x: scroll; max-height: 400px">'
+    html += table.to_html(index=False) + '</div></details></font>'
+    display(HTML(html))
 ```
 
 ---
@@ -141,6 +174,10 @@ display(HTML(
     + ". Up- and down-regulated genes are coloured red and blue, respectively; the "
     + str(n_label_genes) + " most significant of them are labelled. Genes with a missing "
     + "<code>padj</code> (filtered out by pydeseq2) are excluded from the plot.</p>"
+    + "<p>Each plot is followed by two searchable tables of the genes behind it, one for "
+    + "the up- and one for the down-regulated genes. Each of the two tables is limited to "
+    + "the top " + str(ntop) + " genes, is searchable, and can be sorted by clicking on a "
+    + "column header.</p>"
 ))
 ```
 
@@ -243,6 +280,172 @@ def volcano_png(results: pd.DataFrame, title: str) -> str:
 ```
 
 ```{python}
+# add table search function
+# One handler serves every table in the document; the ids of the box and of the table it
+# filters are passed in, which is what keeps a search local to its own table.
+
+html = """
+<script>
+function searchTable(inputId, containerId) {
+    let input = document.getElementById(inputId).value.toLowerCase();
+    let rows = document.querySelectorAll('#' + containerId + ' tbody tr');
+    rows.forEach(row => {
+        let rowText = row.textContent.toLowerCase();
+
+        if (rowText.includes(input)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+function sortTable(containerId, colIndex) {
+    let table = document.querySelector('#' + containerId + ' table');
+    let tbody = table.tBodies[0];
+    let rows = Array.from(tbody.rows);
+
+    // Clicking the column that is already sorted reverses it, any other column starts ascending.
+    let sorted = table.getAttribute('data-sort-col');
+    let ascending = !(sorted === String(colIndex) && table.getAttribute('data-sort-dir') === 'asc');
+
+    let cell = row => row.cells[colIndex].textContent.trim();
+    let numeric = rows.every(row => cell(row) === '' || !isNaN(parseFloat(cell(row))));
+
+    rows.sort((a, b) => {
+        let x = cell(a);
+        let y = cell(b);
+        let order = numeric ? parseFloat(x) - parseFloat(y) : x.localeCompare(y);
+        return ascending ? order : -order;
+    });
+
+    rows.forEach(row => tbody.appendChild(row));
+    table.setAttribute('data-sort-col', colIndex);
+    table.setAttribute('data-sort-dir', ascending ? 'asc' : 'desc');
+}
+</script>
+"""
+display(HTML(html))
+```
+
+```{python}
+# helper functions for creating HTML table
+
+def sortable_headers(table_html: str, table_name: str) -> str:
+    """
+    Turn the header cells of a rendered table into sort handles.
+
+    Every `<th>` of the header row gets an onclick calling `sortTable` with its own column
+    index, so a reader can order the genes by fold change, p-value or any other column. The
+    handler decides numeric or text ordering from the values themselves, which is why the
+    column type does not have to be passed on here.
+    """
+    header = re.search(r'<thead>.*?</thead>', table_html, flags=re.DOTALL)
+    if header is None:
+        return table_html
+
+    index = itertools.count()
+
+    def handle(match):
+        return (
+            "<th style='cursor: pointer' title='Click to sort' onclick=\"sortTable('"
+            + table_name + "', " + str(next(index)) + ")\">" + match.group(1) + " &#8645;</th>"
+        )
+
+    return table_html.replace(
+        header.group(0), re.sub(r'<th>(.*?)</th>', handle, header.group(0), flags=re.DOTALL)
+    )
+
+
+def create_search_table_html(df: pd.DataFrame, search_text: str,
+                             sbox_name: str, table_name: str, ntop: int=100,
+                             lookupFunction: str="searchTable") -> str:
+    """
+    Creates HTML string for searchable table
+
+    Parameters
+    ----------
+    df: pd.DataFrame
+        Pandas DataFrame to be turned into searchable table
+    search_text: str
+        Text that will be displayed in search box before typing
+    sbox_name: str
+        Unique searchbox ID that will be assigned
+    table_name: str
+        Unique table ID that will be assigned
+    ntop: int
+        Limit the number of rows to this number to avoid giant HTMLs
+    lookupFunction: str
+        JavaScript function for text search, has to be defined beforehand.
+
+    Returns
+    -------
+    str
+        HTML table string that can be displayed with IPython.display.HTML
+    """
+
+    # input search box
+    table_html = "<input type='text' id='" + sbox_name + "' onkeyup=\"" + lookupFunction + "('" + sbox_name + "', '" + table_name + "')\" "
+    table_html += "placeholder='" + search_text + "'"
+    table_html += "style='width: 100%; max-width: 300px; padding: 10px; margin-top: 12px; font-family: sans-serif; border: 1px solid #D1D5DB; border-radius: 4px;'>"
+
+    # table, with every header cell wired to the sort handler of its own column
+    table_body = sortable_headers(df.to_html(index=False, max_rows=ntop), table_name)
+    table_html += "<div id=" + table_name + " style='overflow-y: scroll; max-height: 400px'>" + table_body + "</div>"
+
+    return table_html
+```
+
+```{python}
+def table_ids(index: int, group: str, contrast: str, direction: str) -> tuple:
+    """
+    Searchbox and table id for one direction of one group label instance and contrast.
+
+    The ids are built from the same identifiers the volcano loop iterates over, plus the
+    direction, with every character that is not allowed in an HTML id replaced. The
+    running index is kept in the id as well, so two tables cannot end up sharing an id
+    when different identifiers sanitise to the same string.
+    """
+    stem = re.sub(r'[^0-9A-Za-z]+', '_', f"{group}_{contrast}").strip('_')
+    return f"sboxDiff{index}{direction}_{stem}", f"tableDiff{index}{direction}_{stem}"
+
+
+def top_genes_table(results: pd.DataFrame, ntop: int, direction: str) -> pd.DataFrame:
+    """
+    The most interesting up- or down-regulated genes of one contrast, ordered for reading.
+
+    The direction ('up' or 'down') selects the sign of the log2 fold change, and the row
+    limit applies to the selection, so each of the two tables shows its own top ntop
+    genes. Genes passing the same thresholds the volcano plot uses are listed first, and
+    within both blocks the ordering is by adjusted p-value, so the significant hits are at
+    the top of the table without the near misses being dropped. p-values are formatted
+    rather than rounded because they span many orders of magnitude.
+    """
+    table = results[RESULT_COLUMNS].copy()
+
+    if direction == 'up':
+        table = table[table['log2FoldChange'] > 0]
+    else:
+        table = table[table['log2FoldChange'] < 0]
+
+    significant = (table['padj'] < padj_threshold) & (table['log2FoldChange'].abs() > lfc_threshold)
+
+    table = (
+        table.assign(_not_significant=(~significant).astype(int))
+        .sort_values(['_not_significant', 'padj', 'pvalue'])
+        .drop(columns='_not_significant')
+        .head(ntop)
+    )
+
+    for column in ['baseMean', 'log2FoldChange', 'lfcSE', 'stat']:
+        table[column] = table[column].round(3)
+    for column in ['pvalue', 'padj']:
+        table[column] = table[column].map('{:.3g}'.format)
+
+    return table.rename(columns={'feature': 'gene'})
+```
+
+```{python}
 #| output: asis
 
 manifest = read_manifest(path_manifest)
@@ -254,6 +457,10 @@ if manifest.empty:
         "plot here.\n"
     )
 else:
+    # Counter over all (group label instance x contrast) pairs. Together with the
+    # direction it keeps the ids of the searchable tables unique across the document.
+    table_index = 0
+
     for group, rows in manifest.groupby('group', sort=True):
         print(f"\n### <font color='green'>Group: {group}</font>\n")
 
@@ -296,6 +503,33 @@ else:
                 f'{n_dropped} gene(s) with a missing adjusted p-value were excluded.'
                 f'</figcaption></figure>\n'
             )
+
+            # Searchable tables of the very genes plotted above, directly below the plot,
+            # split by the sign of the log2 fold change. One <details> per direction
+            # rather than one holding both, so each table can be opened and searched on
+            # its own; the direction is part of the ids, so the two never collide.
+            for direction, label in [('up', 'Upregulated'), ('down', 'Downregulated')]:
+                sbox_name, table_name = table_ids(table_index, group, contrast, direction)
+                genes = top_genes_table(results, ntop, direction)
+
+                if genes.empty:
+                    print(f"\n<p>No {label.lower()} gene was tested in this contrast.</p>\n")
+                    continue
+
+                table_html = create_search_table_html(
+                    genes,
+                    "Search gene...",
+                    sbox_name,
+                    table_name,
+                    ntop,
+                )
+
+                print(
+                    f"\n<details><summary><font color='green'>{label} genes</font>"
+                    f" - click to expand table</summary>{table_html}</details>\n"
+                )
+
+            table_index += 1
 ```
 
 ---
@@ -326,3 +560,120 @@ _Muzellec B, Teleńczuk M, Cabeli V, & Andreux M. (2023). PyDESeq2: a python pac
 ### <font color='green'>[DESeq2](https://bioconductor.org/packages/DESeq2/)</font>
 
 _Love MI, Huber W, & Anders S. (2014). Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2. Genome Biol., 15(12):550._
+
+---
+
+## <font color='green'>Software versions</font>
+
+The first table lists the software of the pipeline modules that produced the results in
+this report, as collected by Nextflow. The second one is read from the rendering
+environment itself, so it describes the software that produced the report.
+
+```{python}
+def pipeline_versions(path: str) -> pd.DataFrame:
+    """
+    Software versions collected by Nextflow from the modules of this entry point.
+
+    The file is the collated versions.yml of the pipeline: one mapping per process, each
+    holding the tools that process reported. It is flattened into one row per tool so the
+    table reads the same way as the one below.
+    """
+    import yaml
+
+    with open(path) as handle:
+        collected = yaml.safe_load(handle) or {}
+
+    rows = [
+        (process, tool, str(version))
+        for process, tools in collected.items()
+        for tool, version in (tools or {}).items()
+    ]
+
+    return pd.DataFrame(rows, columns=['process', 'software', 'version'])
+
+
+modules = pipeline_versions(VERSIONS_FILE)
+
+display(HTML('<font color="black">' + modules.to_html(index=False) + '</font>'))
+```
+
+```{python}
+import platform
+import shutil
+import subprocess
+
+import IPython
+
+
+def library_version(module) -> str:
+    """
+    Version of an already imported library.
+
+    The attribute is preferred over the installed distribution metadata because it is what
+    the running code reports about itself; the metadata is only consulted as a fallback.
+    """
+    reported = getattr(module, '__version__', None)
+    if reported:
+        return str(reported)
+
+    from importlib.metadata import PackageNotFoundError, version as distribution_version
+
+    try:
+        return distribution_version(module.__name__)
+    except PackageNotFoundError:
+        return 'unknown'
+
+
+def quarto_version():
+    """
+    Version of the quarto binary rendering this document, or None if it cannot be read.
+
+    Quarto does not export its own version into the rendering environment, so the binary is
+    asked directly. The row is dropped rather than guessed when no binary can be reached.
+    """
+    reported = os.environ.get('QUARTO_VERSION')
+    if reported and reported.strip():
+        return reported.strip()
+
+    bin_path = os.environ.get('QUARTO_BIN_PATH')
+    candidates = [os.path.join(bin_path, 'quarto')] if bin_path else []
+    candidates.append(shutil.which('quarto'))
+
+    for candidate in candidates:
+        if not candidate or not os.path.exists(candidate):
+            continue
+        try:
+            completed = subprocess.run(
+                [candidate, '--version'],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=True,
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if completed.stdout.strip():
+            return completed.stdout.strip()
+
+    return None
+```
+
+```{python}
+rows = [('python', platform.python_version())]
+
+quarto = quarto_version()
+if quarto is not None:
+    rows.append(('quarto', quarto))
+
+rows += [
+    ('anndata', library_version(ad)),
+    ('matplotlib', library_version(matplotlib)),
+    ('numpy', library_version(np)),
+    ('pandas', library_version(pd)),
+    ('ipython', library_version(IPython)),
+]
+
+versions = pd.DataFrame(rows, columns=['software', 'version'])
+
+display(HTML('<font color="black">' + versions.to_html(index=False) + '</font>'))
+```
