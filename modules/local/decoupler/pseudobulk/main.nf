@@ -3,9 +3,11 @@ process DECOUPLER_PSEUDOBULK {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    container "${workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container
-        ? 'oras://community.wave.seqera.io/library/decoupler_anndata:1f90c5f9ae5f4f8d'
-        : 'community.wave.seqera.io/library/decoupler_anndata:1f90c5f9ae5f4f8d'}"
+    container "${workflow.containerEngine in ['singularity', 'apptainer'] && params.singularity_cache_dir
+        ? params.singularity_cache_dir + '/decoupler_latest.sif'
+        : workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container
+            ? 'oras://community.wave.seqera.io/library/decoupler_anndata:1f90c5f9ae5f4f8d'
+            : 'community.wave.seqera.io/library/decoupler_anndata:1f90c5f9ae5f4f8d'}"
 
     input:
     tuple val(meta), path(h5ad)
@@ -22,4 +24,11 @@ process DECOUPLER_PSEUDOBULK {
     script:
     prefix = task.ext.prefix ?: "${meta.id}"
     template('pseudobulk.py')
+
+    stub:
+    prefix = task.ext.prefix ?: "${meta.id}"
+    """
+    touch "${prefix}.h5ad"
+    touch "versions.yml"
+    """
 }

@@ -1,0 +1,328 @@
+---
+title: <font color='green'><b><u>Single-cell differential genes report</u></b></font>
+jupyter: python3
+execute:
+  echo: false
+  warning: false
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    embed-resources: true
+---
+
+
+```{python}
+#| tags: [parameters]
+
+PSEUDOBULK_FILE = "pseudobulk.h5ad"
+MANIFEST = "de_manifest.tsv"
+PADJ_THRESHOLD = 0.05
+LFC_THRESHOLD = 1.0
+N_LABEL_GENES = 10
+MAX_CATEGORIES = 50
+```
+
+```{python}
+import warnings
+warnings.filterwarnings('ignore')
+```
+
+```{python}
+import base64
+import io
+import os
+
+import anndata as ad
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+from IPython.display import display, HTML
+```
+
+```{python}
+path_pseudobulk = PSEUDOBULK_FILE
+path_manifest = MANIFEST
+padj_threshold = float(PADJ_THRESHOLD)
+lfc_threshold = float(LFC_THRESHOLD)
+n_label_genes = int(N_LABEL_GENES)
+max_categories = int(MAX_CATEGORIES)
+
+# padj is floored before the log so that padj == 0 does not produce an infinite y value.
+MIN_PADJ = 1e-300
+
+# Columns expected in a pydeseq2 results_df export.
+RESULT_COLUMNS = ['feature', 'baseMean', 'log2FoldChange', 'lfcSE', 'stat', 'pvalue', 'padj']
+```
+
+---
+
+## <font color='green'>Pseudobulk summary</font>
+
+Counts were aggregated per sample and per group label before testing for differential
+expression with pydeseq2. The pseudobulk object below is the input to those tests.
+
+```{python}
+adata = ad.read_h5ad(path_pseudobulk)
+
+display(HTML(
+    "<p>The pseudobulk data set contains " + str(adata.n_obs) + " pseudobulk profiles and "
+    + str(adata.n_vars) + " genes or transcripts.</p>"
+))
+```
+
+```{python}
+def summarise_column(obs: pd.DataFrame, column: str) -> pd.DataFrame:
+    """Value counts for one .obs column, returned as a two column table."""
+    return (
+        obs.value_counts(column)
+        .rename_axis(column)
+        .reset_index(name='number of pseudobulk profiles')
+    )
+
+
+def describable_columns(obs: pd.DataFrame, max_levels: int) -> list:
+    """
+    Pick the .obs columns worth tabulating.
+
+    The columns present depend on how the pseudobulk was built (the sample column plus
+    whichever columns were used for grouping), so nothing is hardcoded here: any
+    non-numeric column with a manageable number of levels is summarised.
+    """
+    columns = []
+    for column in obs.columns:
+        values = obs[column]
+        if pd.api.types.is_numeric_dtype(values) and not isinstance(values.dtype, pd.CategoricalDtype):
+            continue
+        n_levels = values.astype(str).nunique(dropna=False)
+        if 0 < n_levels <= max_levels:
+            columns.append(column)
+    return columns
+```
+
+```{python}
+obs = adata.obs.copy()
+
+# 'pseudobulk_label' is written by the decoupler pseudobulk module and is the most
+# informative breakdown when it is there, so it is shown first. It may be absent for a
+# pseudobulk object built elsewhere, hence the membership test rather than a direct lookup.
+preferred = [column for column in ['pseudobulk_label'] if column in obs.columns]
+columns_to_show = preferred + [
+    column for column in describable_columns(obs, max_categories) if column not in preferred
+]
+
+if not columns_to_show:
+    display(HTML(
+        "<p>No categorical metadata column with a manageable number of levels was found in "
+        "<code>.obs</code>, so no breakdown of the pseudobulk profiles is shown.</p>"
+    ))
+else:
+    for column in columns_to_show:
+        table = summarise_column(obs, column)
+        html = "<h3><font color='green'>Pseudobulk profiles per " + str(column) + "</font></h3>"
+        html += '<font color="black"><details><summary>Click to expand table</summary>'
+        html += '<div style="overflow-y: scroll; overflow-x: scroll; max-height: 400px">'
+        html += table.to_html(index=False) + '</div></details></font>'
+        display(HTML(html))
+```
+
+---
+
+## <font color='green'>Volcano plots</font>
+
+```{python}
+display(HTML(
+    "<p>Genes are called differentially expressed when <code>padj</code> &lt; "
+    + str(padj_threshold) + " and |log2FoldChange| &gt; " + str(lfc_threshold)
+    + ". Up- and down-regulated genes are coloured red and blue, respectively; the "
+    + str(n_label_genes) + " most significant of them are labelled. Genes with a missing "
+    + "<code>padj</code> (filtered out by pydeseq2) are excluded from the plot.</p>"
+))
+```
+
+```{python}
+def read_manifest(path: str) -> pd.DataFrame:
+    """
+    Read the headerless three column manifest: filename, group label instance, contrast.
+
+    Grouping comes from the manifest rather than from the file names, because ids may
+    themselves contain underscores and would be ambiguous to parse.
+    """
+    columns = ['filename', 'group', 'contrast']
+
+    if not os.path.exists(path) or os.path.getsize(path) == 0:
+        return pd.DataFrame(columns=columns)
+
+    try:
+        manifest = pd.read_csv(path, sep="\t", header=None, names=columns, dtype=str)
+    except (pd.errors.EmptyDataError, pd.errors.ParserError):
+        return pd.DataFrame(columns=columns)
+
+    manifest = manifest.dropna(subset=['filename'])
+    manifest['group'] = manifest['group'].fillna('NA')
+    manifest['contrast'] = manifest['contrast'].fillna('NA')
+
+    return manifest
+
+
+def read_results(path: str):
+    """
+    Read one pydeseq2 result table.
+
+    Returns (dataframe, message). Exactly one of the two is None: a missing, empty or
+    malformed file yields a message that is reported in place of the plot.
+    """
+    if not os.path.exists(path):
+        return None, f"Result file <code>{path}</code> is missing."
+    if os.path.getsize(path) == 0:
+        return None, f"Result file <code>{path}</code> is empty."
+
+    try:
+        results = pd.read_csv(path, sep="\t")
+    except (pd.errors.EmptyDataError, pd.errors.ParserError):
+        return None, f"Result file <code>{path}</code> could not be parsed."
+
+    if results.empty:
+        return None, f"Result file <code>{path}</code> contains no rows."
+
+    missing = [column for column in RESULT_COLUMNS if column not in results.columns]
+    if missing:
+        return None, f"Result file <code>{path}</code> is missing the column(s): {', '.join(missing)}."
+
+    return results, None
+```
+
+```{python}
+def volcano_png(results: pd.DataFrame, title: str) -> str:
+    """Draw one volcano plot and return it as a base64 encoded PNG."""
+    fig, ax = plt.subplots(figsize=(6, 5))
+
+    padj = results['padj'].clip(lower=MIN_PADJ)
+    neg_log_padj = -np.log10(padj)
+    lfc = results['log2FoldChange']
+
+    significant = (results['padj'] < padj_threshold) & (lfc.abs() > lfc_threshold)
+    up = significant & (lfc > 0)
+    down = significant & (lfc < 0)
+    rest = ~significant
+
+    ax.scatter(lfc[rest], neg_log_padj[rest], s=6, c='lightgrey', label='not significant')
+    ax.scatter(lfc[down], neg_log_padj[down], s=6, c='tab:blue', label='down')
+    ax.scatter(lfc[up], neg_log_padj[up], s=6, c='tab:red', label='up')
+
+    ax.axhline(-np.log10(max(padj_threshold, MIN_PADJ)), color='grey', lw=0.6, ls='--')
+    ax.axvline(lfc_threshold, color='grey', lw=0.6, ls='--')
+    ax.axvline(-lfc_threshold, color='grey', lw=0.6, ls='--')
+
+    labelled = results.loc[significant].assign(_y=neg_log_padj[significant])
+    labelled = labelled.sort_values('_y', ascending=False).head(n_label_genes)
+    for _, row in labelled.iterrows():
+        ax.annotate(
+            str(row['feature']),
+            (row['log2FoldChange'], row['_y']),
+            fontsize=7,
+            xytext=(2, 2),
+            textcoords='offset points',
+        )
+
+    ax.set_xlabel('log2 fold change')
+    ax.set_ylabel('-log10 adjusted p-value')
+    ax.set_title(title, fontsize=10)
+    ax.legend(fontsize=7, frameon=False, loc='best')
+    fig.tight_layout()
+
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format='png', dpi=150, bbox_inches='tight')
+    plt.close(fig)
+
+    return base64.b64encode(buffer.getvalue()).decode('utf-8')
+```
+
+```{python}
+#| output: asis
+
+manifest = read_manifest(path_manifest)
+
+if manifest.empty:
+    print(
+        "No differential expression results were produced. Every group was either skipped "
+        "by the minimum sample guard or yielded no result table, so there is nothing to "
+        "plot here.\n"
+    )
+else:
+    for group, rows in manifest.groupby('group', sort=True):
+        print(f"\n### <font color='green'>Group: {group}</font>\n")
+
+        for _, row in rows.iterrows():
+            contrast = row['contrast']
+            print(f"\n**Contrast: {contrast}**\n")
+
+            results, message = read_results(row['filename'])
+            if results is None:
+                print(f"\n{message} No volcano plot is shown for this contrast.\n")
+                continue
+
+            # pydeseq2 writes NaN padj for independently filtered genes; those points
+            # cannot be placed on a -log10 axis and are dropped before plotting.
+            n_total = len(results)
+            results = results.dropna(subset=['padj', 'log2FoldChange'])
+            n_dropped = n_total - len(results)
+
+            if results.empty:
+                print(
+                    f"\nAll {n_total} gene(s) in <code>{row['filename']}</code> have a missing "
+                    "adjusted p-value, so no volcano plot is shown for this contrast.\n"
+                )
+                continue
+
+            n_significant = int(
+                (
+                    (results['padj'] < padj_threshold)
+                    & (results['log2FoldChange'].abs() > lfc_threshold)
+                ).sum()
+            )
+
+            image_string = volcano_png(results, f"{group} - {contrast}")
+
+            print(
+                f'\n<figure><img alt="volcano plot {group} {contrast}" '
+                f'src="data:image/png;base64,{image_string}" />'
+                f'<figcaption>{n_significant} of {len(results)} tested gene(s) pass '
+                f'padj &lt; {padj_threshold} and |log2FoldChange| &gt; {lfc_threshold}. '
+                f'{n_dropped} gene(s) with a missing adjusted p-value were excluded.'
+                f'</figcaption></figure>\n'
+            )
+```
+
+---
+
+## <font color='green'>Citations</font>
+
+### <font color='green'>[Nextflow](https://www.nextflow.io/)</font>
+
+_Di Tommaso P, Chatzou M, Floden EW, Barja PP, Palumbo E, Notredame C. (2017). Nextflow enables reproducible computational workflows. Nat Biotechnol., 35(4):316-319._
+
+### <font color='green'>[Nfcore](https://nf-co.re/)</font>
+This pipelines is a substantially modified version of [nfcore:scdowntream](https://github.com/nf-core/scdownstream), which was originally written by Nico Trummer, and uses [nfcore modules](https://github.com/nf-core/modules):
+
+_Ewels PA, Peltzer A, Fillinger S, Patel H, Alneberg J, Wilm A, Garcia MU, Di Tommaso P, Nahnsen S. (2020). The nf-core framework for community-curated bioinformatics pipelines. Nat Biotechnol., 38(3):276-278_
+
+### <font color='green'>[Scanpy](https://scanpy.readthedocs.io/en/stable/)</font>
+
+_Wolf FA, Angerer P, & Theis, FJ. (2018). SCANPY: large-scale single-cell gene expression data analysis. Genome Biol., 19(1):15._
+
+### <font color='green'>[decoupler](https://decoupler-py.readthedocs.io/)</font>
+
+_Badia-i-Mompel P, Vélez Santiago J, Braunger J, Geiss C, Dimitrov D, Müller-Dott S, ... & Saez-Rodriguez J. (2022). decoupleR: ensemble of computational methods to infer biological activities from omics data. Bioinform. Adv., 2(1):vbac016._
+
+### <font color='green'>[PyDESeq2](https://pydeseq2.readthedocs.io/)</font>
+
+_Muzellec B, Teleńczuk M, Cabeli V, & Andreux M. (2023). PyDESeq2: a python package for bulk RNA-seq differential expression analysis. Bioinformatics, 39(9):btad547._
+
+### <font color='green'>[DESeq2](https://bioconductor.org/packages/DESeq2/)</font>
+
+_Love MI, Huber W, & Anders S. (2014). Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2. Genome Biol., 15(12):550._

@@ -3,7 +3,9 @@ process SCANPY_EXPORT_MARKERS {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    container "/data/nhecker/apptainer/images/scanpy_1.11.4_coreinf_0.1.sif"
+    container "${params.singularity_cache_dir
+        ? params.singularity_cache_dir + '/scanpy_1.11.4_coreinf_0.1.sif'
+        : '/data/nhecker/apptainer/images/scanpy_1.11.4_coreinf_0.1.sif'}"
 
     input:
     tuple val(meta), path(h5ad)

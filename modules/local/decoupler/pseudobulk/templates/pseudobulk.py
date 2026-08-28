@@ -7,6 +7,13 @@ import yaml
 
 warnings.filterwarnings("ignore")
 
+os.environ["NUMBA_CACHE_DIR"] = "./tmp/numba"
+os.environ["MPLCONFIGDIR"] = "./tmp/matplotlib"
+os.environ["XDG_CACHE_HOME"] = "./tmp/matplotlib/cache"
+
+os.makedirs("./tmp/numba", exist_ok=True)
+os.makedirs("./tmp/matplotlib/cache", exist_ok=True)
+
 import anndata as ad
 import pandas as pd
 import decoupler as dc

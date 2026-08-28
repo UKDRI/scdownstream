@@ -1,0 +1,56 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/nf-core/scdownstream/master/assets/schema_contrasts.json",
+    "title": "nf-core/scdownstream pipeline - params.diffgenes_contrasts schema",
+    "description": "Schema for the file provided with params.diffgenes_contrasts",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "id": {
+                "type": "string",
+                "pattern": "^\\S+$",
+                "errorMessage": "Contrast id must be provided and cannot contain spaces"
+            },
+            "variable": {
+                "type": "string",
+                "pattern": "^\\S+$",
+                "errorMessage": "Variable must be provided, must be a column of the obs table and cannot contain spaces"
+            },
+            "reference": {
+                "type": "string",
+                "pattern": "^\\S+$",
+                "errorMessage": "Reference level must be provided and cannot contain spaces"
+            },
+            "target": {
+                "type": "string",
+                "pattern": "^\\S+$",
+                "errorMessage": "Target level must be provided and cannot contain spaces"
+            },
+            "blocking": {
+                "type": "string",
+                "pattern": "^(\\S+(,\\S+)*)?$",
+                "default": "",
+                "errorMessage": "Blocking variables cannot contain spaces and must be separated by commas"
+            },
+            "exclude_samples_col": {
+                "type": "string",
+                "pattern": "^\\S*$",
+                "default": "",
+                "errorMessage": "Exclude samples column cannot contain spaces"
+            },
+            "exclude_samples_values": {
+                "type": "string",
+                "pattern": "^(\\S+(,\\S+)*)?$",
+                "default": "",
+                "errorMessage": "Exclude samples values cannot contain spaces and must be separated by commas"
+            }
+        },
+        "required": [
+            "id",
+            "variable",
+            "reference",
+            "target"
+        ]
+    }
+}

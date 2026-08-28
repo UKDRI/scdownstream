@@ -3,7 +3,9 @@ process SCANPY_GENERATE_REPORT {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    container "/nfsdata/apptainer/scanpy_1.11.4_coreinf_0.3.sif"
+    container "${params.singularity_cache_dir
+        ? params.singularity_cache_dir + '/scanpy_1.11.4_coreinf_0.3.sif'
+        : '/nfsdata/apptainer/scanpy_1.11.4_coreinf_0.3.sif'}"
 
     input:
     tuple val(meta), path(h5ad)
@@ -44,7 +46,9 @@ process SCANPY_GENERATE_REPORT_QC {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    container "/nfsdata/apptainer/scanpy_1.11.4_coreinf_0.3.sif"
+    container "${params.singularity_cache_dir
+        ? params.singularity_cache_dir + '/scanpy_1.11.4_coreinf_0.3.sif'
+        : '/nfsdata/apptainer/scanpy_1.11.4_coreinf_0.3.sif'}"
 
     input:
     tuple val(meta), path(h5ad)
