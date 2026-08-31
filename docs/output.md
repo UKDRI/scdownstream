@@ -83,17 +83,20 @@ filtering**.
 
 </details>
 
-### Gene symbol unification
+### Column harmonisation
 
 <details markdown="1">
 <summary>Output files</summary>
 
 - `unify/`
-  - `hugounifier/`: the HUGO symbol mapping and the objects it was applied to (only when
-    `--unify_gene_symbols` is set).
-  - `*.h5ad`: the unified per-sample objects, ready for merging.
+  - `*.h5ad`: the per-sample objects after their gene symbol, batch and cell type columns have been
+    harmonised and duplicate gene symbols resolved, ready for merging.
 
 </details>
+
+Gene symbols are resolved from each sample's `symbol_col` / `geneid_col` (via MyGene.info where
+`symbol_col` is `none`), duplicates are combined according to `--duplicate_var_resolution`, and
+isoforms are optionally aggregated with `--aggregate_isoforms`.
 
 ### Merging and integration
 

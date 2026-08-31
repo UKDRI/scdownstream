@@ -7,9 +7,6 @@ The documentation is split into the following pages:
     file formats, and a description of every parameter group.
 - [Output](output.md)
   - The results each stage produces and how to interpret them.
-- [UK DRI usage](ukdri.md)
-  - Running the pipeline on the UK DRI HPC: pinned checkout, Apptainer image cache, SLURM job
-    pattern and stage chaining.
 - [Acknowledgements](../ACKNOWLEDGEMENTS.md)
   - Provenance of this fork and attribution to the original nf-core/scdownstream authors.
 

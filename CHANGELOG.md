@@ -40,11 +40,14 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 - LIANA+ uses local HCOP ortholog tables (`--ortholog_hcop_directory`) for non-human data.
 - `rank_genes_groups` uses the Wilcoxon test.
 - `--integration_hvgs` default raised from 0 to 5000.
+- `--unify_gene_symbols` is no longer supported: HUGO-based unification only applies to human data.
+  Gene symbol resolution, duplicate handling and isoform aggregation are unaffected.
 - Most intermediate outputs are now published only when `--save_intermediates` is set; the finalized
   objects are published at the top level of `--outdir`.
 - Cell type predictions are merged into the per-sample objects as `obs` columns during finalisation.
 - Documentation rewritten for the fork: README, `docs/usage.md`, `docs/output.md`, a new
-  `docs/ukdri.md`, a new `ACKNOWLEDGEMENTS.md`, and an updated `CITATIONS.md`.
+  `ACKNOWLEDGEMENTS.md`, and an updated `CITATIONS.md`. Cluster-specific guidance lives on the
+  UK DRI Informatics wiki rather than in the repository.
 
 ### `Known issues`
 

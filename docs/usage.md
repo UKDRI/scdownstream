@@ -151,12 +151,13 @@ species: "human"
 > `-c` must only be used for process resource specifications, other infrastructural tweaks, or module
 > arguments (`ext.args`).
 
-On the UK DRI cluster, one `params_<entry>.yml` per stage is the standard pattern — see
-[UK DRI usage](ukdri.md).
+One params file per stage — `params_qc_clustering.yml`, `params_downstream.yml`,
+`params_differential_genes.yml` — keeps the three runs reproducible and easy to re-run
+independently.
 
 ## `qc_clustering`
 
-Stage 1: per-sample QC, cell type annotation, gene symbol unification, merging, scVI integration,
+Stage 1: per-sample QC, cell type annotation, merging, scVI integration,
 embeddings and Leiden clustering.
 
 ```bash
@@ -190,7 +191,6 @@ under `report/`, and a MultiQC report.
 | `--min_counts_gene`               | `0`              | Minimum counts per gene.                                                                                                                                               |
 | `--max_mito_percentage`           | `25`             | Maximum percentage of mitochondrial counts per cell.                                                                                                                   |
 | `--symbol_col`                    | `index`          | Default gene symbol column for samples that do not set their own.                                                                                                      |
-| `--unify_gene_symbols`            | `false`          | Unify gene symbols across samples using HUGO.                                                                                                                          |
 | `--duplicate_var_resolution`      | `sum`            | How to resolve duplicate gene symbols: `mean`, `sum`, `max` or `make_unique`.                                                                                          |
 | `--aggregate_isoforms`            | `false`          | Aggregate isoform-level features.                                                                                                                                      |
 | `--n_hvgs`                        | `3000`           | Highly variable genes used for the PCA/UMAP embedding.                                                                                                                 |
@@ -335,8 +335,15 @@ Two consequences of the current tool set are worth knowing before you interpret 
 **Inactive parameters.** The following are accepted but currently have no effect:
 `--doublet_detection_threshold`, `--skip_enrichment`, `--skip_liana`, `--skip_rankgenesgroups`,
 `--pseudobulk`, `--pseudobulk_groupby_labels`, `--pseudobulk_min_num_cells`, `--cluster_per_label`,
-`--cluster_global`, `--base_embeddings`, `--base_label_col`. `--prep_cellxgene` is no longer
-supported and should be left at its default.
+`--cluster_global`, `--base_embeddings`, `--base_label_col`. `--prep_cellxgene` and
+`--unify_gene_symbols` are no longer supported and should be left at their defaults —
+HUGO-based gene symbol unification only applies to human data and is not reliable enough to
+recommend.
+
+Gene symbols are still harmonised across samples without it: `symbol_col` / `geneid_col` resolution
+(including MyGene.info conversion when `symbol_col` is `none`), duplicate resolution via
+`--duplicate_var_resolution`, and optional isoform aggregation via `--aggregate_isoforms` all run
+regardless.
 
 ## Local container images
 
@@ -344,7 +351,7 @@ Several modules added by this fork use custom container images that are not on a
 The `--singularity_cache_dir` parameter tells them where to find locally built `.sif` files:
 
 ```bash
---singularity_cache_dir /nfsdata/apptainer
+--singularity_cache_dir /path/to/apptainer/images
 ```
 
 It defaults to `$NXF_SINGULARITY_CACHEDIR`, or `$NXF_APPTAINER_CACHEDIR` if that is unset, so
@@ -628,8 +635,9 @@ commit SHA or tag for a fixed version. The revision is recorded in the run repor
 ## Running in the background
 
 Nextflow must keep running until the pipeline finishes. Use `-bg` to detach it from your terminal
-(logs go to a file), or run it inside `screen`/`tmux`. On an HPC, run Nextflow itself as a cluster job
-from which it submits the individual tasks — this is the UK DRI pattern, see [UK DRI usage](ukdri.md).
+(logs go to a file), or run it inside `screen`/`tmux`. On an HPC, the usual pattern is to run
+Nextflow itself as a cluster job, from which it submits the individual tasks; note that its job
+allocation sizes only the driver, not the work.
 
 ## Nextflow memory requirements
 

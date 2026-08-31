@@ -26,7 +26,7 @@ annotation, scVI integration, dimensionality reduction and clustering, then on t
 gene set enrichment and cell–cell communication, and finally pseudobulk differential expression.
 
 The input is ideally the output of [nf-core/scrnaseq](https://nf-co.re/scrnaseq) or a similar
-per-sample count matrix pipeline. We recommend supplying it as AnnData (`.h5ad`) objects: AnnData is
+per-sample count matrix object files. We recommend supplying it as AnnData (`.h5ad`) objects: AnnData is
 part of the [scverse](https://scverse.org/) ecosystem that this pipeline is built on, and it scales
 to large count matrices without the size limits that SingleCellExperiment and Seurat objects run into
 in R.
@@ -89,7 +89,8 @@ differential_genes/    ── decoupler pseudobulk → PyDESeq2 per group × con
 3. Cell type annotation — [CellTypist](https://www.celltypist.org/) and/or
    [SingleR](https://bioconductor.org/packages/release/bioc/html/SingleR.html) with
    [celldex](https://bioconductor.org/packages/release/data/experiment/html/celldex.html) references
-4. Gene symbol unification across samples
+4. Harmonise gene symbol, batch and cell type columns across samples, resolving duplicate gene
+   symbols
 5. Merge and integrate — [scVI](https://docs.scvi-tools.org/en/stable/user_guide/models/scvi.html)
 6. Embeddings and clustering — log-normalisation, HVG selection, PCA, neighbours,
    [UMAP](https://scanpy.readthedocs.io/en/stable/generated/scanpy.tl.umap.html),
@@ -202,8 +203,9 @@ nextflow run UKDRI/scdownstream -r dev_ukdri -entry differential_genes \
 > Provide pipeline parameters on the command line or via `-params-file`. Custom config files passed
 > with `-c` can supply any Nextflow configuration **except parameters**.
 
-On the UK DRI cluster the pipeline is run from a pinned checkout with `-profile apptainer,gpu` and a
-per-stage `params_<entry>.yml` — see [UK DRI usage](docs/ukdri.md).
+UK DRI users: see the
+[UK DRI Informatics wiki](https://wiki.informatics.ukdri.ac.uk/en/Pipelines/nfcore_scdownstream) for
+how to run the pipeline on the cluster.
 
 ## Changes and known limitations
 
@@ -229,19 +231,21 @@ Several of them silently affect results, so please read before interpreting outp
    runs must override it.
 9. **The legacy single-pass workflow is no longer supported** — always pass `-entry` (see the note
    above).
-10. Several other inherited parameters are also not currently supported: `--skip_enrichment`,
+10. **`--unify_gene_symbols` is no longer supported.** HUGO-based gene symbol unification only
+    applies to human data and is not reliable enough to recommend. Gene symbols are still harmonised
+    across samples without it.
+11. Several other inherited parameters are also not currently supported: `--skip_enrichment`,
     `--skip_liana`, `--skip_rankgenesgroups`, `--pseudobulk*`, `--cluster_per_label`,
     `--cluster_global`, and the `exclude_samples_col` / `exclude_samples_values` columns of the
     contrasts file.
-11. MultiQC coverage is partial — the Quarto reports are the more complete view of a run.
+12. MultiQC coverage is partial — the Quarto reports are the more complete view of a run.
 
 ## Documentation
 
 - [Usage](docs/usage.md) — samplesheet format, all parameters, per-entry-point guidance
 - [Output](docs/output.md) — the files each stage produces and how to read them
-- [UK DRI usage](docs/ukdri.md) — running on the UK DRI cluster
 - [UK DRI Informatics wiki](https://wiki.informatics.ukdri.ac.uk/en/Pipelines/nfcore_scdownstream) —
-  the operational source of truth for cluster runs
+  running the pipeline on the UK DRI cluster
 
 Parameters are defined in [`nextflow_schema.json`](nextflow_schema.json); `nextflow run … --help`
 lists them.
@@ -253,8 +257,7 @@ This pipeline is derived from **nf-core/scdownstream**, originally written by
 contributors. Full attribution — original authors, upstream contributors, the nf-core framework and
 the pipelines this work builds on — is in [`ACKNOWLEDGEMENTS.md`](ACKNOWLEDGEMENTS.md).
 
-The fork is maintained by UK DRI Informatics. Its deviations from upstream are UK DRI's
-responsibility and are not endorsed by nf-core or by the original authors.
+The fork is maintained by UK DRI Informatics.
 
 ## Contributions and support
 
