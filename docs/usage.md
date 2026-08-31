@@ -1,30 +1,57 @@
-# nf-core/scdownstream: Usage
+# UK DRI scdownstream: Usage
 
-## :warning: Please read this documentation on the nf-core website: [https://nf-co.re/scdownstream/usage](https://nf-co.re/scdownstream/usage)
+> This is a UK DRI fork of nf-core/scdownstream and is no longer part of the nf-core community.
+> Parameter documentation is generated from [`nextflow_schema.json`](../nextflow_schema.json); run
+> `nextflow run <pipeline> --help` to list every parameter and its default. There is no
+> corresponding page on nf-co.re.
 
-> _Documentation of pipeline parameters is generated automatically from the pipeline schema and can no longer be found in markdown files._
+## Contents
 
-## Filtered and unfiltered matrices
+- [Choosing an entry point](#choosing-an-entry-point)
+- [Samplesheet input](#samplesheet-input)
+- [Filtered and unfiltered matrices](#filtered-and-unfiltered-matrices)
+- [Running the pipeline](#running-the-pipeline)
+- [`qc_clustering`](#qc_clustering)
+- [`downstream`](#downstream)
+- [`differential_genes`](#differential_genes)
+- [Supported tool choices](#supported-tool-choices)
+- [Local container images](#local-container-images)
+- [Reference data](#reference-data)
+- [Cell type annotation](#cell-type-annotation)
+- [Ambient RNA correction](#ambient-rna-correction)
+- [Reference mapping](#reference-mapping)
+- [GPU acceleration](#gpu-acceleration)
+- [Core Nextflow arguments](#core-nextflow-arguments)
+- [Custom configuration](#custom-configuration)
 
-Throughout this documentation, you will find references to `filtered` and `unfiltered` matrices.
-The `unfiltered` matrices are matrices which still contain empty droplets, whereas the `filtered` matrices have been filtered for empty droplets. A more technical definition can be found [here](https://support.10xgenomics.com/single-cell-gene-expression/software/pipelines/latest/output/matrices). `CellRanger` provides you with both matrices, whereas other quantification tools only provide you with the `unfiltered` matrix.
-The pipeline can handle the following cases:
+## Choosing an entry point
 
-1. You have both `filtered` and `unfiltered` matrices: Provide both matrices in the samplesheet and the pipeline will use the `unfiltered` matrix for ambient RNA removal and the `filtered` matrix for all other steps.
-2. You only have the `filtered` matrix: Provide the `filtered` matrix in the samplesheet and the pipeline will use it for all steps. In this case, only `decontX` can be used for ambient RNA removal, as all other methods require the `unfiltered` matrix.
-3. You only have the `unfiltered` matrix: Provide the `unfiltered` matrix in the samplesheet and the pipeline will automatically create a `filtered` matrix by identifying empty droplets using `CellBender`.
+The pipeline is split into three sequential stages, each selected with Nextflow's `-entry` flag.
+**`-entry` is always required.** Each stage consumes the previous stage's finalized `.h5ad` via
+`--base_adata`.
+
+| Stage | Entry point          | Required input                                          | Main output                                       |
+| ----- | -------------------- | ------------------------------------------------------- | ------------------------------------------------- |
+| 1     | `qc_clustering`      | `--input samplesheet.csv`                               | `<name>_finalized.h5ad`                           |
+| 2     | `downstream`         | `--base_adata` (stage 1 h5ad)                           | `<name>_finalized.h5ad`, `<name>_markers.json.gz` |
+| 3     | `differential_genes` | `--base_adata` (stage 2 h5ad) + `--diffgenes_contrasts` | per-contrast DE tables                            |
+
+`--name` sets the identifier used in output file names; it defaults to the entry-point name.
+
+> [!IMPORTANT]
+> Running without `-entry` selects the upstream single-pass workflow, which the three-stage design
+> replaced. It is retained for reference only and is no longer supported.
 
 ## Samplesheet input
 
-You will need to create a samplesheet with information about the samples you would like to analyse before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with at least 2 columns, and a header row as shown in the examples below.
+The samplesheet is required by `-entry qc_clustering`. It is a comma-separated file with a header row
+and at least two columns: `sample`, and at least one of `filtered` / `unfiltered`.
 
 ```bash
 --input '[path to samplesheet file]'
 ```
 
 ### Minimal samplesheet
-
-The samplesheet needs to contain at least two columns: `sample` and at least one out of `filtered` and `unfiltered`:
 
 ```csv title="samplesheet.csv"
 sample,unfiltered
@@ -35,92 +62,342 @@ sample3,/absolute/path/to/sample3.csv
 
 ### Full samplesheet
 
-There are a couple of optional columns that can be used for more advanced features:
+Optional columns enable more advanced features:
 
 ```csv title="samplesheet.csv"
-sample,filtered,unfiltered,batch_col,label_col,unknown_label,min_genes,min_cells,min_counts_cell,min_counts_gene,expected_cells,ambient_correction,ambient_corrected_integration
-sample1,/absolute/path/to/sample1_filtered.h5ad,/absolute/path/to/sample1.h5ad,batch,cell_type,unknown,1,2,3,4,5000,true,false
-sample2,relative/path/to/sample2_filtered.rds,relative/path/to/sample2.rds,batch_id,annotation,unannotated,5,6,7,8,3000,false,
-sample3,/absolute/path/to/sample3_filtered.csv,/absolute/path/to/sample3.csv,,,,9,10,11,12,,true,true
+sample,filtered,unfiltered,batch_col,label_col,unknown_label,expected_cells,ambient_correction,ambient_corrected_integration
+sample1,/absolute/path/to/sample1_filtered.h5ad,/absolute/path/to/sample1.h5ad,batch,cell_type,unknown,5000,true,false
+sample2,relative/path/to/sample2_filtered.rds,relative/path/to/sample2.rds,batch_id,annotation,unannotated,3000,false,
+sample3,/absolute/path/to/sample3_filtered.csv,/absolute/path/to/sample3.csv,,,,,true,true
 ```
 
-For CSV input files, specifying the `batch_col`, `label_col`, and `unknown_label` columns will not have any effect, as no additional metadata is available in the CSV file.
+For CSV input files, `batch_col`, `label_col` and `unknown_label` have no effect, as no additional
+metadata is available in a CSV.
 
-| Column                          | Description                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sample`                        | Unique sample identifier. Will be added to the pipeline output objects as `sample` column.                                                                                                                                                                                                                                                                                                                          |
-| `filtered`                      | May contain paths to `h5ad`, `h5`, `rds`, or `csv` files. `rds` files may contain any object that can be converted to a `SingleCellExperiment` using the [Seurat `as.SingleCellExperiment`](https://satijalab.org/seurat/reference/as.singlecellexperiment) function. `csv` files should contain a matrix with genes as columns and cells as rows.                                                                  |
-| `unfiltered`                    | Same as `filtered`, but for the unfiltered cellranger or nf-core/scrnaseq output. If not provided, only `decontX` can be used for ambient RNA removal.                                                                                                                                                                                                                                                              |
-| `batch_col`                     | Column in the input file containing batch information. If not provided, the entire input object will be considered as one batch. If the `batch_col` is something else than `batch`, it will be renamed to `batch` during pipeline execution.                                                                                                                                                                        |
-| `symbol_col`                    | Column in the input file containing gene symbol information. Defaults to `index`. There are two special values that can be used: `index` and `none`. `index` will use the row names of the matrix as gene symbols. `none` will trigger the pipeline to perform gene symbol conversion using MyGene.info based on the `geneid_col`. The values from `symbol_col` will be set as the index during pipeline execution. |
-| `geneid_col`                    | Column in the input file containing gene identifier information. Defaults to `index`. Only used if `symbol_col` is set to `none`.                                                                                                                                                                                                                                                                                   |
-| `label_col`                     | Column in the input file containing cell type information. Defaults to `label`. If the column does not exist in the input object, the pipeline will create a new column and put `unknown` in it. If the `label_col` is something else than `label`, it will be renamed to `label` during pipeline execution.                                                                                                        |
-| `unknown_label`                 | Value in the `label_col` column that should be considered as unknown. Defaults to `unknown`. If the `unknown_label` is something else than `unknown`, it will be renamed to `unknown` during pipeline execution. If trying to perform integration with scANVI, more than one unique label other than `unknown` must exist in the input data.                                                                        |
-| `counts_layer`                  | Layer in the input file containing the raw counts matrix. Defaults to `X`.                                                                                                                                                                                                                                                                                                                                          |
-| `min_genes`                     | Minimum number of genes required for a cell to be considered. Defaults to `1`.                                                                                                                                                                                                                                                                                                                                      |
-| `min_cells`                     | Minimum number of cells required for a gene to be considered. Defaults to `1`.                                                                                                                                                                                                                                                                                                                                      |
-| `min_counts_cell`               | Minimum number of counts required for a cell to be considered. Defaults to `1`.                                                                                                                                                                                                                                                                                                                                     |
-| `min_counts_gene`               | Minimum number of counts required for a gene to be considered. Defaults to `1`.                                                                                                                                                                                                                                                                                                                                     |
-| `expected_cells`                | Number of expected cells, used as input to CellBender for empty droplet detection.                                                                                                                                                                                                                                                                                                                                  |
-| `max_mito_percentage`           | Maximum percentage of mitochondrial reads for a cell to be considered. Defaults to `100`.                                                                                                                                                                                                                                                                                                                           |
-| `ambient_correction`            | Whether to perform ambient RNA correction for this sample. Set to `true` to use the globally configured method, `false` to skip ambient correction for this sample. Defaults to `true`.                                                                                                                                                                                                                             |
-| `ambient_corrected_integration` | Whether to use ambient-corrected counts for integration for this sample. Set to `true` to use corrected counts in downstream integration, `false` to store them only as additional layers. Can override the global `--ambient_corrected_integration` parameter. Defaults to global setting.                                                                                                                         |
+| Column                          | Description                                                                                                                                                                                                                                                                                             |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sample`                        | Unique sample identifier. Added to the output objects as a `sample` column.                                                                                                                                                                                                                             |
+| `filtered`                      | Path to an `h5ad`, `h5`, `rds` or `csv` file. `rds` files may hold any object convertible to a `SingleCellExperiment` via [Seurat `as.SingleCellExperiment`](https://satijalab.org/seurat/reference/as.singlecellexperiment). `csv` files should hold a matrix with genes as columns and cells as rows. |
+| `unfiltered`                    | As `filtered`, but for the unfiltered CellRanger or nf-core/scrnaseq output. If not provided, only `decontX` can be used for ambient RNA removal.                                                                                                                                                       |
+| `batch_col`                     | Column in the input file holding batch information. If absent, the whole object is treated as one batch. Renamed to `batch` during execution.                                                                                                                                                           |
+| `symbol_col`                    | Column holding gene symbols. Defaults to `index`. Two special values: `index` uses the matrix row names; `none` triggers gene symbol conversion via MyGene.info based on `geneid_col`. The values become the object index.                                                                              |
+| `geneid_col`                    | Column holding gene identifiers. Defaults to `index`. Only used when `symbol_col` is `none`.                                                                                                                                                                                                            |
+| `label_col`                     | Column holding cell type information. Defaults to `label`. If absent, the pipeline creates it and fills it with `unknown`. Renamed to `label` during execution.                                                                                                                                         |
+| `unknown_label`                 | Value in `label_col` to treat as unknown. Defaults to `unknown`. Renamed to `unknown` during execution.                                                                                                                                                                                                 |
+| `counts_layer`                  | Layer holding the raw counts matrix. Defaults to `X`.                                                                                                                                                                                                                                                   |
+| `expected_cells`                | Expected number of cells, passed to CellBender for empty droplet detection.                                                                                                                                                                                                                             |
+| `ambient_correction`            | Whether to run ambient RNA correction for this sample (`true` uses the globally configured method). Defaults to `true`.                                                                                                                                                                                 |
+| `ambient_corrected_integration` | Whether to use ambient-corrected counts for integration for this sample, overriding the global `--ambient_corrected_integration`.                                                                                                                                                                       |
+| `n_hvgs`                        | Number of highly variable genes for this sample. Defaults to `3000`.                                                                                                                                                                                                                                    |
 
-An [example samplesheet](../assets/samplesheet.csv) has been provided with the pipeline.
+> [!WARNING]
+> **Per-sample QC filter columns are currently ignored.** The samplesheet accepts `min_genes`,
+> `min_cells`, `min_counts_cell`, `min_counts_gene`, `max_mito_percentage` and
+> `automatic_cell_filtering`, and they are read into the sample metadata, but the **global**
+> `--min_*` / `--max_*` / `--automatic_cell_filtering` parameters are what actually reach the
+> filtering step. Set your filters globally until this is fixed.
+
+An [example samplesheet](../assets/samplesheet.csv) is provided with the pipeline.
+
+## Filtered and unfiltered matrices
+
+`unfiltered` matrices still contain empty droplets; `filtered` matrices have had empty droplets
+removed. A more technical definition is
+[here](https://support.10xgenomics.com/single-cell-gene-expression/software/pipelines/latest/output/matrices).
+CellRanger provides both; most other quantification tools provide only the unfiltered matrix.
+
+The pipeline handles three cases:
+
+1. **Both matrices available** — provide both. The unfiltered matrix is used for ambient RNA removal
+   and the filtered matrix for everything else.
+2. **Only the filtered matrix** — provide it and it is used for all steps. Only `decontx` can be used
+   for ambient RNA removal, as the other methods need the unfiltered matrix.
+3. **Only the unfiltered matrix** — provide it and the pipeline creates a filtered matrix by
+   identifying empty droplets with CellBender.
 
 ## Running the pipeline
 
-The typical command for running the pipeline is as follows:
-
 ```bash
-nextflow run nf-core/scdownstream --input ./samplesheet.csv --outdir ./results  -profile docker
+nextflow run UKDRI/scdownstream -r dev_ukdri -entry qc_clustering \
+   --input ./samplesheet.csv \
+   --outdir ./results \
+   -profile apptainer
 ```
 
-This will launch the pipeline with the `docker` configuration profile. See below for more information about profiles.
-
-Note that the pipeline will create the following files in your working directory:
+Nextflow creates the following in your working directory:
 
 ```bash
-work                # Directory containing the nextflow working files
-<OUTDIR>            # Finished results in specified location (defined with --outdir)
-.nextflow_log       # Log file from Nextflow
-# Other nextflow hidden files, eg. history of pipeline runs and old logs.
+work                # Nextflow working files
+<OUTDIR>            # Results, at the location given by --outdir
+.nextflow_log       # Nextflow log file
+# plus other hidden Nextflow files, e.g. run history and old logs
 ```
 
-If you wish to repeatedly use the same parameters for multiple runs, rather than specifying each flag in the command, you can specify these in a params file.
-
-Pipeline settings can be provided in a `yaml` or `json` file via `-params-file <file>`.
-
-> [!WARNING]
-> Do not use `-c <file>` to specify parameters as this will result in errors. Custom config files specified with `-c` must only be used for [tuning process resource specifications](https://nf-co.re/docs/usage/configuration#tuning-workflow-resources), other infrastructural tweaks (such as output directories), or module arguments (args).
-
-The above pipeline run specified with a params file in yaml format:
+For repeated runs, put the parameters in a YAML or JSON file and pass it with `-params-file`:
 
 ```bash
-nextflow run nf-core/scdownstream -profile docker -params-file params.yaml
+nextflow run UKDRI/scdownstream -r dev_ukdri -entry qc_clustering -profile apptainer -params-file params.yaml
 ```
-
-with:
 
 ```yaml title="params.yaml"
-input: './samplesheet.csv'
-outdir: './results/'
-<...>
+input: "./samplesheet.csv"
+outdir: "./results/"
+name: "my_study"
+species: "human"
 ```
 
-You can also generate such `YAML`/`JSON` files via [nf-core/launch](https://nf-co.re/launch).
+> [!WARNING]
+> Do not use `-c <file>` to specify parameters — this will result in errors. Config files given with
+> `-c` must only be used for process resource specifications, other infrastructural tweaks, or module
+> arguments (`ext.args`).
 
-### Cell type annotation
+On the UK DRI cluster, one `params_<entry>.yml` per stage is the standard pattern — see
+[UK DRI usage](ukdri.md).
 
-#### Celltypist
+## `qc_clustering`
 
-Automated cell type annotation using [Celltypist](https://github.com/Teichlab/celltypist) and [singleR](https://bioconductor.org/packages/release/bioc/html/SingleR.html) are supported. For `Celltypist`, you can specify the models to use with the [`celltypist_model` parameter](https://nf-co.re/scdownstream/dev/parameters/#celltypist_model).
+Stage 1: per-sample QC, cell type annotation, gene symbol unification, merging, scVI integration,
+embeddings and Leiden clustering.
 
-#### singleR
+```bash
+nextflow run UKDRI/scdownstream -r dev_ukdri -entry qc_clustering \
+   -profile apptainer \
+   --input samplesheet.csv \
+   --name my_study \
+   --species human \
+   --outdir results/qc_clustering
+```
 
-For `singleR`, you can provide a CSV file with information about the celldex references to use for the singleR cell type annotation with the [`celldex_reference` parameter](https://nf-co.re/scdownstream/dev/parameters/#celldex_reference). The exising references are described in the [celldex package description](https://bioconductor.org/packages/devel/data/experiment/manuals/celldex/man/celldex.pdf). You can also provide paths to tar archives of pre-downloaded references (useful if your runtime environment does not have access to the internet).
+Produces `results/qc_clustering/my_study_finalized.h5ad` (plus `.rds`), a Quarto QC/clustering report
+under `report/`, and a MultiQC report.
 
-A CSV file that refers to the celldex references via name can look like this:
+| Parameter                         | Default          | Description                                                                                                                                                            |
+| --------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--input`                         | —                | Samplesheet (required).                                                                                                                                                |
+| `--name`                          | `qc_clustering`  | Identifier used in output file names.                                                                                                                                  |
+| `--species`                       | `human`          | `human` or `mouse`. Set explicitly for mouse data.                                                                                                                     |
+| `--qc_only`                       | `false`          | Stop after per-sample QC and cell type annotation; skip merging, integration, embeddings, clustering and the Quarto report.                                            |
+| `--mito_genes`                    | `null`           | File or pattern identifying mitochondrial genes, used for the mitochondrial percentage metric.                                                                         |
+| `--ambient_correction`            | `decontx`        | `none`, `decontx`, `cellbender`, `soupx` or `scar`.                                                                                                                    |
+| `--ambient_corrected_integration` | `false`          | Use ambient-corrected counts for integration rather than storing them as extra layers.                                                                                 |
+| `--doublet_detection`             | `scrublet`       | Doublet detection method, or `none` to skip. See [Supported tool choices](#supported-tool-choices).                                                                    |
+| `--automatic_cell_filtering`      | `false`          | Derive filtering thresholds automatically from N-MAD outlier detection instead of using the fixed thresholds below.                                                    |
+| `--min_genes`                     | `200`            | Minimum genes per cell.                                                                                                                                                |
+| `--max_genes`                     | `false`          | Maximum genes per cell (`false` disables).                                                                                                                             |
+| `--min_cells`                     | `5`              | Minimum cells per gene.                                                                                                                                                |
+| `--min_counts`                    | `0`              | Minimum counts per cell.                                                                                                                                               |
+| `--max_counts`                    | `false`          | Maximum counts per cell (`false` disables).                                                                                                                            |
+| `--min_counts_gene`               | `0`              | Minimum counts per gene.                                                                                                                                               |
+| `--max_mito_percentage`           | `25`             | Maximum percentage of mitochondrial counts per cell.                                                                                                                   |
+| `--symbol_col`                    | `index`          | Default gene symbol column for samples that do not set their own.                                                                                                      |
+| `--unify_gene_symbols`            | `false`          | Unify gene symbols across samples using HUGO.                                                                                                                          |
+| `--duplicate_var_resolution`      | `sum`            | How to resolve duplicate gene symbols: `mean`, `sum`, `max` or `make_unique`.                                                                                          |
+| `--aggregate_isoforms`            | `false`          | Aggregate isoform-level features.                                                                                                                                      |
+| `--n_hvgs`                        | `3000`           | Highly variable genes used for the PCA/UMAP embedding.                                                                                                                 |
+| `--integration_methods`           | `scvi`           | Integration method. Keep `scvi` — see [Supported tool choices](#supported-tool-choices).                                                                               |
+| `--integration_hvgs`              | `5000`           | Highly variable genes used for integration.                                                                                                                            |
+| `--clustering_resolutions`        | `0.5,1.0`        | Comma-separated Leiden resolutions. One `leiden_<res>` column is written per resolution, and the **first** resolution is copied to `leiden` as the default clustering. |
+| `--cluster_neighbors`             | `neighbors_scvi` | Neighbour graph used for clustering. The default assumes scVI integration.                                                                                             |
+| `--celltypist_model`              | `null`           | Comma-separated [CellTypist](https://www.celltypist.org/models) model names, or a path to a custom `.pkl` model.                                                       |
+| `--celldex_reference`             | `null`           | CSV describing celldex references for SingleR — see [Cell type annotation](#cell-type-annotation).                                                                     |
+| `--scvi_model` / `--scanvi_model` | `null`           | Pre-trained model for reference mapping — see [Reference mapping](#reference-mapping).                                                                                 |
+| `--save_intermediates`            | `false`          | Publish intermediate objects as well as the final ones.                                                                                                                |
+
+scVI itself is tuned with `--scvi_n_latent` (30), `--scvi_n_hidden` (128), `--scvi_n_layers` (2),
+`--scvi_dispersion` (`gene`), `--scvi_gene_likelihood` (`zinb`), `--scvi_max_epochs`,
+`--scvi_categorical_covariates` and `--scvi_continuous_covariates`.
+
+> [!NOTE]
+> `--species` defaults to `human`. Set it explicitly for mouse data: the human default is applied
+> silently, and gene set enrichment and LIANA+ ortholog mapping would then use the wrong species.
+
+## `downstream`
+
+Stage 2: marker genes per cluster, gene set enrichment, and LIANA+ cell–cell communication.
+
+```bash
+nextflow run UKDRI/scdownstream -r dev_ukdri -entry downstream \
+   -profile apptainer \
+   --base_adata results/qc_clustering/my_study_finalized.h5ad \
+   --name my_study \
+   --species human \
+   --outdir results/downstream
+```
+
+> [!NOTE]
+> `--input` is not needed here: this stage works entirely from `--base_adata`. Only `--outdir` is
+> strictly required by the parameter schema, so check your other parameters carefully — a typo in a
+> parameter name is caught, but an omitted one falls back to its default.
+
+| Parameter                         | Default                 | Description                                                                                                                                             |
+| --------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--base_adata`                    | —                       | The finalized h5ad from `qc_clustering` (required).                                                                                                     |
+| `--name`                          | `downstream`            | Identifier used in output file names.                                                                                                                   |
+| `--selected_clustering`           | `leiden`                | The `obs` column to group cells by for marker genes, enrichment and LIANA+. Use e.g. `leiden_1.0` to pick a specific resolution, or a cell type column. |
+| `--species`                       | `human`                 | `human` or `mouse`. Drives enrichment and LIANA+ ortholog mapping.                                                                                      |
+| `--enrich_min_in_group_fraction`  | `0.25`                  | Minimum fraction of cells in the group expressing a gene for it to enter enrichment.                                                                    |
+| `--enrich_min_fold_change`        | `1.0`                   | Minimum fold change for a gene to enter enrichment.                                                                                                     |
+| `--enrich_max_out_group_fraction` | `0.5`                   | Maximum fraction of cells outside the group expressing a gene.                                                                                          |
+| `--ortholog_hcop_directory`       | `/nfsdata/genome/hcop/` | Directory of HCOP ortholog tables for LIANA+ — see [Reference data](#reference-data).                                                                   |
+| `--markers_uns_key`               | `rank_genes_groups`     | `uns` key holding the marker results to export.                                                                                                         |
+| `--markers_thr_adj_pvalue`        | `0.05`                  | Adjusted p-value threshold for the exported markers.                                                                                                    |
+| `--markers_n_top`                 | `100`                   | Number of top markers per group to export.                                                                                                              |
+| `--markers_pct_nz`                | `0.1`                   | Minimum fraction of non-zero expressing cells for an exported marker.                                                                                   |
+| `--markers_min_logfc`             | `0`                     | Minimum log fold change for an exported marker.                                                                                                         |
+| `--report_table_row_limit`        | `250`                   | Maximum rows shown per table in the HTML report.                                                                                                        |
+
+Marker genes are computed with `scanpy.tl.rank_genes_groups` using the **Wilcoxon** test.
+
+## `differential_genes`
+
+Stage 3: pseudobulk aggregation with decoupler, then PyDESeq2 differential expression for every
+combination of group label and contrast.
+
+```bash
+nextflow run UKDRI/scdownstream -r dev_ukdri -entry differential_genes \
+   -profile apptainer \
+   --base_adata results/downstream/my_study_finalized.h5ad \
+   --diffgenes_contrasts contrasts.tsv \
+   --diffgenes_group_col cell_type \
+   --diffgenes_sample_col sample \
+   --name my_study \
+   --outdir results/differential_genes
+```
+
+> [!IMPORTANT]
+> The input h5ad must contain a **`counts` layer** holding raw counts. Pseudobulk aggregation sums
+> that layer; normalised data cannot be used.
+
+| Parameter                  | Default | Description                                                                                                                         |
+| -------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `--base_adata`             | —       | Input h5ad with a `counts` layer (required).                                                                                        |
+| `--diffgenes_contrasts`    | —       | Contrasts TSV (required) — see below.                                                                                               |
+| `--diffgenes_group_col`    | `''`    | `obs` column holding the group label to test within, e.g. a cluster or cell type column. One DE analysis is run per distinct value. |
+| `--diffgenes_sample_col`   | `''`    | `obs` column identifying the biological sample. Pseudobulk profiles are formed per sample.                                          |
+| `--diffgenes_min_counts`   | `1000`  | Drop pseudobulk samples with fewer total counts.                                                                                    |
+| `--diffgenes_min_cells`    | `10`    | Drop pseudobulk samples aggregated from fewer cells.                                                                                |
+| `--diffgenes_min_samples`  | `2`     | Minimum pseudobulk samples required **on each side** of a contrast.                                                                 |
+| `--report_table_row_limit` | `250`   | Maximum rows shown per table in the HTML report.                                                                                    |
+
+### The contrasts file
+
+A **tab-separated** file following the
+[nf-core/differentialabundance](https://nf-co.re/differentialabundance) contrasts definition,
+validated against [`assets/schema_contrasts.json`](../assets/schema_contrasts.json). An example is
+provided at [`assets/contrasts.tsv`](../assets/contrasts.tsv).
+
+| Column                   | Required | Description                                                                                                                     |
+| ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                     | yes      | Contrast name, used in output file names.                                                                                       |
+| `variable`               | yes      | `obs` column holding the condition to compare.                                                                                  |
+| `reference`              | yes      | Value of `variable` treated as the reference (baseline) group.                                                                  |
+| `target`                 | yes      | Value of `variable` treated as the target group. Log fold changes are target vs reference.                                      |
+| `blocking`               | no       | Additional `obs` columns to include in the design as covariates. **Comma-separated**, because the file itself is tab-separated. |
+| `exclude_samples_col`    | no       | Accepted but **currently inactive**.                                                                                            |
+| `exclude_samples_values` | no       | Accepted but **currently inactive**.                                                                                            |
+
+The design formula is `~ variable [+ blocking…]`, fitted with `refit_cooks=True`.
+
+> [!WARNING]
+> A contrast is **silently skipped** for a given group label if either side has fewer than
+> `--diffgenes_min_samples` surviving pseudobulk samples. No error is raised and no output file is
+> written for that combination. Check the DE report's coverage against the contrasts you expected,
+> and consult `de_manifest.tsv` in the report inputs to see which combinations actually produced
+> results.
+
+Every column named in the contrasts file — `variable` and each `blocking` column — is automatically
+carried through pseudobulk aggregation alongside `--diffgenes_group_col`, so those columns must exist
+in the input object's `obs`.
+
+## Supported tool choices
+
+This fork focuses on a curated set of tools — the approaches we have validated on UK DRI data. Please
+use the values below. Further tools will be enabled as they are curated and validated; the parameter
+schema is broader than this list, and values outside it are not yet supported.
+
+| Step                   | Parameter                                   | Supported values                                           |
+| ---------------------- | ------------------------------------------- | ---------------------------------------------------------- |
+| Doublet detection      | `--doublet_detection`                       | `scrublet` (default), `none`                               |
+| Ambient RNA correction | `--ambient_correction`                      | `decontx` (default), `soupx`, `cellbender`, `scar`, `none` |
+| Integration            | `--integration_methods`                     | `scvi` (default)                                           |
+| Clustering             | `--clustering_resolutions`                  | Leiden, one or more resolutions                            |
+| Cell type annotation   | `--celltypist_model`, `--celldex_reference` | CellTypist, SingleR / celldex                              |
+
+Two consequences of the current tool set are worth knowing before you interpret results:
+
+- **Doublets are annotated, not removed.** scrublet writes its scores and its `predicted_doublet`
+  call into the object; no cells are dropped. Filter on that annotation yourself in downstream
+  analysis. `--doublet_detection_threshold` has no effect.
+- **scVI drives everything after the merge.** The embeddings, clustering and reports are built on the
+  scVI latent space, and `--cluster_neighbors` defaults to `neighbors_scvi` accordingly. Keep `scvi`
+  in `--integration_methods`; if it is omitted, the post-merge steps produce no output and no error.
+
+**Inactive parameters.** The following are accepted but currently have no effect:
+`--doublet_detection_threshold`, `--skip_enrichment`, `--skip_liana`, `--skip_rankgenesgroups`,
+`--pseudobulk`, `--pseudobulk_groupby_labels`, `--pseudobulk_min_num_cells`, `--cluster_per_label`,
+`--cluster_global`, `--base_embeddings`, `--base_label_col`. `--prep_cellxgene` is no longer
+supported and should be left at its default.
+
+## Local container images
+
+Several modules added by this fork use custom container images that are not on a public registry.
+The `--singularity_cache_dir` parameter tells them where to find locally built `.sif` files:
+
+```bash
+--singularity_cache_dir /nfsdata/apptainer
+```
+
+It defaults to `$NXF_SINGULARITY_CACHEDIR`, or `$NXF_APPTAINER_CACHEDIR` if that is unset, so
+exporting either environment variable is usually enough. When set and running under the
+`singularity` or `apptainer` profile, modules use `<singularity_cache_dir>/<image>.sif` instead of
+pulling a remote container.
+
+The images referenced are:
+
+| Image                           | Used by                                     |
+| ------------------------------- | ------------------------------------------- |
+| `scanpy_1.11.4_coreinf_0.3.sif` | the Quarto report modules                   |
+| `scanpy_1.11.4_coreinf_0.1.sif` | `SCANPY_ENRICH`, `SCANPY_EXPORT_MARKERS`    |
+| `decoupler_latest.sif`          | `DECOUPLER_PSEUDOBULK`, `FILTER_PSEUDOBULK` |
+| `pydeseq2_latest.sif`           | `DIFFERENTIAL_GENES_PER_CONTRAST`           |
+
+> [!WARNING]
+> The decoupler and PyDESeq2 modules fall back to a public registry image if no local `.sif` is
+> found, but **five processes do not**: `SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`,
+> `PYDESEQ2_GENERATE_REPORT`, `SCANPY_ENRICH` and `SCANPY_EXPORT_MARKERS` fall back to hard-coded
+> absolute paths on the UK DRI filesystem and ignore the container engine in use. Off the UK DRI
+> cluster you must build these images and point `--singularity_cache_dir` at a directory holding them
+> under exactly the names above.
+
+## Reference data
+
+**HCOP orthologs (LIANA+).** `--ortholog_hcop_directory` defaults to the UK DRI path
+`/nfsdata/genome/hcop/`. LIANA+ reads `<directory>/human_<species>_hcop_fifteen_column.txt.gz` from
+it to map its human-derived ligand–receptor resource onto non-human data. Off-site runs must
+override the parameter and provide the corresponding
+[HCOP](https://www.genenames.org/tools/hcop/) table.
+
+**CellTypist models** are downloaded at runtime unless `--celltypist_model` is given a local `.pkl`
+path.
+
+**celldex references** may be given by name (downloaded at runtime) or as paths to pre-downloaded tar
+archives — useful where the compute nodes have no internet access.
+
+## Cell type annotation
+
+### CellTypist
+
+Specify one or more models with `--celltypist_model` (comma-separated). Available models are listed
+at [celltypist.org](https://www.celltypist.org/models). A path containing `/` is treated as a custom
+model file.
+
+### SingleR
+
+`--celldex_reference` takes a CSV describing the celldex references to use. The available references
+are described in the
+[celldex package documentation](https://bioconductor.org/packages/devel/data/experiment/manuals/celldex/man/celldex.pdf).
+
+Referring to references by name:
 
 ```csv title="celldex_references.csv"
 id,label,reference,version
@@ -128,68 +405,88 @@ hpca,label.main,hpca,2024-02-26
 monaco_immune,label.fine,monaco_immune,2024-02-26
 ```
 
-A CSV file that refers to the celldex references via path can look like this:
+Referring to pre-downloaded tar archives by path:
 
 ```csv title="celldex_references.csv"
 hpca,label.main,/path/to/hpca.tar
 monaco_immune,label.fine,/path/to/monaco_immune.tar
 ```
 
-Example tar archives can be found [here](https://github.com/nf-core/test-datasets/tree/scdownstream/singleR).
+> [!NOTE]
+> Cell type predictions are merged into the per-sample objects as `obs` columns during the
+> finalisation step of `qc_clustering`.
 
-### Reference mapping
+## Ambient RNA correction
 
-The pipeline supports mapping new samples into the latent space of an existing scVI/scANVI model.
-If it is an scANVI model, this approach allows transferring cell type annotations to new samples.
-If the scVI/scANVI model was built during a previous run of the pipeline,
-you can also use the previous output AnnData file as a base,
-and the pipeline will aggregate the new samples onto the base AnnData.
+Ambient RNA correction removes contaminating RNA from cell-free droplets. Select the method globally
+with `--ambient_correction` (`decontx` by default; also `cellbender`, `soupx`, `scar`, or `none`):
 
-The following scenarious can be distinguished:
+```bash
+nextflow run UKDRI/scdownstream -r dev_ukdri -entry qc_clustering \
+   --ambient_correction cellbender --input samplesheet.csv --outdir results
+```
 
-- **You have a reference scVI model from an arbitrary source (e.g. from a publication) and you want to map new data into the latent space described by the model.** In this case, you need to provide the path to the reference model via the `reference_model` parameter and set the `reference_model_type` parameter to `scvi`. Only `scvi` and `scanvi` may be used in the `integration_methods` parameter in this case. `scanvi` will only work if he input data in the samplesheet contains at least some cell type annotations. Using `scanvi` in addition to `scvi` as an integration method will extend the model so that it can be used for label transfer in future.
-- **You have a reference scANVI model from an arbitrary source (e.g. from a publication) and you want to map new data into the latent space described by the model and transfer cell type annotations to the new data.** In this case, you need to provide the path to the reference model via the `reference_model` parameter and set the `reference_model_type` parameter to `scanvi`. Only `scanvi` may be used in the `integration_methods` parameter in this case.
-- **You have a reference scVI/scANVI model as well as an output AnnData file from a previous run of the pipeline and you want to add more samples to the existing AnnData file.** In this case, you need to provide the path to the reference model via the `reference_model` parameter and set the `reference_model_type` parameter to either `scvi` or `scanvi`, depending on the type of the reference model. If an scANVI model is used, existing cell type annotations will be transferred to the new samples. The existing AnnData file should be provided via the `base_adata` parameter.
+Correction can be disabled per sample from the samplesheet:
 
-The pipeline will perform the preprocessing steps on the new samples as usual. During the integration step, the new samples will be mapped onto the latent space of the reference model. If `base_adata` is provided, the new samples will then be aggregated onto the base file. The clustering, dimensionality reduction etc. will then be performed on the integrated object.
+```csv title="samplesheet.csv"
+sample,filtered,unfiltered,ambient_correction
+sample1,/path/to/sample1_filtered.h5ad,/path/to/sample1.h5ad,true
+sample2,/path/to/sample2_filtered.h5ad,/path/to/sample2.h5ad,false
+```
 
-### Skipping integration
+By default the corrected counts are stored as an additional layer (e.g.
+`ambient_corrected_decontx`) while the raw counts stay in `X`, so integration uses the raw counts and
+the corrected counts are available for inspection. To use the corrected counts for integration
+instead, set `--ambient_corrected_integration true` globally, or the
+`ambient_corrected_integration` column per sample.
 
-:::tip
-This can be useful if you have assigned cell type annotations to the integrated object and want to perform further analysis based on these annotations.
-:::
+> [!WARNING]
+> When `ambient_corrected_integration` is enabled, the corrected counts **replace** the raw counts in
+> `X` and the original raw counts are no longer available.
 
-If you want to run tasks after the integration step without performing integration, you can provide a previous result of the pipeline as the `base_adata` parameter. You do not need to provide a samplesheet via the `input` parameter in this case. In order to let the pipeline know which integration embeddings should be used, you need to provide the `base_embeddings` parameter. If you stored the labels (e.g. cell type annotations) in a column other than `label`, you can provide the column name via the `base_label_col` parameter.
+## Reference mapping
 
-The pipeline will then re-execute the tasks after the integration step without performing integration again. Most interestingly, the pipeline will generate cell type specific UMAPs, clusterings, and PAGA graphs, if the `clustering_per_label` parameter is set to `true`.
+`qc_clustering` supports mapping new samples into the latent space of an existing scVI or scANVI
+model, via `--scvi_model` and `--scanvi_model`. With an scANVI model this also transfers cell type
+annotations to the new samples.
 
-### GPU acceleration
+- **Pre-trained scVI model** — pass its path to `--scvi_model` and keep `scvi` in
+  `--integration_methods`. Only the genes present in the reference model are used, rather than
+  intersecting highly variable genes.
+- **Adding samples to an existing object** — additionally pass the previous run's h5ad to
+  `--base_adata`; the new samples are aggregated onto it after integration.
+
+> [!NOTE]
+> `--scanvi_model` exists for label transfer from a pre-trained scANVI model, but scANVI is not yet
+> part of the curated tool set (see [Supported tool choices](#supported-tool-choices)): it produces
+> embeddings without driving the rest of the workflow.
+
+## GPU acceleration
 
 :::warning{title="Experimental feature"}
-This is an experimental feature and may produce errors. If you encounter any issues, please report them on the [nf-core/scdownstream GitHub repository](https://github.com/nf-core/scdownstream/issues/new?assignees=&labels=bug&projects=&template=bug_report.yml).
+This is an experimental feature and may produce errors. Please report issues on the
+[UKDRI/scdownstream issue tracker](https://github.com/UKDRI/scdownstream/issues).
 :::
 
 :::info{title="Prerequisites"}
 
-- GPU acceleration has only been tested with Docker, Singularity and Apptainer.
-  - Other container technologies might work, but have not been tested.
-  - Conda is not supported.
+- Tested with Docker, Singularity and Apptainer. Other container technologies may work but are
+  untested. Conda is not supported.
 - CUDA 12.0 or later is required.
-- The GPUs must have a [Compute Capability](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#compute-capabilities) of 7.0 or higher.
+- GPUs must have a
+  [Compute Capability](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#compute-capabilities)
+  of 7.0 or higher.
 
 :::
 
-Tools with implemented support for GPU acceleration are:
+Tools with GPU support:
 
-- cellbender
-- scvi-tools
-  - scVI/scANVI
-  - scAR
-  - solo
+- CellBender
+- scvi-tools — scVI/scANVI, scAR, solo
 
-To utilize GPU acceleration, you need to specify the `gpu` profile. This will make the tool steps use cuda-enabled environments and it will tell the tools to use the GPU. All processes which support GPU acceleration are marked with the `process_gpu` label.
-
-You also need to make sure that the tasks are run on a machine with a GPU. If all tasks are run on a machine with a GPU, no further action is needed. If you are running the pipeline on a slurm cluster, where there is dedicated queue for GPU jobs, you need additional configuration that might look like this:
+Add the `gpu` profile to use CUDA-enabled environments. All GPU-capable processes carry the
+`process_gpu` label. You must also ensure those tasks land on GPU nodes. On a Slurm cluster with a
+dedicated GPU queue:
 
 ```bash
 process {
@@ -201,172 +498,143 @@ process {
 ```
 
 :::tip
-More information on how to configure Slurm in Nextflow can be found [here](https://www.nextflow.io/docs/latest/executor.html#slurm). Depending on your cluster configuration, you might need to adjust the `clusterOptions` to one of the following:
-
-- `--gpus 1` (as in the example above)
-- `--gpus-per-node=1`
-- `--gres=gpu:1`
-
+See the [Nextflow Slurm documentation](https://www.nextflow.io/docs/latest/executor.html#slurm).
+Depending on your cluster you may need `--gpus-per-node=1` or `--gres=gpu:1` instead of `--gpus 1`.
 :::
 
 :::tip
-If your jobs get assigned to the correct nodes, but the GPU is not utilized, you might need to add the following configuration:
-`singularity.runOptions = '--no-mount tmp --writable-tmpfs --nv --env CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES --env ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES --env ZE_AFFINITY_MASK=$ZE_AFFINITY_MASK --env NVIDIA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES`
+If jobs land on the right nodes but the GPU is not used, you may need:
+`singularity.runOptions = '--no-mount tmp --writable-tmpfs --nv --env CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES --env ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES --env ZE_AFFINITY_MASK=$ZE_AFFINITY_MASK --env NVIDIA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES'`
 
-The first part (`--no-mount tmp --writable-tmpfs --nv`) is set by default in the `gpu` profile. The rest of this configuration is needed in some cases to make the GPU visible to the container.
+The first part (`--no-mount tmp --writable-tmpfs --nv`) is already set by the `gpu` profile.
 :::
-
-For different executors, the configuration might look different. Once a wider range of users have tested the GPU support, we will provide more detailed instructions for different executors.
-
-### Ambient RNA correction
-
-Ambient RNA correction removes contaminating RNA from cell-free droplets that can confound single-cell analysis. The pipeline supports multiple ambient RNA correction methods that can be configured both globally and per-sample.
-
-The pipeline allows you to select an ambient RNA correction method globally using the `--ambient_correction` parameter. Available methods include `decontx` (default), `cellbender`, `soupx`, `scar`, or `none` to skip correction entirely:
-
-```bash
-nextflow run nf-core/scdownstream --ambient_correction cellbender --input samplesheet.csv --outdir results
-```
-
-For finer control, you can disable ambient RNA correction for specific samples by setting `ambient_correction` to `false` in your samplesheet:
-
-```csv title="samplesheet.csv"
-sample,filtered,unfiltered,ambient_correction
-sample1,/path/to/sample1_filtered.h5ad,/path/to/sample1.h5ad,true
-sample2,/path/to/sample2_filtered.h5ad,/path/to/sample2.h5ad,false
-```
-
-By default, the pipeline stores ambient-corrected counts as additional layers in the AnnData object (e.g., `ambient_corrected_decontx`) while keeping the original raw counts in the `X` layer. This means all downstream analysis including integration uses the raw counts, with corrected counts available for optional inspection.
-
-If you want to use the ambient-corrected counts for integration instead, you can enable this behavior globally or per sample:
-
-```bash
-nextflow run nf-core/scdownstream --ambient_corrected_integration true --input samplesheet.csv --outdir results
-```
-
-```csv title="samplesheet.csv"
-sample,filtered,unfiltered,ambient_corrected_integration
-sample1,/path/to/sample1_filtered.h5ad,/path/to/sample1.h5ad,true
-sample2,/path/to/sample2_filtered.h5ad,/path/to/sample2.h5ad,false
-```
-
-:::warning
-When `ambient_corrected_integration` is enabled, the corrected counts replace the raw counts in the `X` layer, and the original raw counts are no longer available.
-:::
-
-### Updating the pipeline
-
-When you run the above command, Nextflow automatically pulls the pipeline code from GitHub and stores it as a cached version. When running the pipeline after this, it will always use the cached version if available - even if the pipeline has been updated since. To make sure that you're running the latest version of the pipeline, make sure that you regularly update the cached version of the pipeline:
-
-```bash
-nextflow pull nf-core/scdownstream
-```
-
-### Reproducibility
-
-It is a good idea to specify the pipeline version when running the pipeline on your data. This ensures that a specific version of the pipeline code and software are used when you run your pipeline. If you keep using the same tag, you'll be running the same version of the pipeline, even if there have been changes to the code since.
-
-First, go to the [nf-core/scdownstream releases page](https://github.com/nf-core/scdownstream/releases) and find the latest pipeline version - numeric only (eg. `1.3.1`). Then specify this when running the pipeline with `-r` (one hyphen) - eg. `-r 1.3.1`. Of course, you can switch to another version by changing the number after the `-r` flag.
-
-This version number will be logged in reports when you run the pipeline, so that you'll know what you used when you look back in the future. For example, at the bottom of the MultiQC reports.
-
-To further assist in reproducibility, you can use share and reuse [parameter files](#running-the-pipeline) to repeat pipeline runs with the same settings without having to write out a command with every single parameter.
-
-> [!TIP]
-> If you wish to share such profile (such as upload as supplementary material for academic publications), make sure to NOT include cluster specific paths to files, nor institutional specific profiles.
 
 ## Core Nextflow arguments
 
 > [!NOTE]
-> These options are part of Nextflow and use a _single_ hyphen (pipeline parameters use a double-hyphen)
+> These are Nextflow options and use a _single_ hyphen. Pipeline parameters use a double hyphen.
+
+### `-entry`
+
+Selects the stage to run: `qc_clustering`, `downstream` or `differential_genes`. Always required —
+see [Choosing an entry point](#choosing-an-entry-point).
 
 ### `-profile`
 
-Use this parameter to choose a configuration profile. Profiles can give configuration presets for different compute environments.
+Chooses a configuration profile. Profiles bundled with the pipeline select how software is provided:
 
-Several generic profiles are bundled with the pipeline which instruct the pipeline to use software packaged using different methods (Docker, Singularity, Podman, Shifter, Charliecloud, Apptainer, Conda) - see below.
+- `apptainer` — [Apptainer](https://apptainer.org/) (the UK DRI default)
+- `singularity` — [Singularity](https://sylabs.io/docs/)
+- `docker` — [Docker](https://docker.com/)
+- `podman`, `shifter`, `charliecloud` — other container engines
+- `conda` — [Conda](https://conda.io/docs/); a last resort, and not supported for GPU runs
+- `gpu` — enables CUDA-capable environments, combine with a container profile
+- `test` — a complete configuration for automated testing, including links to test data
+
+Multiple profiles can be combined and are applied in order, so later profiles override earlier ones:
+`-profile apptainer,gpu`.
 
 > [!IMPORTANT]
-> We highly recommend the use of Docker or Singularity containers for full pipeline reproducibility, however when this is not possible, Conda is also supported.
+> Use a container profile for reproducibility. If `-profile` is omitted the pipeline runs locally and
+> expects every tool to be on `PATH`, which is not recommended.
 
-The pipeline also dynamically loads configurations from [https://github.com/nf-core/configs](https://github.com/nf-core/configs) when it runs, making multiple config profiles for various institutional clusters available at run time. For more information and to check if your system is supported, please see the [nf-core/configs documentation](https://github.com/nf-core/configs#documentation).
+> [!NOTE]
+> `-profile test_offline` is no longer supported. Use `-profile test`.
 
-Note that multiple profiles can be loaded, for example: `-profile test,docker` - the order of arguments is important!
-They are loaded in sequence, so later profiles can overwrite earlier profiles.
-
-If `-profile` is not specified, the pipeline will run locally and expect all software to be installed and available on the `PATH`. This is _not_ recommended, since it can lead to different results on different machines dependent on the computer environment.
-
-- `test`
-  - A profile with a complete configuration for automated testing
-  - Includes links to test data so needs no other parameters
-- `docker`
-  - A generic configuration profile to be used with [Docker](https://docker.com/)
-- `singularity`
-  - A generic configuration profile to be used with [Singularity](https://sylabs.io/docs/)
-- `podman`
-  - A generic configuration profile to be used with [Podman](https://podman.io/)
-- `shifter`
-  - A generic configuration profile to be used with [Shifter](https://nersc.gitlab.io/development/shifter/how-to-use/)
-- `charliecloud`
-  - A generic configuration profile to be used with [Charliecloud](https://hpc.github.io/charliecloud/)
-- `apptainer`
-  - A generic configuration profile to be used with [Apptainer](https://apptainer.org/)
-- `wave`
-  - A generic configuration profile to enable [Wave](https://seqera.io/wave/) containers. Use together with one of the above (requires Nextflow `24.03.0-edge` or later).
-- `conda`
-  - A generic configuration profile to be used with [Conda](https://conda.io/docs/). Please only use Conda as a last resort i.e. when it's not possible to run the pipeline with Docker, Singularity, Podman, Shifter, Charliecloud, or Apptainer.
+The pipeline still dynamically loads institutional configurations from
+[nf-core/configs](https://github.com/nf-core/configs). Since this fork is not an nf-core pipeline,
+there is no pipeline-specific config there and no plan to add one — use `-c` with your own config
+instead.
 
 ### `-resume`
 
-Specify this when restarting a pipeline. Nextflow will use cached results from any pipeline steps where the inputs are the same, continuing from where it got to previously. For input to be considered the same, not only the names must be identical but the files' contents as well. For more info about this parameter, see [this blog post](https://www.nextflow.io/blog/2019/demystifying-nextflow-resume.html).
-
-You can also supply a run name to resume a specific run: `-resume [run-name]`. Use the `nextflow log` command to show previous run names.
+Restarts a pipeline, reusing cached results for steps whose inputs are unchanged. Both file names and
+contents must match. See
+[this blog post](https://www.nextflow.io/blog/2019/demystifying-nextflow-resume.html). You can resume
+a specific run with `-resume [run-name]`; `nextflow log` lists previous run names.
 
 ### `-c`
 
-Specify the path to a specific config file (this is a core Nextflow command). See the [nf-core website documentation](https://nf-co.re/usage/configuration) for more information.
+Specifies an additional config file. Use it for resources and infrastructure, never for parameters.
 
 ## Custom configuration
 
 ### Resource requests
 
-Whilst the default requirements set within the pipeline will hopefully work for most people and with most input data, you may find that you want to customise the compute resources that the pipeline requests. Each step in the pipeline has a default set of requirements for number of CPUs, memory and time. For most of the pipeline steps, if the job exits with any of the error codes specified [here](https://github.com/nf-core/rnaseq/blob/4c27ef5610c87db00c3c5a3eed10b1d161abf575/conf/base.config#L18) it will automatically be resubmitted with higher resources request (2 x original, then 3 x original). If it still fails after the third attempt then the pipeline execution is stopped.
+Each process has default CPU, memory and time requests, defined in [`conf/base.config`](../conf/base.config)
+and selected by process labels (`process_low`, `process_medium`, `process_high`, `process_gpu`, …).
+Failed jobs are automatically retried with increased resources for a limited number of attempts.
 
-To change the resource requests, please see the [max resources](https://nf-co.re/docs/usage/configuration#max-resources) and [tuning workflow resources](https://nf-co.re/docs/usage/configuration#tuning-workflow-resources) section of the nf-core website.
+To raise the memory for the heaviest processes, put this in a config file and pass it with `-c`:
 
-### Custom Containers
+```groovy title="custom.config"
+process {
+  withLabel:process_high {
+    memory = 225.GB
+  }
+}
+```
 
-In some cases, you may wish to change the container or conda environment used by a pipeline steps for a particular tool. By default, nf-core pipelines use containers and software from the [biocontainers](https://biocontainers.pro/) or [bioconda](https://bioconda.github.io/) projects. However, in some cases the pipeline specified version maybe out of date.
+This fork also provides `--memory_scale`, which multiplies every memory request in
+`conf/base.config` by the given factor — a quick way to scale the whole pipeline up for large
+datasets.
 
-To use a different container from the default container or conda environment specified in a pipeline, please see the [updating tool versions](https://nf-co.re/docs/usage/configuration#updating-tool-versions) section of the nf-core website.
+### Custom containers
 
-### Custom Tool Arguments
+To override the container used by a single process, use a `withName` selector in a `-c` config:
 
-A pipeline might not always support every possible argument or option of a particular tool used in pipeline. Fortunately, nf-core pipelines provide some freedom to users to insert additional parameters that the pipeline does not include by default.
+```groovy title="custom.config"
+process {
+  withName:SCANPY_ENRICH {
+    container = '/path/to/my_image.sif'
+  }
+}
+```
 
-To learn how to provide additional arguments to a particular tool of the pipeline, please see the [customising tool arguments](https://nf-co.re/docs/usage/configuration#customising-tool-arguments) section of the nf-core website.
+For the custom images this fork relies on, prefer `--singularity_cache_dir` — see
+[Local container images](#local-container-images).
 
-### nf-core/configs
+### Custom tool arguments
 
-In most cases, you will only need to create a custom config as a one-off but if you and others within your organisation are likely to be running nf-core pipelines regularly and need to use the same settings regularly it may be a good idea to request that your custom config file is uploaded to the `nf-core/configs` git repository. Before you do this please can you test that the config file works with your pipeline of choice using the `-c` parameter. You can then create a pull request to the `nf-core/configs` repository with the addition of your config file, associated documentation file (see examples in [`nf-core/configs/docs`](https://github.com/nf-core/configs/tree/master/docs)), and amending [`nfcore_custom.config`](https://github.com/nf-core/configs/blob/master/nfcore_custom.config) to include your custom profile.
+Extra arguments can be passed to a process via `ext.args`:
 
-See the main [Nextflow documentation](https://www.nextflow.io/docs/latest/config.html) for more information about creating your own configuration files.
+```groovy title="custom.config"
+process {
+  withName:SCANPY_LEIDEN {
+    ext.args = '--flavor igraph'
+  }
+}
+```
 
-If you have any questions or issues please send us a message on [Slack](https://nf-co.re/join/slack) on the [`#configs` channel](https://nfcore.slack.com/channels/configs).
+### Updating the pipeline
+
+Nextflow caches the pipeline code it pulls from GitHub. To make sure you are running the current
+version:
+
+```bash
+nextflow pull UKDRI/scdownstream
+```
+
+### Reproducibility
+
+Pin the revision you run with `-r`, e.g. `-r dev_ukdri` for the development branch or a specific
+commit SHA or tag for a fixed version. The revision is recorded in the run reports. Sharing the
+`-params-file` alongside it makes a run reproducible without a long command line.
+
+> [!TIP]
+> If you share a params file (for example as supplementary material), remove cluster-specific paths
+> such as `--singularity_cache_dir` and `--ortholog_hcop_directory`.
 
 ## Running in the background
 
-Nextflow handles job submissions and supervises the running jobs. The Nextflow process must run until the pipeline is finished.
-
-The Nextflow `-bg` flag launches Nextflow in the background, detached from your terminal so that the workflow does not stop if you log out of your session. The logs are saved to a file.
-
-Alternatively, you can use `screen` / `tmux` or similar tool to create a detached session which you can log back into at a later time.
-Some HPC setups also allow you to run nextflow within a cluster job submitted your job scheduler (from where it submits more jobs).
+Nextflow must keep running until the pipeline finishes. Use `-bg` to detach it from your terminal
+(logs go to a file), or run it inside `screen`/`tmux`. On an HPC, run Nextflow itself as a cluster job
+from which it submits the individual tasks — this is the UK DRI pattern, see [UK DRI usage](ukdri.md).
 
 ## Nextflow memory requirements
 
-In some cases, the Nextflow Java virtual machines can start to request a large amount of memory.
-We recommend adding the following line to your environment to limit this (typically in `~/.bashrc` or `~./bash_profile`):
+The Nextflow JVM can request a large amount of memory. Limiting it in your shell profile (typically
+`~/.bashrc`) is recommended:
 
 ```bash
 NXF_OPTS='-Xms1g -Xmx4g'

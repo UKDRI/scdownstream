@@ -1,148 +1,274 @@
-<h1>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/nf-core-scdownstream_logo_dark.png">
-    <img alt="nf-core/scdownstream" src="docs/images/nf-core-scdownstream_logo_light.png">
-  </picture>
-</h1>
+# UK DRI scdownstream
 
-[![GitHub Actions CI Status](https://github.com/nf-core/scdownstream/actions/workflows/nf-test.yml/badge.svg)](https://github.com/nf-core/scdownstream/actions/workflows/nf-test.yml)
-[![GitHub Actions Linting Status](https://github.com/nf-core/scdownstream/actions/workflows/linting.yml/badge.svg)](https://github.com/nf-core/scdownstream/actions/workflows/linting.yml)[![AWS CI](https://img.shields.io/badge/CI%20tests-full%20size-FF9900?labelColor=000000&logo=Amazon%20AWS)](https://nf-co.re/scdownstream/results)[![Cite with Zenodo](http://img.shields.io/badge/DOI-10.5281/zenodo.XXXXXXX-1073c8?labelColor=000000)](https://doi.org/10.5281/zenodo.XXXXXXX)
-[![nf-test](https://img.shields.io/badge/unit_tests-nf--test-337ab7.svg)](https://www.nf-test.com)
+_A UK DRI fork of [nf-core/scdownstream](https://github.com/nf-core/scdownstream)._
 
-[![Nextflow](https://img.shields.io/badge/version-%E2%89%A524.10.5-green?style=flat&logo=nextflow&logoColor=white&color=%230DC09D&link=https%3A%2F%2Fnextflow.io)](https://www.nextflow.io/)
-[![nf-core template version](https://img.shields.io/badge/nf--core_template-3.3.2-green?style=flat&logo=nfcore&logoColor=white&color=%2324B064&link=https%3A%2F%2Fnf-co.re)](https://github.com/nf-core/tools/releases/tag/3.3.2)
-[![run with conda](http://img.shields.io/badge/run%20with-conda-3EB049?labelColor=000000&logo=anaconda)](https://docs.conda.io/en/latest/)
-[![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
-[![run with singularity](https://img.shields.io/badge/run%20with-singularity-1d355c.svg?labelColor=000000)](https://sylabs.io/docs/)
-[![Launch on Seqera Platform](https://img.shields.io/badge/Launch%20%F0%9F%9A%80-Seqera%20Platform-%234256e7)](https://cloud.seqera.io/launch?pipeline=https://github.com/nf-core/scdownstream)
+> [!IMPORTANT]
+> This pipeline began life as a fork of [nf-core/scdownstream](https://github.com/nf-core/scdownstream) and has
+> since diverged substantially. It is now developed independently by **UK DRI Informatics** and follows its own release and configuration conventions.
+>
+> Please raise issues and questions in [this repository](https://github.com/UKDRI/scdownstream). For
+> the original, nf-core community-supported pipeline, see
+> [nf-co.re/scdownstream](https://nf-co.re/scdownstream).
+>
+> The original authors and contributors are credited in
+> [`ACKNOWLEDGEMENTS.md`](ACKNOWLEDGEMENTS.md).
 
-[![Get help on Slack](http://img.shields.io/badge/slack-nf--core%20%23scdownstream-4A154B?labelColor=000000&logo=slack)](https://nfcore.slack.com/channels/scdownstream)[![Follow on Bluesky](https://img.shields.io/badge/bluesky-%40nf__core-1185fe?labelColor=000000&logo=bluesky)](https://bsky.app/profile/nf-co.re)[![Follow on Mastodon](https://img.shields.io/badge/mastodon-nf__core-6364ff?labelColor=FFFFFF&logo=mastodon)](https://mstdn.science/@nf_core)[![Watch on YouTube](http://img.shields.io/badge/youtube-nf--core-FF0000?labelColor=000000&logo=youtube)](https://www.youtube.com/c/nf-core)
+[![Nextflow](https://img.shields.io/badge/nextflow-%E2%89%A524.10.5-green?style=flat&logo=nextflow&logoColor=white&color=%230DC09D)](https://www.nextflow.io/)
+[![run with apptainer](https://img.shields.io/badge/run%20with-apptainer-1d355c.svg?labelColor=000000)](https://apptainer.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?labelColor=000000)](LICENSE)
 
 ## Introduction
 
-**nf-core/scdownstream** is a bioinformatics pipeline that can be used to process already quantified single-cell RNA-seq data. It takes a samplesheet and h5ad-, SingleCellExperiment/Seurat- or CSV files as input and performs quality control, integration, dimensionality reduction and clustering. It produces an integrated h5ad and SingleCellExperiment file and an extensive QC report.
+**UK DRI scdownstream** is a Nextflow pipeline for the downstream analysis of processed single-cell
+RNA-seq data. It takes per-sample count matrices (h5ad, 10x h5, SingleCellExperiment / Seurat RDS, or
+CSV) and carries them through quality control, ambient RNA correction, doublet detection, cell type
+annotation, scVI integration, dimensionality reduction and clustering, then on through marker genes,
+gene set enrichment and cell–cell communication, and finally pseudobulk differential expression.
 
-The pipeline is based on the learnings and implementations from the following pipelines (alphabetical):
+The input is ideally the output of [nf-core/scrnaseq](https://nf-co.re/scrnaseq) or a similar
+per-sample count matrix pipeline. We recommend supplying it as AnnData (`.h5ad`) objects: AnnData is
+part of the [scverse](https://scverse.org/) ecosystem that this pipeline is built on, and it scales
+to large count matrices without the size limits that SingleCellExperiment and Seurat objects run into
+in R.
+
+The pipeline is organised as **three sequential stages**, each its own Nextflow entry point, so that
+long-running analyses can be checkpointed and re-run independently.
+
+It inherits the learnings and implementations of the following pipelines (alphabetical), via
+nf-core/scdownstream:
 
 - [panpipes](https://github.com/DendrouLab/panpipes)
 - [scFlow](https://combiz.github.io/scFlow/)
 - [scRAFIKI](https://github.com/Mye-InfoBank/scRAFIKI)
 - [YASCP](https://github.com/wtsi-hgi/yascp)
 
-# ![nf-core/scdownstream](docs/images/metromap.png)
+## Entry points
 
-Steps marked with the boat icon are not yet implemented. For the other steps, the pipeline uses the following tools:
+The pipeline is always invoked with an explicit `-entry`. The three stages are **sequential**: each
+consumes the previous stage's finalized `.h5ad` via `--base_adata`.
 
-1. Per-sample preprocessing
-   1. Convert all RDS files to h5ad format
-   2. Create filtered matrix (if not provided)
-   3. Present QC for raw counts ([`MultiQC`](http://multiqc.info/))
-   4. Remove ambient RNA
-      - [decontX](https://bioconductor.org/packages/release/bioc/html/decontX.html)
-      - [soupX](https://cran.r-project.org/web/packages/SoupX/readme/README.html)
-      - [cellbender](https://cellbender.readthedocs.io/en/latest/)
-      - [scAR](https://docs.scvi-tools.org/en/stable/user_guide/models/scar.html)
-   5. Apply user-defined QC filters (can be defined per sample in the samplesheet)
-   6. Doublet detection (Majority vote possible)
-      - [SOLO](https://docs.scvi-tools.org/en/stable/user_guide/models/solo.html)
-      - [scrublet](https://scanpy.readthedocs.io/en/stable/api/generated/scanpy.pp.scrublet.html)
-      - [DoubletDetection](https://doubletdetection.readthedocs.io/en/v2.5.2/doubletdetection.doubletdetection.html)
-      - [SCDS](https://bioconductor.org/packages/devel/bioc/vignettes/scds/inst/doc/scds.html)
-2. Sample aggregation
-   1. Merge into a single h5ad file
-   2. Present QC for merged counts ([`MultiQC`](http://multiqc.info/))
-   3. Integration
-      - [scVI](https://docs.scvi-tools.org/en/stable/user_guide/models/scvi.html)
-      - [scANVI](https://docs.scvi-tools.org/en/stable/user_guide/models/scanvi.html)
-      - [Harmony](https://portals.broadinstitute.org/harmony/articles/quickstart.html)
-      - [BBKNN](https://github.com/Teichlab/bbknn)
-      - [Combat](https://scanpy.readthedocs.io/en/latest/api/generated/scanpy.pp.combat.html)
-      - [Seurat](https://satijalab.org/seurat/articles/integration_introduction)
-3. Cell type annotation
-   - [celltypist](https://www.celltypist.org/)
-4. Clustering and dimensionality reduction
-   1. [Leiden clustering](https://scanpy.readthedocs.io/en/stable/generated/scanpy.tl.leiden.html)
-   2. [UMAP](https://scanpy.readthedocs.io/en/stable/generated/scanpy.tl.umap.html)
-5. Create report ([`MultiQC`](http://multiqc.info/))
+| Stage | Entry point                 | Required input                                                        | Main output                                                             |
+| ----- | --------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| 1     | `-entry qc_clustering`      | `--input samplesheet.csv`                                             | `<name>_finalized.h5ad`, MultiQC report, QC/clustering HTML report      |
+| 2     | `-entry downstream`         | `--base_adata <stage 1 h5ad>`                                         | `<name>_finalized.h5ad`, `<name>_markers.json.gz`, analysis HTML report |
+| 3     | `-entry differential_genes` | `--base_adata <stage 2 h5ad>` + `--diffgenes_contrasts contrasts.tsv` | per-contrast DE tables, pseudobulk h5ad, DE HTML report                 |
 
-## Usage
+```text
+samplesheet.csv
+      │
+      ▼  -entry qc_clustering
+<name>_finalized.h5ad  ── QC, integration (scVI), UMAP, Leiden clustering
+      │
+      ▼  -entry downstream        --base_adata
+<name>_finalized.h5ad  ── marker genes, enrichment, LIANA+ cell–cell communication
+      │
+      ▼  -entry differential_genes  --base_adata  --diffgenes_contrasts
+differential_genes/    ── decoupler pseudobulk → PyDESeq2 per group × contrast
+```
+
+> [!IMPORTANT]
+> **Always pass `-entry`.** Running `nextflow run …` without it selects the upstream single-pass
+> workflow ([`workflows/scdownstream.nf`](workflows/scdownstream.nf)), which the three-stage design
+> replaced. It is retained for reference only and is no longer supported.
+
+## Pipeline steps
+
+### Stage 1 — `qc_clustering`
+
+1. Load and convert inputs to h5ad (h5ad, 10x h5, RDS, CSV)
+2. Per-sample quality control
+   1. QC metrics for raw counts ([`MultiQC`](http://multiqc.info/))
+   2. Doublet detection — [scrublet](https://scanpy.readthedocs.io/en/stable/api/generated/scanpy.pp.scrublet.html)
+      (doublets are **annotated, not removed** — see [Status](#status-and-known-limitations))
+   3. Ambient RNA correction — [decontX](https://bioconductor.org/packages/release/bioc/html/decontX.html)
+      (default), [soupX](https://cran.r-project.org/web/packages/SoupX/readme/README.html),
+      [CellBender](https://cellbender.readthedocs.io/en/latest/),
+      [scAR](https://docs.scvi-tools.org/en/stable/user_guide/models/scar.html)
+   4. Cell filtering — fixed thresholds, or automatic N-MAD outlier thresholds via
+      `--automatic_cell_filtering`
+3. Cell type annotation — [CellTypist](https://www.celltypist.org/) and/or
+   [SingleR](https://bioconductor.org/packages/release/bioc/html/SingleR.html) with
+   [celldex](https://bioconductor.org/packages/release/data/experiment/html/celldex.html) references
+4. Gene symbol unification across samples
+5. Merge and integrate — [scVI](https://docs.scvi-tools.org/en/stable/user_guide/models/scvi.html)
+6. Embeddings and clustering — log-normalisation, HVG selection, PCA, neighbours,
+   [UMAP](https://scanpy.readthedocs.io/en/stable/generated/scanpy.tl.umap.html),
+   [Leiden](https://scanpy.readthedocs.io/en/stable/generated/scanpy.tl.leiden.html) at every
+   resolution in `--clustering_resolutions`
+7. Reports — a [Quarto](https://quarto.org/) QC/clustering report and a
+   [`MultiQC`](http://multiqc.info/) report
+
+`--qc_only` stops after step 3, producing per-sample QC objects without merging or integration.
+
+### Stage 2 — `downstream`
+
+1. Marker genes per cluster — `scanpy.tl.rank_genes_groups` (Wilcoxon) on the clustering named by
+   `--selected_clustering`
+2. Gene set enrichment over those markers
+3. Cell–cell communication — [LIANA+](https://liana-py.readthedocs.io/) rank aggregation, using HCOP
+   orthologs for non-human species
+4. Marker export to `<name>_markers.json.gz`, and h5ad/RDS finalisation
+5. A Quarto analysis report
+
+### Stage 3 — `differential_genes`
+
+1. Pseudobulk aggregation per sample × group label — [decoupler](https://decoupler-py.readthedocs.io/)
+   (`counts` layer, sum mode)
+2. Drop pseudobulk samples below `--diffgenes_min_counts` / `--diffgenes_min_cells`
+3. Split into one object per group label (cluster or cell type, `--diffgenes_group_col`)
+4. Differential expression per group label × contrast —
+   [PyDESeq2](https://pydeseq2.readthedocs.io/), design `~ variable [+ blocking…]`
+5. A Quarto differential expression report across all results
+
+Contrasts are supplied as a TSV following the
+[nf-core/differentialabundance](https://nf-co.re/differentialabundance) definition — see
+[`assets/contrasts.tsv`](assets/contrasts.tsv) and the
+[usage documentation](docs/usage.md#differential_genes).
+
+## Tool choices
+
+This fork focuses on a curated set of tools — the approaches we have validated on UK DRI data:
+
+| Step                    | Supported                                                     |
+| ----------------------- | ------------------------------------------------------------- |
+| Doublet detection       | `scrublet`                                                    |
+| Ambient RNA correction  | `decontx` (default), `soupx`, `cellbender`, `scar`, or `none` |
+| Integration             | `scvi`                                                        |
+| Clustering              | Leiden, at multiple resolutions                               |
+| Cell type annotation    | CellTypist, SingleR / celldex                                 |
+| Differential expression | PyDESeq2 on decoupler pseudobulk                              |
+
+Further tools will be added as they are curated and validated. Until then, please use the values
+above — see [Supported tool choices](docs/usage.md#supported-tool-choices) for the details.
+
+## Quick start
 
 > [!NOTE]
-> If you are new to Nextflow and nf-core, please refer to [this page](https://nf-co.re/docs/usage/installation) on how to set-up Nextflow. Make sure to [test your setup](https://nf-co.re/docs/usage/introduction#how-to-run-a-pipeline) with `-profile test` before running the workflow on actual data.
+> If you are new to Nextflow, see the [Nextflow documentation](https://www.nextflow.io/docs/latest/)
+> for installation. If you are unsure about the `filtered` / `unfiltered` distinction in the
+> samplesheet, see [Filtered and unfiltered matrices](docs/usage.md#filtered-and-unfiltered-matrices).
 
-> [!NOTE]
-> If you are confused by the terms `filtered` and `unfiltered`, please check out the respective [documentation](https://nf-co.re/scdownstream/dev/docs/usage/#filtered-and-unfiltered-matrices).
-
-First, prepare a samplesheet with your input data that looks as follows:
+Prepare a samplesheet describing your per-sample matrices:
 
 ```csv title="samplesheet.csv"
 sample,unfiltered
 sample1,/absolute/path/to/sample1.h5ad
-sample2,/absolute/path/to/sample3.h5
-sample3,relative/path/to/sample2.rds
-sample4,/absolute/path/to/sample3.csv
+sample2,/absolute/path/to/sample2.h5
+sample3,relative/path/to/sample3.rds
+sample4,/absolute/path/to/sample4.csv
 ```
 
-Each entry represents a h5ad, h5, RDS or CSV file. RDS files may contain any object that can be converted to a SingleCellExperiment using the [Seurat `as.SingleCellExperiment`](https://satijalab.org/seurat/reference/as.singlecellexperiment) function.
-CSV files should contain a matrix with genes as columns and cells as rows. The first column should contain cell names/barcodes.
+Each entry is an h5ad, 10x h5, RDS or CSV file. RDS files may contain any object convertible to a
+SingleCellExperiment via [Seurat's `as.SingleCellExperiment`](https://satijalab.org/seurat/reference/as.singlecellexperiment).
+CSV files should hold a matrix with genes as columns and cells as rows, the first column being cell
+barcodes.
 
--->
-
-Now, you can run the pipeline using:
+**Stage 1 — QC, integration and clustering:**
 
 ```bash
-nextflow run nf-core/scdownstream \
-   -profile <docker/singularity/.../institute> \
+nextflow run UKDRI/scdownstream -r dev_ukdri -entry qc_clustering \
+   -profile apptainer \
    --input samplesheet.csv \
-   --outdir <OUTDIR>
+   --name my_study \
+   --species human \
+   --outdir results/qc_clustering
+```
+
+**Stage 2 — downstream analysis:**
+
+```bash
+nextflow run UKDRI/scdownstream -r dev_ukdri -entry downstream \
+   -profile apptainer \
+   --base_adata results/qc_clustering/my_study_finalized.h5ad \
+   --name my_study \
+   --species human \
+   --outdir results/downstream
+```
+
+**Stage 3 — differential expression:**
+
+```bash
+nextflow run UKDRI/scdownstream -r dev_ukdri -entry differential_genes \
+   -profile apptainer \
+   --base_adata results/downstream/my_study_finalized.h5ad \
+   --diffgenes_contrasts contrasts.tsv \
+   --diffgenes_group_col cell_type \
+   --diffgenes_sample_col sample \
+   --name my_study \
+   --outdir results/differential_genes
 ```
 
 > [!WARNING]
-> Please provide pipeline parameters via the CLI or Nextflow `-params-file` option. Custom config files including those provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_; see [docs](https://nf-co.re/docs/usage/getting_started/configuration#custom-configuration-files).
+> Provide pipeline parameters on the command line or via `-params-file`. Custom config files passed
+> with `-c` can supply any Nextflow configuration **except parameters**.
 
-For more details and further functionality, please refer to the [usage documentation](https://nf-co.re/scdownstream/usage) and the [parameter documentation](https://nf-co.re/scdownstream/parameters).
+On the UK DRI cluster the pipeline is run from a pinned checkout with `-profile apptainer,gpu` and a
+per-stage `params_<entry>.yml` — see [UK DRI usage](docs/ukdri.md).
 
-## Pipeline output
+## Changes and known limitations
 
-To see the results of an example test run with a full size dataset refer to the [results](https://nf-co.re/scdownstream/results) tab on the nf-core website pipeline page.
-For more details about the output files and reports, please refer to the
-[output documentation](https://nf-co.re/scdownstream/output).
+This pipeline is **work in development**. The following are known and, for now, expected behaviours.
+Several of them silently affect results, so please read before interpreting output.
+
+1. **Doublets are flagged, not removed.** scrublet writes its scores and predictions into the object,
+   but the doublet removal step is currently disabled. Filter on the doublet annotation yourself.
+   `--doublet_detection_threshold` is not currently supported.
+2. **Keep `scvi` in `--integration_methods`.** Everything after the merge is built on the scVI latent
+   space; a selection that omits `scvi` produces no output and no error.
+3. **Per-sample QC overrides in the samplesheet are ignored.** The per-sample `min_genes`,
+   `max_mito_percentage`, `automatic_cell_filtering` and related columns are read into the sample
+   metadata but the global `--min_*` / `--max_*` parameters are what actually reach the filtering
+   step. Set filters globally.
+4. **`--prep_cellxgene` is no longer supported.** Leave it at its default.
+5. **`-profile test_offline` is no longer supported.** Use `-profile test` instead.
+6. **Set `--species` explicitly.** It defaults to `human`, and mouse data analysed under the human
+   default produces wrong enrichment and cell–cell communication results without any error.
+7. **Five processes have no container registry fallback** and require locally built `.sif` images. We will publish these images to a container registry in the near future —
+   see [Local container images](docs/usage.md#local-container-images).
+8. **`--ortholog_hcop_directory` defaults to a UK DRI path** (`/nfsdata/genome/hcop/`). Off-site
+   runs must override it.
+9. **The legacy single-pass workflow is no longer supported** — always pass `-entry` (see the note
+   above).
+10. Several other inherited parameters are also not currently supported: `--skip_enrichment`,
+    `--skip_liana`, `--skip_rankgenesgroups`, `--pseudobulk*`, `--cluster_per_label`,
+    `--cluster_global`, and the `exclude_samples_col` / `exclude_samples_values` columns of the
+    contrasts file.
+11. MultiQC coverage is partial — the Quarto reports are the more complete view of a run.
+
+## Documentation
+
+- [Usage](docs/usage.md) — samplesheet format, all parameters, per-entry-point guidance
+- [Output](docs/output.md) — the files each stage produces and how to read them
+- [UK DRI usage](docs/ukdri.md) — running on the UK DRI cluster
+- [UK DRI Informatics wiki](https://wiki.informatics.ukdri.ac.uk/en/Pipelines/nfcore_scdownstream) —
+  the operational source of truth for cluster runs
+
+Parameters are defined in [`nextflow_schema.json`](nextflow_schema.json); `nextflow run … --help`
+lists them.
 
 ## Credits
 
-nf-core/scdownstream was originally written by [Nico Trummer](https://github.com/nictru).
+This pipeline is derived from **nf-core/scdownstream**, originally written by
+[Nico Trummer](https://github.com/nictru), and would not exist without the work of its authors and
+contributors. Full attribution — original authors, upstream contributors, the nf-core framework and
+the pipelines this work builds on — is in [`ACKNOWLEDGEMENTS.md`](ACKNOWLEDGEMENTS.md).
 
-We thank the following people for their extensive assistance in the development of this pipeline (alphabetical):
+The fork is maintained by UK DRI Informatics. Its deviations from upstream are UK DRI's
+responsibility and are not endorsed by nf-core or by the original authors.
 
-- [Fabian Rost](https://github.com/fbnrst)
-- [Fabiola Curion](https://github.com/bio-la)
-- [Gregor Sturm](https://github.com/grst)
-- [Jonathan Talbot-Martin](https://github.com/jtalbotmartin)
-- [Lukas Heumos](https://github.com/zethson)
-- [Matiss Ozols](https://github.com/maxozo)
-- [Nathan Skene](https://github.com/NathanSkene)
-- [Nurun Fancy](https://github.com/nfancy)
-- [Riley Grindle](https://github.com/Riley-Grindle)
-- [Ryan Seaman](https://github.com/RPSeaman)
-- [Steffen Möller](https://github.com/smoe)
-- [Wojtek Sowinski](https://github.com/WojtekSowinski)
+## Contributions and support
 
-## Contributions and Support
-
-If you would like to contribute to this pipeline, please see the [contributing guidelines](.github/CONTRIBUTING.md).
-
-For further information or help, don't hesitate to get in touch on the [Slack `#scdownstream` channel](https://nfcore.slack.com/channels/scdownstream) (you can join with [this invite](https://nf-co.re/join/slack)).
+Contributions are welcome via pull request against the `dev_ukdri` branch of
+[UKDRI/scdownstream](https://github.com/UKDRI/scdownstream). For help, open an issue in this
+repository or contact UK DRI Informatics.
 
 ## Citations
 
-<!-- TODO nf-core: Add citation for pipeline after first release. Uncomment lines below and update Zenodo doi and badge at the top of this file. -->
-<!-- If you use nf-core/scdownstream for your analysis, please cite it using the following doi: [10.5281/zenodo.XXXXXX](https://doi.org/10.5281/zenodo.XXXXXX) -->
+An extensive list of references for the tools used by the pipeline can be found in
+[`CITATIONS.md`](CITATIONS.md).
 
-<!-- TODO nf-core: Add bibliography of tools and data used in your pipeline -->
-
-An extensive list of references for the tools used by the pipeline can be found in the [`CITATIONS.md`](CITATIONS.md) file.
-
-You can cite the `nf-core` publication as follows:
+This pipeline is no longer part of nf-core, but it was built on the nf-core framework and template,
+which you may wish to cite:
 
 > **The nf-core framework for community-curated bioinformatics pipelines.**
 >

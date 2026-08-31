@@ -1,91 +1,75 @@
-# nf-core/scdownstream: Output
+# UK DRI scdownstream: Output
 
 ## Introduction
 
-This document describes the output produced by the pipeline. Most of the plots are taken from the MultiQC report, which summarises results at the end of the pipeline.
+This document describes the output produced by the pipeline. All paths are relative to the directory
+given by `--outdir`.
 
-The directories listed below will be created in the results directory after the pipeline has finished. All paths are relative to the top-level results directory.
+Because the pipeline is split into [three entry points](usage.md#choosing-an-entry-point), each stage
+writes into its own results directory and produces a different subset of the tree below. The sections
+are grouped by stage.
 
-## Pipeline overview
+> [!IMPORTANT]
+> Most intermediate objects are only published when `--save_intermediates` is set. Without it you get
+> the finalized objects, the HTML reports, MultiQC and `pipeline_info/` — which is usually what you
+> want.
 
-The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes data using the following steps:
+## Stage 1 — `qc_clustering`
 
-1. Per-sample preprocessing
-   1. Convert all RDS files to h5ad format
-   2. Create filtered matrix (if not provided)
-   3. Present QC for raw counts ([`MultiQC`](http://multiqc.info/))
-   4. Remove ambient RNA
-      - [decontX](https://bioconductor.org/packages/release/bioc/html/decontX.html)
-      - [soupX](https://cran.r-project.org/web/packages/SoupX/readme/README.html)
-      - [cellbender](https://cellbender.readthedocs.io/en/latest/)
-      - [scAR](https://docs.scvi-tools.org/en/stable/user_guide/models/scar.html)
-   5. Apply user-defined QC filters (can be defined per sample in the samplesheet)
-   6. Doublet detection (Majority vote possible)
-      - [SOLO](https://docs.scvi-tools.org/en/stable/user_guide/models/solo.html)
-      - [scrublet](https://scanpy.readthedocs.io/en/stable/api/generated/scanpy.pp.scrublet.html)
-      - [DoubletDetection](https://doubletdetection.readthedocs.io/en/v2.5.2/doubletdetection.doubletdetection.html)
-      - [SCDS](https://bioconductor.org/packages/devel/bioc/vignettes/scds/inst/doc/scds.html)
-2. Sample aggregation
-   1. Merge into a single h5ad file
-   2. Present QC for merged counts ([`MultiQC`](http://multiqc.info/))
-   3. Integration
-      - [scVI](https://docs.scvi-tools.org/en/stable/user_guide/models/scvi.html)
-      - [scANVI](https://docs.scvi-tools.org/en/stable/user_guide/models/scanvi.html)
-      - [Harmony](https://portals.broadinstitute.org/harmony/articles/quickstart.html)
-      - [BBKNN](https://github.com/Teichlab/bbknn)
-      - [Combat](https://scanpy.readthedocs.io/en/latest/api/generated/scanpy.pp.combat.html)
-      - [Seurat](https://satijalab.org/seurat/articles/integration_introduction)
-3. Cell type annotation
-   - [celltypist](https://www.celltypist.org/)
-   - [singleR](https://www.bioconductor.org/packages/release/bioc/html/SingleR.html)
-4. Clustering and dimensionality reduction
-   1. [Leiden clustering](https://scanpy.readthedocs.io/en/stable/generated/scanpy.tl.leiden.html)
-   2. [UMAP](https://scanpy.readthedocs.io/en/stable/generated/scanpy.tl.umap.html)
-5. Create report ([`MultiQC`](http://multiqc.info/))
-
-### Per-sample preprocessing
+Produces, at the top level of the results directory:
 
 <details markdown="1">
 <summary>Output files</summary>
 
-- `preprocess/${sample_id}/`
-  - `converted/`: Contains the result of converting input file formats to h5ad.
-  - `unified/`: Versions of the input files that have been optimized for usage in the pipeline.
-  - `empty_droplet_removal/`: Results of empty droplet removal. Only if no `filtered` matrix is provided in the samplesheet.
-  - `qc_raw/`: QC plots for the raw input data.
-  - `ambient_rna_removal/`: Results of ambient RNA removal.
-  - `custom_thresholds/`: Results of applying user-defined QC thresholds.
-  - `doublet_detection/`: Directories related to doublet detection.
-    - `input_rds/`: RDS version of the h5ad file that is used as input to the doublet detection tools.
-    - `(doubletdetection|scds|scrublet|solo)/`: Results of doublet detection. Each directory contains a filtered `h5ad`/`rds` and a `csv`/`pkl` file with the doublet annotations.
-    - `${sample_id}.h5ad`: The h5ad without doublets.
-  - `qc_preprocessed/`: QC plots for the preprocessed data.
+- `<name>_finalized.h5ad`: the integrated, clustered AnnData object. **This is the input to
+  `-entry downstream`.**
+- `<name>_finalized.rds`: a SingleCellExperiment version of the same object.
 
 </details>
 
-`nf-core/scdownstream` covers a range of preprocessing methods. The output of each step is stored in the `preprocess` directory. The `preprocess` directory contains a subdirectory for each sample, which contains the results of the preprocessing steps.
+`<name>` is the value of `--name` (defaulting to `qc_clustering`).
 
-### Sample aggregation
+> [!NOTE]
+> RDS conversion runs with `errorStrategy 'ignore'`, so the `.rds` file is best-effort: if conversion
+> fails the run continues and only the `.h5ad` is produced.
+
+### Input loading
 
 <details markdown="1">
 <summary>Output files</summary>
 
-- `combine/`
-  - `merge/`
-    - `merged_inner.h5ad`: The merged h5ad file with only the intersection of the genes. Will be used for integration.
-    - `merged_outer.h5ad`: The merged h5ad file with all genes. Will be used as base for the final h5ad file.
-    - `merged_sample_genes.png`: UpSet plot showing the overlap of genes between samples.
-  - `integrate/`
-    - `input_hvg`
-      - `*.h5ad`: The h5ad file that is used as input to the integration tools.
-      - `*.rds`: RDS version of the h5ad file.
-    - `${tool}`
-      - `*.h5ad/*.rds`: The integrated h5ad or rds file.
-      - `X_${tool}.pkl`: Low-dimensional representation of the integrated data.
+- `load_h5ad/`: the result of converting RDS, 10x h5 and CSV inputs to h5ad.
 
 </details>
 
-The `combine` directory contains the results of the sample aggregation step. The `merge` directory contains the merged h5ad files, which are used as input to the integration tools. The `integrate` directory contains the results of the integration step. The integrated h5ad files are stored in subdirectories named after the integration tool used.
+### Quality control
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `quality_control/`
+  - `sizes/`: collected per-sample object sizes.
+  - `empty_droplet_removal/`: CellBender empty droplet detection. Only produced when no `filtered`
+    matrix was given in the samplesheet.
+  - `qc_raw/`: QC metrics and plots for the raw input data, also fed into MultiQC.
+  - `doublet_detection/scrublet/`: scrublet output — the annotated `h5ad`, the per-cell doublet
+    scores and predictions, and a `*_mqc.json` carrying the score distribution plot for MultiQC.
+  - `ambient_rna_removal/`: ambient RNA correction results (decontX, SoupX, CellBender or scAR
+    depending on `--ambient_correction`).
+  - `custom_thresholds/`: the result of cell and gene filtering, plus QC plots. When
+    `--automatic_cell_filtering` is set, the N-MAD-derived thresholds used are reported here.
+  - `qc_filtered/`: QC metrics and plots after filtering, also fed into MultiQC.
+  - `finalized/`: the per-sample objects with cell type predictions merged back in.
+
+</details>
+
+Note the step order in this fork: **doublet detection runs before ambient RNA correction and
+filtering**.
+
+> [!WARNING]
+> Doublets are **annotated, not removed**. The `obs` columns written by scrublet mark predicted
+> doublets, but no cells are dropped — see
+> [Supported tool choices](usage.md#supported-tool-choices).
 
 ### Cell type annotation
 
@@ -93,87 +77,164 @@ The `combine` directory contains the results of the sample aggregation step. The
 <summary>Output files</summary>
 
 - `celltypes/`
-  - `celltypist/`
-    - `*.h5ad`: The h5ad file with cell type annotations.
-    - `*.pkl`: The cell type annotations in a pickle file.
-  - `singleR`
-    - `*.h5ad`: The h5ad file with cell type annotations.
-    - `*.csv`: The cell type annotations in a CSV file.
-    - `*.pdf`: The cell type annotation plots in PDF format.
-  - `celldexreferenceprocessing`
-    - `dir`: A directory containing `h5` and `rds` files for the reference(s)
+  - `celltypist/`: the annotated `h5ad` and the predictions as a `pkl`.
+  - `singler/`: the annotated `h5ad`, the predictions as a `csv`, and diagnostic plots as `pdf`.
+- `adata/`: objects produced by merging predictions back into the sample AnnData.
 
 </details>
 
-The `celltypes` directory contains the results of the cell type annotation step. So far, only `celltypist` is supported.
-
-### Clustering and dimensionality reduction
+### Gene symbol unification
 
 <details markdown="1">
 <summary>Output files</summary>
 
-- `cluster_dimred/`
-  - `${integration}/`
-    - `neighbors/`
-      - `*.h5ad`: The h5ad file with the neighborhood graph.
-    - `leiden/`
-      - ${resolution}/`
-        - `*.h5ad`: The h5ad file with the leiden clustering.
-        - `*.pkl`: The leiden clustering in a pickle file.
-    - `umap/`
-      - `*.h5ad`: The h5ad file with the UMAP coordinates.
-      - `*.pkl`: The UMAP coordinates in a pickle file.
+- `unify/`
+  - `hugounifier/`: the HUGO symbol mapping and the objects it was applied to (only when
+    `--unify_gene_symbols` is set).
+  - `*.h5ad`: the unified per-sample objects, ready for merging.
 
 </details>
 
-The `cluster_dimred` directory contains the results of the clustering and dimensionality reduction step. The results are stored in subdirectories named after the integration tool used.
-
-### Finalize
+### Merging and integration
 
 <details markdown="1">
 <summary>Output files</summary>
 
-- `finalize/`
-  - `merged.h5ad`: The final h5ad file with all results.
-  - `merged.rds`: RDS version of the final h5ad file.
-  - `merged_metadata.csv`: Metadata of the final h5ad file.
+- `combine/`
+  - `merge/`
+    - `merged_inner.h5ad`: samples merged on the intersection of genes. Used for integration.
+    - `merged_outer.h5ad`: samples merged over all genes. Used as the base for the final object.
+    - `merged_sample_genes.png`: UpSet plot of gene overlap between samples.
+  - `merge_emb/<id>/`: merged embeddings, when embeddings from multiple sources are combined.
+  - `integrate/`
+    - `input_hvg/`: the highly-variable-gene subset passed to the integration tools, as `h5ad` and
+      `rds`.
+    - `scvi/`: the scVI-integrated object and `X_scvi.pkl`, the latent representation.
 
 </details>
 
-The `finalize` directory contains the final results of the pipeline. The final h5ad file contains all results from the pipeline and is stored in the `merged.h5ad` file. The metadata of the final h5ad file is stored in the `merged_metadata.csv` file.
+scVI is the curated integration method — see
+[Supported tool choices](usage.md#supported-tool-choices).
+
+### Embeddings and clustering
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `scanpy/<name>/`: the object after each embedding and clustering step — log-normalisation, HVG
+  selection, PCA (including loadings), the neighbour graph, UMAP, and Leiden clustering.
+
+</details>
+
+Leiden clustering writes one `leiden_<resolution>` column per entry in
+`--clustering_resolutions`, and copies the **first** resolution into `leiden` as the default
+clustering. `--selected_clustering` in stage 2 picks which of these to use.
+
+### Reports
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `report/<name>_scdownstream_report.html`: a self-contained [Quarto](https://quarto.org/) report
+  covering per-sample QC, filtering, integration, the UMAP embedding and the clustering at each
+  resolution. Tables are searchable and capped at `--report_table_row_limit` rows.
+
+</details>
 
 ### MultiQC
-
-:::warning
-The MultiQC report is not yet fully implemented and will be improved in future releases.
-Until then, feel free to utilize [CELLxGENE](https://cellxgene.cziscience.com/docs/05__Annotate%20and%20Analyze%20Your%20Data/5_1__Getting%20Started:%20Install,%20Launch,%20Quick%20Start) for interactive exploration of the results.
-:::
 
 <details markdown="1">
 <summary>Output files</summary>
 
 - `multiqc/`
-  - `multiqc_report.html`: a standalone HTML file that can be viewed in your web browser.
-  - `multiqc_data/`: directory containing parsed statistics from the different tools used in the pipeline.
-  - `multiqc_plots/`: directory containing static images from the report in various formats.
+  - `multiqc_report.html`: a standalone HTML report viewable in a browser.
+  - `multiqc_data/`: parsed statistics from the tools used.
+  - `multiqc_plots/`: static images from the report.
 
 </details>
 
-[MultiQC](http://multiqc.info) is a visualization tool that generates a single HTML report summarising all samples in your project. Most of the pipeline QC results are visualised in the report and further statistics are available in the report data directory.
+[MultiQC](http://multiqc.info) collates per-sample QC across the pipeline — raw and filtered cell and
+gene counts, mitochondrial content, doublet score distributions — into one report, and also records
+the software versions used. Coverage is partial: the Quarto report above is the more complete view of
+a `qc_clustering` run.
 
-Results generated by MultiQC collate pipeline QC from supported tools e.g. FastQC. The pipeline has special steps which also allow the software versions to be reported in the MultiQC output for future traceability. For more information about how to use MultiQC reports, see <http://multiqc.info>.
+## Stage 2 — `downstream`
 
-### Pipeline information
+<details markdown="1">
+<summary>Output files</summary>
+
+- `<name>_finalized.h5ad` / `<name>_finalized.rds`: the object with marker genes, enrichment results
+  and LIANA+ output added. **This is the input to `-entry differential_genes`.**
+- `<name>_markers.json.gz`: the marker genes per group, filtered by `--markers_thr_adj_pvalue`,
+  `--markers_n_top`, `--markers_pct_nz` and `--markers_min_logfc`, in a compact JSON form for
+  downstream tooling.
+- `scanpy/<name>/`: the object after `rank_genes_groups` (Wilcoxon) and after gene set enrichment.
+- `per_group/<name>/liana/`: [LIANA+](https://liana-py.readthedocs.io/) rank-aggregate cell–cell
+  communication results.
+- `report/<name>_scdownstream_report.html`: a Quarto report covering the marker genes per group, the
+  enrichment results and the cell–cell communication analysis.
+
+</details>
+
+Marker genes and enrichment are computed over the grouping named by `--selected_clustering`, so a
+run grouped by cell type and a run grouped by `leiden_1.0` should be written to different `--outdir`
+directories (or given different `--name` values) to avoid overwriting each other.
+
+## Stage 3 — `differential_genes`
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `differential_genes/`
+  - `pseudobulk/`
+    - `<name>_pseudobulk.h5ad`: raw pseudobulk profiles, one observation per sample × group label,
+      summed from the `counts` layer.
+    - `<name>_pseudobulk_filtered.h5ad`: the same after dropping profiles below
+      `--diffgenes_min_counts` / `--diffgenes_min_cells`.
+    - `per_group/`: one h5ad per distinct value of `--diffgenes_group_col`.
+  - `deseq2/<group_label>/`
+    - `<name>_<group_label>_<contrast>.tsv`: the PyDESeq2 result table for that group label and
+      contrast — one row per gene, with columns `feature`, `baseMean`, `log2FoldChange`, `lfcSE`,
+      `stat`, `pvalue`, `padj`. Log fold changes are **target vs reference**.
+- `report/<name>_differential_genes_report.html`: a Quarto report summarising every contrast across
+  every group label — pseudobulk composition, per-contrast result tables and summary counts.
+
+</details>
+
+Only the `pseudobulk/` intermediates are gated on `--save_intermediates`; the DE tables and the
+report are always published.
+
+> [!WARNING]
+> A (group label, contrast) combination with fewer than `--diffgenes_min_samples` pseudobulk samples
+> on either side is **skipped silently** and produces no `.tsv`. The report is driven by a
+> `de_manifest.tsv` mapping each result file to its group label and contrast, so the set of tables in
+> the report is the authoritative record of what was actually tested. Compare it against the contrasts
+> you supplied.
+
+## Pipeline information
 
 <details markdown="1">
 <summary>Output files</summary>
 
 - `pipeline_info/`
-  - Reports generated by Nextflow: `execution_report.html`, `execution_timeline.html`, `execution_trace.txt` and `pipeline_dag.dot`/`pipeline_dag.svg`.
-  - Reports generated by the pipeline: `pipeline_report.html`, `pipeline_report.txt` and `software_versions.yml`. The `pipeline_report*` files will only be present if the `--email` / `--email_on_fail` parameter's are used when running the pipeline.
-  - Reformatted samplesheet files used as input to the pipeline: `samplesheet.valid.csv`.
-  - Parameters used by the pipeline run: `params.json`.
+  - Reports generated by Nextflow, each suffixed with the run timestamp:
+    `execution_report_*.html`, `execution_timeline_*.html`, `execution_trace_*.txt` and
+    `pipeline_dag_*.html`.
+  - Software versions: `nf_core_scdownstream_software_mqc_versions.yml` (`qc_clustering`) or
+    `nf_core_scdownstream_differential_genes_software_mqc_versions.yml` (`differential_genes`).
+  - `pipeline_report.html` / `pipeline_report.txt`: only produced by `qc_clustering`, and only when
+    `--email` / `--email_on_fail` is used.
+  - The validated samplesheet: `samplesheet.valid.csv`.
+  - The parameters used for the run: `params.json`.
 
 </details>
 
-[Nextflow](https://www.nextflow.io/docs/latest/tracing.html) provides excellent functionality for generating various reports relevant to the running and execution of the pipeline. This will allow you to troubleshoot errors with the running of the pipeline, and also provide you with other information such as launch commands, run times and resource usage.
+[Nextflow](https://www.nextflow.io/docs/latest/tracing.html) generates these reports to help
+troubleshoot failures and to record launch commands, run times and resource usage.
+
+## Directories referenced elsewhere but not produced
+
+Some publishing rules inherited from upstream target steps that are not part of the curated workflow.
+The three entry points do not write them: `cluster_dimred/`, `pseudobulking/`,
+`per_group/<id>/paga/`, `finalized/`, and the
+`quality_control/doublet_detection/{solo,doubletdetection,scds}/` directories.
