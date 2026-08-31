@@ -1,10 +1,17 @@
-# nf-core/scdownstream: Documentation
+# UK DRI scdownstream: Documentation
 
-The nf-core/scdownstream documentation is split into the following pages:
+The documentation is split into the following pages:
 
 - [Usage](usage.md)
-  - An overview of how the pipeline works, how to run it and a description of all of the different command-line flags.
+  - How the pipeline works, how to run each of its three entry points, the samplesheet and contrasts
+    file formats, and a description of every parameter group.
 - [Output](output.md)
-  - An overview of the different results produced by the pipeline and how to interpret them.
+  - The results each stage produces and how to interpret them.
+- [Acknowledgements](../ACKNOWLEDGEMENTS.md)
+  - Provenance of this fork and attribution to the original nf-core/scdownstream authors.
 
-You can find a lot more documentation about installing, configuring and running nf-core pipelines on the website: [https://nf-co.re](https://nf-co.re)
+Parameters are defined in [`nextflow_schema.json`](../nextflow_schema.json); `nextflow run … --help`
+lists them with their defaults.
+
+Operational guidance for UK DRI users lives on the
+[UK DRI Informatics wiki](https://wiki.informatics.ukdri.ac.uk/en/Pipelines/nfcore_scdownstream).
