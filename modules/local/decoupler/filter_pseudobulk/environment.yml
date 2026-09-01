@@ -11,5 +11,5 @@ dependencies:
     - numpy>=1.24
     - scipy>=1.11
     - scanpy>=1.10
-    - decoupler>=1.6
+    - decoupler>=2.0
     - pyyaml

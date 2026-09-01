@@ -359,22 +359,45 @@ exporting either environment variable is usually enough. When set and running un
 `singularity` or `apptainer` profile, modules use `<singularity_cache_dir>/<image>.sif` instead of
 pulling a remote container.
 
-The images referenced are:
+The images referenced are, with the Dockerfile that builds each:
 
-| Image                           | Used by                                     |
-| ------------------------------- | ------------------------------------------- |
-| `scanpy_1.11.4_coreinf_0.3.sif` | the Quarto report modules                   |
-| `scanpy_1.11.4_coreinf_0.1.sif` | `SCANPY_ENRICH`, `SCANPY_EXPORT_MARKERS`    |
-| `decoupler_latest.sif`          | `DECOUPLER_PSEUDOBULK`, `FILTER_PSEUDOBULK` |
-| `pydeseq2_latest.sif`           | `DIFFERENTIAL_GENES_PER_CONTRAST`           |
+| Image                           | Used by                                                                          | Dockerfile                                    |
+| ------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------- |
+| `scanpy_1.11.4_coreinf_0.3.sif` | `SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`, `SCANPY_ENRICH` | `modules/local/scanpy/report/Dockerfile`      |
+| `pydeseq2_latest.sif`           | `DIFFERENTIAL_GENES_PER_CONTRAST`                                                | `modules/local/pydeseq2/differential_genes/Dockerfile` |
+
+Both are built `FROM gcfntnu/scanpy:1.11.4`. Three further processes use that public Docker Hub
+image directly and are not affected by `--singularity_cache_dir` at all — Nextflow pulls and
+converts it for them on first use: `DECOUPLER_PSEUDOBULK` and `FILTER_PSEUDOBULK` (the base ships
+decoupler 2.1.1 and anndata 0.12.2) and `SCANPY_EXPORT_MARKERS` (scanpy, pandas, numpy, yaml).
+`SCANPY_ENRICH` still needs the derived image because `sc.queries.enrich()` imports
+`gprofiler-official`, which the base does not have.
+
+Build one with, for example:
+
+```bash
+cd modules/local/scanpy/report
+docker build -t scanpy_1.11.4_coreinf_0.3 .
+apptainer build "$NXF_SINGULARITY_CACHEDIR/scanpy_1.11.4_coreinf_0.3.sif" \
+    docker-daemon://scanpy_1.11.4_coreinf_0.3:latest
+```
 
 > [!WARNING]
-> The decoupler and PyDESeq2 modules fall back to a public registry image if no local `.sif` is
-> found, but **five processes do not**: `SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`,
-> `PYDESEQ2_GENERATE_REPORT`, `SCANPY_ENRICH` and `SCANPY_EXPORT_MARKERS` fall back to hard-coded
-> absolute paths on the UK DRI filesystem and ignore the container engine in use. Off the UK DRI
-> cluster you must build these images and point `--singularity_cache_dir` at a directory holding them
-> under exactly the names above.
+> **None of these five processes has a working public container.** Four of them
+> (`SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`,
+> `SCANPY_ENRICH`) fall back to hard-coded absolute paths on the UK DRI filesystem and ignore the
+> container engine in use, so they also break under `-profile docker`.
+> `DIFFERENTIAL_GENES_PER_CONTRAST` used to name a `community.wave.seqera.io` image that **does not
+> exist** — that URI returns `MANIFEST_UNKNOWN` and was never built. It now resolves to the literal
+> marker `CONTAINER_REGISTRY_MISSING`, so the failure is explicit rather than looking like a valid
+> pull. Either way you must build the images above and point `--singularity_cache_dir` at a
+> directory holding them under exactly these filenames.
+
+> [!WARNING]
+> The Dockerfiles are **reconstructions, not the original recipes.** The images in use on the UK DRI
+> cluster were built by hand and no recipe was committed; these were derived from each image's name
+> and from the imports its templates actually use. Validate output against a known-good run before
+> relying on results from a freshly built image.
 
 ## Reference data
 
