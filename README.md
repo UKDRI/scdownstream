@@ -203,6 +203,60 @@ nextflow run UKDRI/scdownstream -r dev_ukdri -entry differential_genes \
 > Provide pipeline parameters on the command line or via `-params-file`. Custom config files passed
 > with `-c` can supply any Nextflow configuration **except parameters**.
 
+> [!IMPORTANT]
+> **You must set the Apptainer/Singularity cache directory before running.** Five processes have
+> no working public container image and are only reachable through a locally built `.sif` (see
+> [Locally built container images](#locally-built-container-images) below). Export the cache
+> directory, or pass `--singularity_cache_dir`, and make sure the two images listed below are
+> present in it:
+>
+> ```bash
+> export NXF_SINGULARITY_CACHEDIR=/path/to/apptainer/images
+> ```
+>
+> `--singularity_cache_dir` defaults to `$NXF_SINGULARITY_CACHEDIR`, falling back to
+> `$NXF_APPTAINER_CACHEDIR`. If neither is set, `-entry downstream` and `-entry differential_genes`
+> fail at container resolution with `CONTAINER_REGISTRY_MISSING`.
+
+## Locally built container images
+
+Two images are not on any public registry and must be built by hand and placed in the
+Apptainer/Singularity cache directory under **exactly** these filenames:
+
+| Image file                      | Required by                                                                | Dockerfile                                                                      |
+| ------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `scanpy_1.11.4_coreinf_0.3.sif` | `SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`, `SCANPY_ENRICH` | [`modules/local/scanpy/report/Dockerfile`](modules/local/scanpy/report/Dockerfile) |
+| `pydeseq2_latest.sif`           | `DIFFERENTIAL_GENES_PER_CONTRAST`                                          | [`modules/local/pydeseq2/differential_genes/Dockerfile`](modules/local/pydeseq2/differential_genes/Dockerfile) |
+
+Both build `FROM gcfntnu/scanpy:1.11.4`, the public Docker Hub image that Nextflow pulls and
+converts automatically. Three processes run on that base directly and need no hand-built image at
+all — `DECOUPLER_PSEUDOBULK` and `FILTER_PSEUDOBULK` (the base ships decoupler 2.1.1 and
+anndata 0.12.2) and `SCANPY_EXPORT_MARKERS` (scanpy, pandas, numpy, yaml only).
+
+`SCANPY_ENRICH` cannot join them: `sc.queries.enrich()` needs `gprofiler-official`, which the base
+does not ship, and the template's bare `except:` would turn the resulting `ImportError` into an
+empty enrichment table for every group with a zero exit code.
+
+To build one:
+
+```bash
+cd modules/local/scanpy/report
+docker build -t scanpy_1.11.4_coreinf_0.3 .
+apptainer build "$NXF_SINGULARITY_CACHEDIR/scanpy_1.11.4_coreinf_0.3.sif" \
+    docker-daemon://scanpy_1.11.4_coreinf_0.3:latest
+```
+
+> [!WARNING]
+> These Dockerfiles are **reconstructions, not the original recipes.** The images in use on the
+> UK DRI cluster were built by hand and no recipe was ever committed; the Dockerfiles were derived
+> from each image's name and from the imports its templates actually use. They should be
+> functionally equivalent but are not guaranteed to match byte-for-byte. Validate output against a
+> known-good run before relying on results produced from a freshly built image.
+
+The Apptainer image for PyDESeq2 has to be compiled from the Dockerfile above and added to the
+Apptainer cache directory by hand. A proper registry entry will be added; until then the module's
+non-cache branch is marked `CONTAINER_REGISTRY_MISSING` (see known limitation 7 below).
+
 UK DRI users: see the
 [UK DRI Informatics wiki](https://wiki.informatics.ukdri.ac.uk/en/Pipelines/nfcore_scdownstream) for
 how to run the pipeline on the cluster.
@@ -225,8 +279,17 @@ Several of them silently affect results, so please read before interpreting outp
 5. **`-profile test_offline` is no longer supported.** Use `-profile test` instead.
 6. **Set `--species` explicitly.** It defaults to `human`, and mouse data analysed under the human
    default produces wrong enrichment and cell–cell communication results without any error.
-7. **Five processes have no container registry fallback** and require locally built `.sif` images. We will publish these images to a container registry in the near future —
-   see [Local container images](docs/usage.md#local-container-images).
+7. **Five processes have no working public container** and require locally built `.sif` images —
+   see [Locally built container images](#locally-built-container-images). Four of them
+   (`SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`,
+   `SCANPY_ENRICH`) fall back to hard-coded absolute paths on the UK DRI filesystem and ignore the
+   container engine in use, so they break under `-profile docker`.
+   `DIFFERENTIAL_GENES_PER_CONTRAST` previously carried a `community.wave.seqera.io` URI that
+   **does not exist** — it returns `MANIFEST_UNKNOWN` and was never built — and is now marked
+   `CONTAINER_REGISTRY_MISSING` so the failure is explicit instead of looking like a valid image.
+   We intend to publish both images to a registry. `DECOUPLER_PSEUDOBULK`, `FILTER_PSEUDOBULK` and
+   `SCANPY_EXPORT_MARKERS` no longer need a hand-built image: they run directly on the public
+   `gcfntnu/scanpy:1.11.4`.
 8. **`--ortholog_hcop_directory` defaults to a UK DRI path** (`/nfsdata/genome/hcop/`). Off-site
    runs must override it.
 9. **The legacy single-pass workflow is no longer supported** — always pass `-entry` (see the note

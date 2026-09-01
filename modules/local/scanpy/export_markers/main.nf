@@ -3,9 +3,10 @@ process SCANPY_EXPORT_MARKERS {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    container "${params.singularity_cache_dir
-        ? params.singularity_cache_dir + '/scanpy_1.11.4_coreinf_0.1.sif'
-        : '/data/nhecker/apptainer/images/scanpy_1.11.4_coreinf_0.1.sif'}"
+    // Public base image, no derived image needed: this template only uses scanpy, pandas,
+    // numpy, yaml and threadpoolctl, all of which the base already ships. Under
+    // singularity/apptainer Nextflow converts it to a .sif in NXF_SINGULARITY_CACHEDIR.
+    container 'gcfntnu/scanpy:1.11.4'
 
     input:
     tuple val(meta), path(h5ad)

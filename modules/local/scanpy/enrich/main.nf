@@ -3,9 +3,13 @@ process SCANPY_ENRICH {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
+    // Cannot use the plain gcfntnu/scanpy:1.11.4 base: enrich.py calls sc.queries.enrich(),
+    // which imports gprofiler-official, and the base does not ship it. The bare `except:` in
+    // the template would swallow the ImportError and write 'empty set' for every group, so the
+    // process would exit 0 with silently empty enrichment. Keep the derived image.
     container "${params.singularity_cache_dir
-        ? params.singularity_cache_dir + '/scanpy_1.11.4_coreinf_0.1.sif'
-        : '/data/nhecker/apptainer/images/scanpy_1.11.4_coreinf_0.1.sif'}"
+        ? params.singularity_cache_dir + '/scanpy_1.11.4_coreinf_0.3.sif'
+        : '/nfsdata/apptainer/scanpy_1.11.4_coreinf_0.3.sif'}"
 
     input:
     tuple val(meta), path(h5ad)

@@ -3,11 +3,11 @@ process FILTER_PSEUDOBULK {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    container "${workflow.containerEngine in ['singularity', 'apptainer'] && params.singularity_cache_dir
-        ? params.singularity_cache_dir + '/decoupler_latest.sif'
-        : workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container
-            ? 'oras://community.wave.seqera.io/library/decoupler_anndata:1f90c5f9ae5f4f8d'
-            : 'community.wave.seqera.io/library/decoupler_anndata:1f90c5f9ae5f4f8d'}"
+    // Public base image, no derived image needed: it already ships this template's full
+    // dependency set (decoupler 2.1.1 — required for the dc.pp.* API used below — plus
+    // anndata 0.12.2, pandas and pyyaml). Under singularity/apptainer Nextflow converts
+    // this to a .sif in NXF_SINGULARITY_CACHEDIR on first use.
+    container 'gcfntnu/scanpy:1.11.4'
 
     input:
     tuple val(meta), path(h5ad)
