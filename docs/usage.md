@@ -366,12 +366,10 @@ The images referenced are, with the Dockerfile that builds each:
 | `scanpy_1.11.4_coreinf_0.3.sif` | `SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`, `SCANPY_ENRICH` | `modules/local/scanpy/report/Dockerfile`      |
 | `pydeseq2_latest.sif`           | `DIFFERENTIAL_GENES_PER_CONTRAST`                                                | `modules/local/pydeseq2/differential_genes/Dockerfile` |
 
-Both are built `FROM gcfntnu/scanpy:1.11.4`. Three further processes use that public Docker Hub
-image directly and are not affected by `--singularity_cache_dir` at all — Nextflow pulls and
-converts it for them on first use: `DECOUPLER_PSEUDOBULK` and `FILTER_PSEUDOBULK` (the base ships
-decoupler 2.1.1 and anndata 0.12.2) and `SCANPY_EXPORT_MARKERS` (scanpy, pandas, numpy, yaml).
-`SCANPY_ENRICH` still needs the derived image because `sc.queries.enrich()` imports
-`gprofiler-official`, which the base does not have.
+Both are built `FROM gcfntnu/scanpy:1.11.4`. Three further processes —
+`DECOUPLER_PSEUDOBULK`, `FILTER_PSEUDOBULK` and `SCANPY_EXPORT_MARKERS` — use that public Docker
+Hub image directly and are not affected by `--singularity_cache_dir` at all; Nextflow pulls and
+converts it for them on first use.
 
 Build one with, for example:
 
@@ -383,21 +381,13 @@ apptainer build "$NXF_SINGULARITY_CACHEDIR/scanpy_1.11.4_coreinf_0.3.sif" \
 ```
 
 > [!WARNING]
-> **None of these five processes has a working public container.** Four of them
+> **None of these five processes has a public container image.** Four of them
 > (`SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`,
-> `SCANPY_ENRICH`) fall back to hard-coded absolute paths on the UK DRI filesystem and ignore the
+> `SCANPY_ENRICH`) fall back to a hard-coded absolute path on the UK DRI filesystem and ignore the
 > container engine in use, so they also break under `-profile docker`.
-> `DIFFERENTIAL_GENES_PER_CONTRAST` used to name a `community.wave.seqera.io` image that **does not
-> exist** — that URI returns `MANIFEST_UNKNOWN` and was never built. It now resolves to the literal
-> marker `CONTAINER_REGISTRY_MISSING`, so the failure is explicit rather than looking like a valid
-> pull. Either way you must build the images above and point `--singularity_cache_dir` at a
-> directory holding them under exactly these filenames.
-
-> [!WARNING]
-> The Dockerfiles are **reconstructions, not the original recipes.** The images in use on the UK DRI
-> cluster were built by hand and no recipe was committed; these were derived from each image's name
-> and from the imports its templates actually use. Validate output against a known-good run before
-> relying on results from a freshly built image.
+> `DIFFERENTIAL_GENES_PER_CONTRAST` resolves to the literal marker `CONTAINER_REGISTRY_MISSING`
+> when the cache directory is unset. Either way you must build the images above and point
+> `--singularity_cache_dir` at a directory holding them under exactly these filenames.
 
 ## Reference data
 

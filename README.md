@@ -228,14 +228,9 @@ Apptainer/Singularity cache directory under **exactly** these filenames:
 | `scanpy_1.11.4_coreinf_0.3.sif` | `SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`, `SCANPY_ENRICH` | [`modules/local/scanpy/report/Dockerfile`](modules/local/scanpy/report/Dockerfile) |
 | `pydeseq2_latest.sif`           | `DIFFERENTIAL_GENES_PER_CONTRAST`                                          | [`modules/local/pydeseq2/differential_genes/Dockerfile`](modules/local/pydeseq2/differential_genes/Dockerfile) |
 
-Both build `FROM gcfntnu/scanpy:1.11.4`, the public Docker Hub image that Nextflow pulls and
-converts automatically. Three processes run on that base directly and need no hand-built image at
-all — `DECOUPLER_PSEUDOBULK` and `FILTER_PSEUDOBULK` (the base ships decoupler 2.1.1 and
-anndata 0.12.2) and `SCANPY_EXPORT_MARKERS` (scanpy, pandas, numpy, yaml only).
-
-`SCANPY_ENRICH` cannot join them: `sc.queries.enrich()` needs `gprofiler-official`, which the base
-does not ship, and the template's bare `except:` would turn the resulting `ImportError` into an
-empty enrichment table for every group with a zero exit code.
+Both build `FROM gcfntnu/scanpy:1.11.4`. Three further processes —
+`DECOUPLER_PSEUDOBULK`, `FILTER_PSEUDOBULK` and `SCANPY_EXPORT_MARKERS` — run on that public
+image directly and need nothing built by hand; Nextflow pulls and converts it on first use.
 
 To build one:
 
@@ -245,13 +240,6 @@ docker build -t scanpy_1.11.4_coreinf_0.3 .
 apptainer build "$NXF_SINGULARITY_CACHEDIR/scanpy_1.11.4_coreinf_0.3.sif" \
     docker-daemon://scanpy_1.11.4_coreinf_0.3:latest
 ```
-
-> [!WARNING]
-> These Dockerfiles are **reconstructions, not the original recipes.** The images in use on the
-> UK DRI cluster were built by hand and no recipe was ever committed; the Dockerfiles were derived
-> from each image's name and from the imports its templates actually use. They should be
-> functionally equivalent but are not guaranteed to match byte-for-byte. Validate output against a
-> known-good run before relying on results produced from a freshly built image.
 
 The Apptainer image for PyDESeq2 has to be compiled from the Dockerfile above and added to the
 Apptainer cache directory by hand. A proper registry entry will be added; until then the module's
@@ -279,17 +267,13 @@ Several of them silently affect results, so please read before interpreting outp
 5. **`-profile test_offline` is no longer supported.** Use `-profile test` instead.
 6. **Set `--species` explicitly.** It defaults to `human`, and mouse data analysed under the human
    default produces wrong enrichment and cell–cell communication results without any error.
-7. **Five processes have no working public container** and require locally built `.sif` images —
-   see [Locally built container images](#locally-built-container-images). Four of them
+7. **Five processes have no public container image** and require locally built `.sif` files — see
+   [Locally built container images](#locally-built-container-images). Four of them
    (`SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`,
-   `SCANPY_ENRICH`) fall back to hard-coded absolute paths on the UK DRI filesystem and ignore the
+   `SCANPY_ENRICH`) fall back to a hard-coded absolute path on the UK DRI filesystem and ignore the
    container engine in use, so they break under `-profile docker`.
-   `DIFFERENTIAL_GENES_PER_CONTRAST` previously carried a `community.wave.seqera.io` URI that
-   **does not exist** — it returns `MANIFEST_UNKNOWN` and was never built — and is now marked
-   `CONTAINER_REGISTRY_MISSING` so the failure is explicit instead of looking like a valid image.
-   We intend to publish both images to a registry. `DECOUPLER_PSEUDOBULK`, `FILTER_PSEUDOBULK` and
-   `SCANPY_EXPORT_MARKERS` no longer need a hand-built image: they run directly on the public
-   `gcfntnu/scanpy:1.11.4`.
+   `DIFFERENTIAL_GENES_PER_CONTRAST` resolves to `CONTAINER_REGISTRY_MISSING` unless the cache
+   directory is set. Both images are intended for a registry.
 8. **`--ortholog_hcop_directory` defaults to a UK DRI path** (`/nfsdata/genome/hcop/`). Off-site
    runs must override it.
 9. **The legacy single-pass workflow is no longer supported** — always pass `-entry` (see the note
