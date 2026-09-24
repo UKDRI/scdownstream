@@ -3,15 +3,8 @@ process DIFFERENTIAL_GENES_PER_CLUSTER {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    // NO PUBLIC CONTAINER: this module has never had one. The Wave URIs previously written here
-    // ('community.wave.seqera.io/library/pydeseq2_anndata:ed0f23c01ea418d9', both plain and
-    // oras://) return MANIFEST_UNKNOWN — they were placeholders that were never built, so the
-    // module only ever ran via the local .sif branch below.
-    // TO FIX: build an image from environment.yml with Seqera Containers
-    // (https://seqera.io/containers/) and replace the marker with the two returned URIs.
-    container "${workflow.containerEngine in ['singularity', 'apptainer'] && params.singularity_cache_dir
-        ? params.singularity_cache_dir + '/pydeseq2_latest.sif'
-        : 'CONTAINER_REGISTRY_MISSING'}"
+    // Built from the Dockerfile in this module directory.
+    container 'nhecker/pydeseq2:0.1'
 
     input:
     tuple val(meta), path(h5ad)
@@ -44,15 +37,8 @@ process DIFFERENTIAL_GENES_PER_CONTRAST {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    // NO PUBLIC CONTAINER: this module has never had one. The Wave URIs previously written here
-    // ('community.wave.seqera.io/library/pydeseq2_anndata:ed0f23c01ea418d9', both plain and
-    // oras://) return MANIFEST_UNKNOWN — they were placeholders that were never built, so the
-    // module only ever ran via the local .sif branch below.
-    // TO FIX: build an image from environment.yml with Seqera Containers
-    // (https://seqera.io/containers/) and replace the marker with the two returned URIs.
-    container "${workflow.containerEngine in ['singularity', 'apptainer'] && params.singularity_cache_dir
-        ? params.singularity_cache_dir + '/pydeseq2_latest.sif'
-        : 'CONTAINER_REGISTRY_MISSING'}"
+    // Built from the Dockerfile in this module directory.
+    container 'nhecker/pydeseq2:0.1'
 
     input:
     tuple val(meta), path(h5ad), val(contrast)

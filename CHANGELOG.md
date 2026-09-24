@@ -26,8 +26,9 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 - Multi-resolution Leiden clustering in a single step (`--clustering_resolutions`), writing one
   `leiden_<res>` column per resolution.
 - Gene set enrichment (`--enrich_*`) and marker gene export to JSON (`--markers_*`).
-- `--singularity_cache_dir` for resolving locally built Apptainer/Singularity `.sif` images instead
-  of pulling remote containers; defaults to `$NXF_SINGULARITY_CACHEDIR` / `$NXF_APPTAINER_CACHEDIR`.
+- Public container images for the report, enrichment and differential expression modules:
+  `nhecker/scanpy-report:1.11.4-coreinf0.4` and `nhecker/pydeseq2:0.1`, built from Dockerfiles in
+  the repository.
 - `--memory_scale`, which scales every memory request in `conf/base.config`.
 - `--qc_only`, to stop after per-sample QC and cell type annotation.
 - Per-sample `n_hvgs` and `automatic_cell_filtering` columns in the samplesheet schema.

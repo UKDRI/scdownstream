@@ -15,7 +15,7 @@
 - [`downstream`](#downstream)
 - [`differential_genes`](#differential_genes)
 - [Supported tool choices](#supported-tool-choices)
-- [Local container images](#local-container-images)
+- [Container images](#container-images)
 - [Reference data](#reference-data)
 - [Cell type annotation](#cell-type-annotation)
 - [Ambient RNA correction](#ambient-rna-correction)
@@ -345,49 +345,25 @@ Gene symbols are still harmonised across samples without it: `symbol_col` / `gen
 `--duplicate_var_resolution`, and optional isoform aggregation via `--aggregate_isoforms` all run
 regardless.
 
-## Local container images
+## Container images
 
-Several modules added by this fork use custom container images that are not on a public registry.
-The `--singularity_cache_dir` parameter tells them where to find locally built `.sif` files:
+Every process runs from a public container image, so nothing has to be built by hand. Nextflow
+pulls each image on first use. Under the `singularity` or `apptainer` profile it converts the image
+to a `.sif` in `$NXF_SINGULARITY_CACHEDIR`. Two images are specific to this fork, each built from a
+Dockerfile in the repository:
 
-```bash
---singularity_cache_dir /path/to/apptainer/images
-```
+| Image                                     | Used by                                                                                            | Dockerfile                                             |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `nhecker/scanpy-report:1.11.4-coreinf0.4` | `SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`, `SCANPY_ENRICH` | `modules/local/scanpy/report/Dockerfile`               |
+| `nhecker/pydeseq2:0.1`                    | `DIFFERENTIAL_GENES_PER_CONTRAST`                                                                  | `modules/local/pydeseq2/differential_genes/Dockerfile` |
 
-It defaults to `$NXF_SINGULARITY_CACHEDIR`, or `$NXF_APPTAINER_CACHEDIR` if that is unset, so
-exporting either environment variable is usually enough. When set and running under the
-`singularity` or `apptainer` profile, modules use `<singularity_cache_dir>/<image>.sif` instead of
-pulling a remote container.
+Both are built `FROM gcfntnu/scanpy:1.11.4`. `DECOUPLER_PSEUDOBULK`, `FILTER_PSEUDOBULK` and
+`SCANPY_EXPORT_MARKERS` use that public image directly. The images are published for `linux/amd64`
+only.
 
-The images referenced are, with the Dockerfile that builds each:
-
-| Image                           | Used by                                                                          | Dockerfile                                    |
-| ------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------- |
-| `scanpy_1.11.4_coreinf_0.3.sif` | `SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`, `SCANPY_ENRICH` | `modules/local/scanpy/report/Dockerfile`      |
-| `pydeseq2_latest.sif`           | `DIFFERENTIAL_GENES_PER_CONTRAST`                                                | `modules/local/pydeseq2/differential_genes/Dockerfile` |
-
-Both are built `FROM gcfntnu/scanpy:1.11.4`. Three further processes —
-`DECOUPLER_PSEUDOBULK`, `FILTER_PSEUDOBULK` and `SCANPY_EXPORT_MARKERS` — use that public Docker
-Hub image directly and are not affected by `--singularity_cache_dir` at all; Nextflow pulls and
-converts it for them on first use.
-
-Build one with, for example:
-
-```bash
-cd modules/local/scanpy/report
-docker build -t scanpy_1.11.4_coreinf_0.3 .
-apptainer build "$NXF_SINGULARITY_CACHEDIR/scanpy_1.11.4_coreinf_0.3.sif" \
-    docker-daemon://scanpy_1.11.4_coreinf_0.3:latest
-```
-
-> [!WARNING]
-> **None of these five processes has a public container image.** Four of them
-> (`SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`,
-> `SCANPY_ENRICH`) fall back to a hard-coded absolute path on the UK DRI filesystem and ignore the
-> container engine in use, so they also break under `-profile docker`.
-> `DIFFERENTIAL_GENES_PER_CONTRAST` resolves to the literal marker `CONTAINER_REGISTRY_MISSING`
-> when the cache directory is unset. Either way you must build the images above and point
-> `--singularity_cache_dir` at a directory holding them under exactly these filenames.
+Prefer `-profile apptainer` over `-profile docker`. Docker Hub limits anonymous pulls, and Docker
+pulls on every host, while Apptainer pulls each image once into `$NXF_SINGULARITY_CACHEDIR`. See the
+note in the [README](../README.md#container-images).
 
 ## Reference data
 
@@ -543,7 +519,7 @@ see [Choosing an entry point](#choosing-an-entry-point).
 
 Chooses a configuration profile. Profiles bundled with the pipeline select how software is provided:
 
-- `apptainer` — [Apptainer](https://apptainer.org/) (the UK DRI default)
+- `apptainer` — [Apptainer](https://apptainer.org/); **recommended**, and the UK DRI default
 - `singularity` — [Singularity](https://sylabs.io/docs/)
 - `docker` — [Docker](https://docker.com/)
 - `podman`, `shifter`, `charliecloud` — other container engines
@@ -611,8 +587,7 @@ process {
 }
 ```
 
-For the custom images this fork relies on, prefer `--singularity_cache_dir` — see
-[Local container images](#local-container-images).
+The images this fork uses are listed under [Container images](#container-images).
 
 ### Custom tool arguments
 
@@ -643,7 +618,7 @@ commit SHA or tag for a fixed version. The revision is recorded in the run repor
 
 > [!TIP]
 > If you share a params file (for example as supplementary material), remove cluster-specific paths
-> such as `--singularity_cache_dir` and `--ortholog_hcop_directory`.
+> such as `--ortholog_hcop_directory`.
 
 ## Running in the background
 
