@@ -32,11 +32,15 @@ if adata.n_vars > n_hvgs and n_hvgs >= 0:
         kwargs["n_top_genes"] = n_hvgs
 
     sc.pp.highly_variable_genes(adata, **kwargs)
+else:
+    # Not more genes than requested (or selection disabled): keep every gene, so the
+    # .pkl output the module declares is always written
+    adata.var["highly_variable"] = True
 
-    adata.var[["highly_variable"]].to_pickle(f"{prefix}.pkl")
-    
-    if subset_to_hvgs:
-        adata = adata[:, adata.var["highly_variable"]]
+adata.var[["highly_variable"]].to_pickle(f"{prefix}.pkl")
+
+if subset_to_hvgs:
+    adata = adata[:, adata.var["highly_variable"]]
 
 adata.write_h5ad(f"{prefix}.h5ad")
 
