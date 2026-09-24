@@ -8,7 +8,7 @@ process SCANPY_ENRICH {
     // the template would swallow the ImportError and write 'empty set' for every group, so the
     // process would exit 0 with silently empty enrichment. Keep the derived image.
     // Built from modules/local/scanpy/report/Dockerfile.
-    container 'nhecker/scanpy-report:1.11.4-coreinf0.4'
+    container 'docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4'
 
     input:
     tuple val(meta), path(h5ad)

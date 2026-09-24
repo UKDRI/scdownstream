@@ -4,7 +4,7 @@ process SCANPY_GENERATE_REPORT {
 
     conda "${moduleDir}/environment.yml"
     // Built from modules/local/scanpy/report/Dockerfile.
-    container 'nhecker/scanpy-report:1.11.4-coreinf0.4'
+    container 'docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4'
 
     input:
     tuple val(meta), path(h5ad)
@@ -46,7 +46,7 @@ process SCANPY_GENERATE_REPORT_QC {
 
     conda "${moduleDir}/environment.yml"
     // Built from modules/local/scanpy/report/Dockerfile.
-    container 'nhecker/scanpy-report:1.11.4-coreinf0.4'
+    container 'docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4'
 
     input:
     tuple val(meta), path(h5ad)

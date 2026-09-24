@@ -4,7 +4,7 @@ process DIFFERENTIAL_GENES_PER_CLUSTER {
 
     conda "${moduleDir}/environment.yml"
     // Built from the Dockerfile in this module directory.
-    container 'nhecker/pydeseq2:0.1'
+    container 'docker.io/nhecker/pydeseq2:0.1'
 
     input:
     tuple val(meta), path(h5ad)
@@ -38,7 +38,7 @@ process DIFFERENTIAL_GENES_PER_CONTRAST {
 
     conda "${moduleDir}/environment.yml"
     // Built from the Dockerfile in this module directory.
-    container 'nhecker/pydeseq2:0.1'
+    container 'docker.io/nhecker/pydeseq2:0.1'
 
     input:
     tuple val(meta), path(h5ad), val(contrast)

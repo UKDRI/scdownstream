@@ -212,8 +212,8 @@ Dockerfiles in the repository:
 
 | Image                                     | Required by                                                                                        | Dockerfile                                                                                                      |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `nhecker/scanpy-report:1.11.4-coreinf0.4` | `SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`, `SCANPY_ENRICH` | [`modules/local/scanpy/report/Dockerfile`](modules/local/scanpy/report/Dockerfile)                             |
-| `nhecker/pydeseq2:0.1`                    | `DIFFERENTIAL_GENES_PER_CONTRAST`                                                                  | [`modules/local/pydeseq2/differential_genes/Dockerfile`](modules/local/pydeseq2/differential_genes/Dockerfile) |
+| `docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4` | `SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`, `SCANPY_ENRICH` | [`modules/local/scanpy/report/Dockerfile`](modules/local/scanpy/report/Dockerfile)                             |
+| `docker.io/nhecker/pydeseq2:0.1`                    | `DIFFERENTIAL_GENES_PER_CONTRAST`                                                                  | [`modules/local/pydeseq2/differential_genes/Dockerfile`](modules/local/pydeseq2/differential_genes/Dockerfile) |
 
 Both are built `FROM gcfntnu/scanpy:1.11.4`, which `DECOUPLER_PSEUDOBULK`, `FILTER_PSEUDOBULK` and
 `SCANPY_EXPORT_MARKERS` use directly. The images are published for `linux/amd64` only.

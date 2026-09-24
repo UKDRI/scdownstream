@@ -3,7 +3,7 @@ process PYDESEQ2_GENERATE_REPORT {
     label 'process_medium'
 
     // Built from modules/local/scanpy/report/Dockerfile.
-    container 'nhecker/scanpy-report:1.11.4-coreinf0.4'
+    container 'docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4'
 
     input:
     tuple val(meta), path(h5ad)
