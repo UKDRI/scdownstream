@@ -20,21 +20,24 @@ batch_key = "${batch_key}"
 subset_to_hvgs = "${subset_to_hvgs}" == "true"
 
 
-if adata.n_vars > n_hvgs and n_hvgs >= 0:
-    kwargs = {}
+select_hvgs = adata.n_vars > n_hvgs and n_hvgs >= 0
 
-    if batch_key:
-        kwargs["batch_key"] = batch_key
+kwargs = {}
 
-    # If an actual limit is provided, use it
-    # Otherwise, scanpy will automatically determine the number of highly variable genes
-    if n_hvgs > 0:
-        kwargs["n_top_genes"] = n_hvgs
+if batch_key:
+    kwargs["batch_key"] = batch_key
 
-    sc.pp.highly_variable_genes(adata, **kwargs)
-else:
-    # Not more genes than requested (or selection disabled): keep every gene, so the
-    # .pkl output the module declares is always written
+# If an actual limit is provided, use it
+# Otherwise, scanpy will automatically determine the number of highly variable genes
+if select_hvgs and n_hvgs > 0:
+    kwargs["n_top_genes"] = n_hvgs
+
+# Always run this: it also stores the statistics (uns["hvg"], means, dispersions) that
+# sc.pl.highly_variable_genes needs in the reports
+sc.pp.highly_variable_genes(adata, **kwargs)
+
+if not select_hvgs:
+    # Not more genes than requested (or selection disabled): keep every gene
     adata.var["highly_variable"] = True
 
 adata.var[["highly_variable"]].to_pickle(f"{prefix}.pkl")
