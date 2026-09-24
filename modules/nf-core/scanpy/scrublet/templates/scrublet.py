@@ -36,11 +36,11 @@ path_plt = "${prefix}_distributions.png"
 fig = sc.pl.scrublet_score_distribution(adata, return_fig=True)
 fig.savefig(path_plt)
 
+adata.obs["predicted_doublet"] = adata.obs["predicted_doublet"].astype(bool)
+
 # save anndata
 adata.write_h5ad(f"{prefix}.h5ad")
 
-
-adata.obs["predicted_doublet"] = adata.obs["predicted_doublet"].astype(bool)
 df = adata.obs[["predicted_doublet"]]
 df.columns = ["${prefix}"]
 df.to_pickle("${prefix}.pkl")
