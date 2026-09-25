@@ -79,7 +79,7 @@ differential_genes/    ── decoupler pseudobulk → PyDESeq2 per group × con
 2. Per-sample quality control
    1. QC metrics for raw counts ([`MultiQC`](http://multiqc.info/))
    2. Doublet detection — [scrublet](https://scanpy.readthedocs.io/en/stable/api/generated/scanpy.pp.scrublet.html)
-      (doublets are **annotated, not removed** — see [Status](#status-and-known-limitations))
+      (doublets are **annotated, not removed** — see [Status](#changes-and-known-limitations))
    3. Ambient RNA correction — [decontX](https://bioconductor.org/packages/release/bioc/html/decontX.html)
       (default), [soupX](https://cran.r-project.org/web/packages/SoupX/readme/README.html),
       [CellBender](https://cellbender.readthedocs.io/en/latest/),
@@ -142,12 +142,62 @@ This fork focuses on a curated set of tools — the approaches we have validated
 Further tools will be added as they are curated and validated. Until then, please use the values
 above — see [Supported tool choices](docs/usage.md#supported-tool-choices) for the details.
 
+## Prerequisites
+
+You need:
+
+- **[Nextflow](https://www.nextflow.io/docs/latest/install.html) ≥ 24.10.5**, which requires Java 17
+  or later.
+- **[Apptainer](https://apptainer.org/docs/admin/latest/installation.html)** (or Singularity). This is
+  the recommended way to run the pipeline. Docker also works, but see the Docker Hub pull-limit
+  note under [Container images](#container-images).
+- An **x86_64 Linux** machine or cluster. The container images are published for `linux/amd64`
+  only.
+- **Internet access** from the machine running the tasks: images are pulled on first use, CellTypist
+  models are downloaded at run time, and gene set enrichment queries the g:Profiler web service.
+
+UK DRI users: see the
+[UK DRI Informatics wiki](https://wiki.informatics.ukdri.ac.uk/en/Pipelines/nfcore_scdownstream) for
+how to run the pipeline on the cluster.
+
+### Running the pipeline on non-human species
+
+Cell–cell communication (LIANA+, in `-entry downstream`) uses a human ligand–receptor resource.
+Mapping it onto another species needs an HCOP ortholog table, which you download once:
+
+1. **Set `--species` on every stage.** Supported values are `human` (default) and `mouse`.
+2. **Download the HCOP table for your species** from the
+   [HGNC HCOP downloads](https://www.genenames.org/download/hcop/tsv/). Use the fifteen-column file,
+   and keep its original name, because LIANA+ looks for
+   `<directory>/human_<species>_hcop_fifteen_column.txt.gz`:
+
+   ```bash
+   mkdir -p hcop
+   curl -o hcop/human_mouse_hcop_fifteen_column.txt.gz \
+       https://storage.googleapis.com/public-download-files/hcop/human_mouse_hcop_fifteen_column.txt.gz
+   ```
+
+3. **Pass the directory to `-entry downstream`** with `--ortholog_hcop_directory`:
+
+   ```bash
+   nextflow run UKDRI/scdownstream -r dev_ukdri -entry downstream \
+      -profile apptainer \
+      --base_adata results/qc_clustering/my_study_finalized.h5ad \
+      --name my_study \
+      --species mouse \
+      --ortholog_hcop_directory hcop \
+      --outdir results/downstream
+   ```
+
+Without it, `-entry downstream` stops with an error for a non-human `--species`. Human data does not
+need it. See [Reference data](docs/usage.md#reference-data) for details.
+
 ## Quick start
 
 > [!NOTE]
-> If you are new to Nextflow, see the [Nextflow documentation](https://www.nextflow.io/docs/latest/)
-> for installation. If you are unsure about the `filtered` / `unfiltered` distinction in the
-> samplesheet, see [Filtered and unfiltered matrices](docs/usage.md#filtered-and-unfiltered-matrices).
+> Install the requirements listed under [Prerequisites](#prerequisites) first. If you are unsure
+> about the `filtered` / `unfiltered` distinction in the samplesheet, see
+> [Filtered and unfiltered matrices](docs/usage.md#filtered-and-unfiltered-matrices).
 
 Prepare a samplesheet describing your per-sample matrices:
 
@@ -228,10 +278,6 @@ Both extend the public `gcfntnu/scanpy:1.11.4` image, which `DECOUPLER_PSEUDOBUL
 > pull many times and hit the limit mid-run. If you must use Docker, run `docker login` first, or
 > pre-pull the images on each host.
 
-UK DRI users: see the
-[UK DRI Informatics wiki](https://wiki.informatics.ukdri.ac.uk/en/Pipelines/nfcore_scdownstream) for
-how to run the pipeline on the cluster.
-
 ## Changes and known limitations
 
 This pipeline is **work in development**. The following are known and, for now, expected behaviours.
@@ -249,22 +295,18 @@ Several of them silently affect results, so please read before interpreting outp
 4. **`--prep_cellxgene` is no longer supported.** Leave it at its default.
 5. **`-profile test_offline` is no longer supported.** Use `-profile test` instead.
 6. **Set `--species` explicitly.** It defaults to `human`, and mouse data analysed under the human
-   default produces wrong enrichment and cell–cell communication results without any error.
-7. **Non-human data needs HCOP ortholog tables for LIANA+.** Download
-   `human_<species>_hcop_fifteen_column.txt.gz` (e.g. `human_mouse_hcop_fifteen_column.txt.gz`) from
-   the [HGNC HCOP downloads](https://www.genenames.org/download/hcop/tsv/) into a directory and pass it
-   with `--ortholog_hcop_directory`; `-entry downstream` stops with an error if it is missing for a
-   non-human `--species`. Human data does not need it.
-8. **The upstream single-pass workflow has been removed.** Always pass `-entry`; without it the
+   default produces wrong enrichment and cell–cell communication results without any error. See
+   [Running the pipeline on non-human species](#running-the-pipeline-on-non-human-species).
+7. **The upstream single-pass workflow has been removed.** Always pass `-entry`; without it the
    pipeline runs `qc_clustering` (see the note above).
-9. **`--unify_gene_symbols` is no longer supported.** HUGO-based gene symbol unification only
+8. **`--unify_gene_symbols` is no longer supported.** HUGO-based gene symbol unification only
     applies to human data and is not reliable enough to recommend. Gene symbols are still harmonised
     across samples without it.
-10. Several other inherited parameters are also not currently supported: `--skip_enrichment`,
+9. Several other inherited parameters are also not currently supported: `--skip_enrichment`,
     `--skip_liana`, `--skip_rankgenesgroups`, `--pseudobulk*`, `--cluster_per_label`,
     `--cluster_global`, and the `exclude_samples_col` / `exclude_samples_values` columns of the
     contrasts file.
-11. MultiQC coverage is partial — the Quarto reports are the more complete view of a run.
+10. MultiQC coverage is partial — the Quarto reports are the more complete view of a run.
 
 ## Documentation
 

@@ -54,7 +54,7 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Known issues`
 
-See [Status and known limitations](README.md#status-and-known-limitations).
+See [Status and known limitations](README.md#changes-and-known-limitations).
 
 ---
 
