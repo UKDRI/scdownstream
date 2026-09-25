@@ -723,14 +723,6 @@
                     "description": "Custom MultiQC yaml file containing HTML including a methods description.",
                     "fa_icon": "fas fa-cog"
                 },
-                "singularity_cache_dir": {
-                    "type": "string",
-                    "format": "directory-path",
-                    "description": "Directory containing locally built Singularity/Apptainer .sif images.",
-                    "help_text": "When running with the `singularity` or `apptainer` profile and this parameter is set, modules use `<singularity_cache_dir>/<image>.sif` instead of pulling the remote container. Defaults to `$NXF_SINGULARITY_CACHEDIR` (or `$NXF_APPTAINER_CACHEDIR`) when either is set in the environment.",
-                    "fa_icon": "fas fa-folder-open",
-                    "hidden": true
-                },
                 "validate_params": {
                     "type": "boolean",
                     "description": "Boolean whether to validate parameters against the schema at runtime",

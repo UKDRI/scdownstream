@@ -6,7 +6,7 @@ process SCANPY_EXPORT_MARKERS {
     // Public base image, no derived image needed: this template only uses scanpy, pandas,
     // numpy, yaml and threadpoolctl, all of which the base already ships. Under
     // singularity/apptainer Nextflow converts it to a .sif in NXF_SINGULARITY_CACHEDIR.
-    container 'gcfntnu/scanpy:1.11.4'
+    container 'docker.io/gcfntnu/scanpy:1.11.4'
 
     input:
     tuple val(meta), path(h5ad)

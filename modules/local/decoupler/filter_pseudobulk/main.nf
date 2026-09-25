@@ -7,7 +7,7 @@ process FILTER_PSEUDOBULK {
     // dependency set (decoupler 2.1.1 — required for the dc.pp.* API used below — plus
     // anndata 0.12.2, pandas and pyyaml). Under singularity/apptainer Nextflow converts
     // this to a .sif in NXF_SINGULARITY_CACHEDIR on first use.
-    container 'gcfntnu/scanpy:1.11.4'
+    container 'docker.io/gcfntnu/scanpy:1.11.4'
 
     input:
     tuple val(meta), path(h5ad)
