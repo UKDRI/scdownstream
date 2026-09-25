@@ -249,8 +249,11 @@ Several of them silently affect results, so please read before interpreting outp
 5. **`-profile test_offline` is no longer supported.** Use `-profile test` instead.
 6. **Set `--species` explicitly.** It defaults to `human`, and mouse data analysed under the human
    default produces wrong enrichment and cell–cell communication results without any error.
-7. **`--ortholog_hcop_directory` defaults to a UK DRI path** (`/nfsdata/genome/hcop/`). Off-site
-   runs must override it.
+7. **Non-human data needs HCOP ortholog tables for LIANA+.** Download
+   `human_<species>_hcop_fifteen_column.txt.gz` (e.g. `human_mouse_hcop_fifteen_column.txt.gz`) from
+   the [HGNC HCOP downloads](https://www.genenames.org/download/hcop/tsv/) into a directory and pass it
+   with `--ortholog_hcop_directory`; `-entry downstream` stops with an error if it is missing for a
+   non-human `--species`. Human data does not need it.
 8. **The legacy single-pass workflow is no longer supported** — always pass `-entry` (see the note
    above).
 9. **`--unify_gene_symbols` is no longer supported.** HUGO-based gene symbol unification only

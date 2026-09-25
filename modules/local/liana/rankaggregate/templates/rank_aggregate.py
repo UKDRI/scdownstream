@@ -54,6 +54,13 @@ dict_species = {
 species = dict_species[species] if species in dict_species.keys() else species
 
 # Getting ortholog mappings if needed
+if species != "human" and not hcop_dir.strip():
+    raise ValueError(
+        f"--ortholog_hcop_directory is required for LIANA+ with species '{species}'. Download "
+        f"human_{species}_hcop_fifteen_column.txt.gz from https://www.genenames.org/download/hcop/tsv/ "
+        "into a directory and pass that directory."
+    )
+
 resource = None
 if species != "human":
     try:

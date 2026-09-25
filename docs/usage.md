@@ -238,7 +238,7 @@ nextflow run UKDRI/scdownstream -r dev_ukdri -entry downstream \
 | `--enrich_min_in_group_fraction`  | `0.25`                  | Minimum fraction of cells in the group expressing a gene for it to enter enrichment.                                                                    |
 | `--enrich_min_fold_change`        | `1.0`                   | Minimum fold change for a gene to enter enrichment.                                                                                                     |
 | `--enrich_max_out_group_fraction` | `0.5`                   | Maximum fraction of cells outside the group expressing a gene.                                                                                          |
-| `--ortholog_hcop_directory`       | `/nfsdata/genome/hcop/` | Directory of HCOP ortholog tables for LIANA+ — see [Reference data](#reference-data).                                                                   |
+| `--ortholog_hcop_directory`       | `null`                  | Directory of HCOP ortholog tables; required for LIANA+ on non-human data — see [Reference data](#reference-data).                                       |
 | `--markers_uns_key`               | `rank_genes_groups`     | `uns` key holding the marker results to export.                                                                                                         |
 | `--markers_thr_adj_pvalue`        | `0.05`                  | Adjusted p-value threshold for the exported markers.                                                                                                    |
 | `--markers_n_top`                 | `100`                   | Number of top markers per group to export.                                                                                                              |
@@ -367,11 +367,21 @@ note in the [README](../README.md#container-images).
 
 ## Reference data
 
-**HCOP orthologs (LIANA+).** `--ortholog_hcop_directory` defaults to the UK DRI path
-`/nfsdata/genome/hcop/`. LIANA+ reads `<directory>/human_<species>_hcop_fifteen_column.txt.gz` from
-it to map its human-derived ligand–receptor resource onto non-human data. Off-site runs must
-override the parameter and provide the corresponding
-[HCOP](https://www.genenames.org/tools/hcop/) table.
+**HCOP orthologs (LIANA+).** LIANA+ maps its human-derived ligand–receptor resource onto
+non-human data using HCOP ortholog tables. For any `--species` other than human, download the
+fifteen-column table for your species from the
+[HGNC HCOP downloads](https://www.genenames.org/download/hcop/tsv/), e.g.
+
+```bash
+mkdir -p hcop
+curl -o hcop/human_mouse_hcop_fifteen_column.txt.gz \
+    https://storage.googleapis.com/public-download-files/hcop/human_mouse_hcop_fifteen_column.txt.gz
+```
+
+and pass the directory with `--ortholog_hcop_directory hcop`. LIANA+ reads
+`<directory>/human_<species>_hcop_fifteen_column.txt.gz`, so keep the original file name.
+`--ortholog_hcop_directory` has no default. `-entry downstream` stops with an error if it is
+missing for a non-human species, and human data does not need it.
 
 **CellTypist models** are downloaded at runtime unless `--celltypist_model` is given a local `.pkl`
 path.

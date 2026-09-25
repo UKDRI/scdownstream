@@ -42,7 +42,12 @@ workflow DOWNSTREAM_ANALYSIS {
     ch_h5ad = SCANPY_RANKGENESGROUPS.out.h5ad
     SCANPY_ENRICH(ch_h5ad, "rank_genes_groups", params.species, params.enrich_min_in_group_fraction, params.enrich_min_fold_change, params.enrich_max_out_group_fraction)
     ch_h5ad = SCANPY_ENRICH.out.h5ad
-    LIANA_RANKAGGREGATE(ch_h5ad, clustering_name, params.species, params.ortholog_hcop_directory)
+    LIANA_RANKAGGREGATE(
+        ch_h5ad,
+        clustering_name,
+        params.species,
+        params.ortholog_hcop_directory ? file(params.ortholog_hcop_directory, checkIfExists: true) : []
+    )
     ch_h5ad = LIANA_RANKAGGREGATE.out.h5ad
 
     // create output final output files
