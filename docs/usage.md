@@ -349,15 +349,16 @@ regardless.
 
 Every process runs from a public container image, so nothing has to be built by hand. Nextflow
 pulls each image on first use. Under the `singularity` or `apptainer` profile it converts the image
-to a `.sif` in `$NXF_SINGULARITY_CACHEDIR`. Two images are specific to this fork, each built from a
-Dockerfile in the repository:
+to a `.sif` in `$NXF_SINGULARITY_CACHEDIR`. Two images are specific to this fork. They are hosted on
+Docker Hub and pulled the same way; their Dockerfiles are kept in the repository only as the recipe
+they were built from:
 
-| Image                                     | Used by                                                                                            | Dockerfile                                             |
+| Image (Docker Hub)                        | Used by                                                                                            | Recipe                                                 |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
 | `docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4` | `SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`, `SCANPY_ENRICH` | `modules/local/scanpy/report/Dockerfile`               |
 | `docker.io/nhecker/pydeseq2:0.1`                    | `DIFFERENTIAL_GENES_PER_CONTRAST`                                                                  | `modules/local/pydeseq2/differential_genes/Dockerfile` |
 
-Both are built `FROM gcfntnu/scanpy:1.11.4`. `DECOUPLER_PSEUDOBULK`, `FILTER_PSEUDOBULK` and
+Both extend the public `gcfntnu/scanpy:1.11.4` image. `DECOUPLER_PSEUDOBULK`, `FILTER_PSEUDOBULK` and
 `SCANPY_EXPORT_MARKERS` use that public image directly. The images are published for `linux/amd64`
 only.
 
