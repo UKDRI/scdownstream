@@ -1,4 +1,4 @@
-# Image: scanpy_1.11.4_coreinf_0.3
+# Image: docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4
 #
 FROM gcfntnu/scanpy:1.11.4
 
@@ -9,7 +9,7 @@ RUN wget -qO /tmp/quarto-1.9.38-linux-amd64.deb https://github.com/quarto-dev/qu
     rm /tmp/quarto-1.9.38-linux-amd64.deb && \
     rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir papermill
-RUN pip install --no-cache-dir nbconvert
-RUN pip install --no-cache-dir gprofiler-official
+RUN pip install --no-cache-dir papermill==2.7.0
+RUN pip install --no-cache-dir nbconvert==7.17.1
+RUN pip install --no-cache-dir gprofiler-official==1.0.0
 RUN pip install --no-cache-dir liana==1.6.1

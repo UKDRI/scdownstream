@@ -1,13 +1,14 @@
+# papermill is required: quarto render -P (Jupyter engine) needs it to inject the parameters.
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - conda-forge::python=3.11
+  - conda-forge::python=3.11.11
   - conda-forge::anndata=0.12.2
-  - conda-forge::pandas
-  - conda-forge::matplotlib
+  - conda-forge::pandas=2.3.2
+  - conda-forge::matplotlib=3.10.5
   - conda-forge::quarto=1.9.38
   - conda-forge::papermill=2.7.0
   - conda-forge::nbconvert=7.17.1
   - conda-forge::ipykernel=6.30.1
-  - conda-forge::pyyaml
+  - conda-forge::pyyaml=6.0.2
