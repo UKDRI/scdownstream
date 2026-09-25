@@ -67,9 +67,9 @@ differential_genes/    ── decoupler pseudobulk → PyDESeq2 per group × con
 ```
 
 > [!IMPORTANT]
-> **Always pass `-entry`.** Running `nextflow run …` without it selects the upstream single-pass
-> workflow ([`workflows/scdownstream.nf`](workflows/scdownstream.nf)), which the three-stage design
-> replaced. It is retained for reference only and is no longer supported.
+> **Always pass `-entry`**, so it is explicit which stage runs and on what input. Without it the
+> pipeline falls back to stage 1 (`qc_clustering`) and prints a warning; it never runs `downstream`
+> or `differential_genes` on its own. The upstream single-pass workflow has been removed.
 
 ## Pipeline steps
 
@@ -254,8 +254,8 @@ Several of them silently affect results, so please read before interpreting outp
    the [HGNC HCOP downloads](https://www.genenames.org/download/hcop/tsv/) into a directory and pass it
    with `--ortholog_hcop_directory`; `-entry downstream` stops with an error if it is missing for a
    non-human `--species`. Human data does not need it.
-8. **The legacy single-pass workflow is no longer supported** — always pass `-entry` (see the note
-   above).
+8. **The upstream single-pass workflow has been removed.** Always pass `-entry`; without it the
+   pipeline runs `qc_clustering` (see the note above).
 9. **`--unify_gene_symbols` is no longer supported.** HUGO-based gene symbol unification only
     applies to human data and is not reliable enough to recommend. Gene symbols are still harmonised
     across samples without it.

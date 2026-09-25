@@ -39,8 +39,8 @@ The pipeline is split into three sequential stages, each selected with Nextflow'
 `--name` sets the identifier used in output file names; it defaults to the entry-point name.
 
 > [!IMPORTANT]
-> Running without `-entry` selects the upstream single-pass workflow, which the three-stage design
-> replaced. It is retained for reference only and is no longer supported.
+> Always pass `-entry`. Without it the pipeline runs stage 1 (`qc_clustering`) and prints a warning.
+> The upstream single-pass workflow has been removed.
 
 ## Samplesheet input
 

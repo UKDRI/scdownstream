@@ -15,6 +15,8 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 - Three sequential entry points, replacing the single-pass workflow: `-entry qc_clustering`,
   `-entry downstream` and `-entry differential_genes`, chained by passing each stage's
   `<name>_finalized.h5ad` to the next as `--base_adata`.
+  The single-pass workflow (`workflows/scdownstream.nf`) has been removed; running without
+  `-entry` runs `qc_clustering` with a warning.
 - Pseudobulk differential expression: decoupler pseudobulk aggregation, count/cell filtering, split
   per group label, and PyDESeq2 per group label × contrast. Contrasts are read from a TSV following
   the nf-core/differentialabundance definition.
