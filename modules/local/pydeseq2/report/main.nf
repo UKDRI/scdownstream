@@ -2,6 +2,7 @@ process PYDESEQ2_GENERATE_REPORT {
     tag "${meta.id}"
     label 'process_medium'
 
+    conda "${moduleDir}/environment.yml"
     // Built from modules/local/scanpy/report/Dockerfile.
     container 'docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4'
 

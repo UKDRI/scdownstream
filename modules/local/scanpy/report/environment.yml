@@ -1,0 +1,16 @@
+# Mirrors docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4 (modules/local/scanpy/report/Dockerfile)
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - conda-forge::python=3.11
+  - conda-forge::scanpy=1.11.4
+  - conda-forge::anndata=0.12.2
+  - conda-forge::quarto=1.9.38
+  - conda-forge::papermill=2.7.0
+  - conda-forge::nbconvert=7.17.1
+  - conda-forge::ipykernel=6.30.1
+  - conda-forge::pyyaml
+  - conda-forge::threadpoolctl
+  - bioconda::gprofiler-official=1.0.0
+  - bioconda::liana=1.6.1
