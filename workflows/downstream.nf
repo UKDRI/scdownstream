@@ -52,7 +52,7 @@ workflow DOWNSTREAM_ANALYSIS {
 
     // create output final output files
     FINALIZE_H5AD(ch_h5ad)
-    
+
     ch_versions = ch_versions.mix(FINALIZE_H5AD.out.versions)
 
     //
