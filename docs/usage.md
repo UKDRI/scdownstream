@@ -245,6 +245,7 @@ nextflow run UKDRI/scdownstream -r dev_ukdri -entry downstream \
 | `--markers_pct_nz`                | `0.1`                   | Minimum fraction of non-zero expressing cells for an exported marker.                                                                                   |
 | `--markers_min_logfc`             | `0`                     | Minimum log fold change for an exported marker.                                                                                                         |
 | `--report_table_row_limit`        | `250`                   | Maximum rows shown per table in the HTML report.                                                                                                        |
+| `--umap_for_plots`                | `X_umap_scvi`           | UMAP used for the report plots: `X_umap_scvi` (scVI graph) or `X_umap_pca` (PCA graph). Also applies to the stage 1 report.                            |
 
 Marker genes are computed with `scanpy.tl.rank_genes_groups` using the **Wilcoxon** test.
 

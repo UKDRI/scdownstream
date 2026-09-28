@@ -11,6 +11,7 @@ process SCANPY_GENERATE_REPORT {
     path(ipynb_template)
     val(clustering_name)
     val(ntop)
+    val(umap_for_plots)
 
     output:
     tuple val(meta), path("*.html"), emit: html
@@ -33,6 +34,7 @@ process SCANPY_GENERATE_REPORT {
         -P FILE:${h5ad} \\
         -P CLUSTERING_NAME:${clustering_name} \\
         -P NTOP:${ntop} \\
+        -P "UMAP_FOR_PLOTS:${umap_for_plots}" \\
         --to html
 
     cat <<-END_VERSIONS > versions.yml
@@ -65,6 +67,7 @@ process SCANPY_GENERATE_REPORT_QC {
     input:
     tuple val(meta), path(h5ad)
     path(ipynb_template)
+    val(umap_for_plots)
 
     output:
     tuple val(meta), path("*.html"), emit: html
@@ -85,6 +88,7 @@ process SCANPY_GENERATE_REPORT_QC {
     quarto render ${ipynb_template} \\
         --output ${prefix}.html \\
         -P FILE:${h5ad} \\
+        -P "UMAP_FOR_PLOTS:${umap_for_plots}" \\
         --to html
 
     cat <<-END_VERSIONS > versions.yml

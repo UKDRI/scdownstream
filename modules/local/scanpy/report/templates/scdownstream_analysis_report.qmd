@@ -19,6 +19,7 @@ format:
 FILE = "scdownstream.h5ad"
 CLUSTERING_NAME = "leiden"
 NTOP = 250
+UMAP_FOR_PLOTS = "X_umap_scvi"
 ```
 
 ```{python}
@@ -39,8 +40,34 @@ ntop = NTOP
 ```{python}
 adata = sc.read(path_adata)
 
-# Default UMAP for plots: the scVI-based one, matching the graph used for clustering
-default_umap = "X_umap_scvi" if "X_umap_scvi" in adata.obsm else "X_umap"
+# UMAP for the plots, set by --umap_for_plots (default X_umap_scvi, the graph clustering uses).
+# X_umap_pca is the PCA-based UMAP; X_umap is a copy kept for tools such as sc.pl.umap, and older
+# outputs may only have X_umap.
+from IPython.display import display, HTML
+
+def resolve_umap(adata, requested):
+    requested = str(requested).strip() if requested else ""
+    for key in ([requested, f"X_{requested}"] if requested else []):
+        if key in adata.obsm:
+            return key, None
+    for key in ["X_umap_scvi", "X_umap_pca", "X_umap"]:
+        if key in adata.obsm:
+            note = (f"UMAP '{requested}' was not found in adata.obsm, plotting '{key}' instead. "
+                    f"Available: {', '.join(adata.obsm.keys())}.") if requested else None
+            return key, note
+    raise ValueError(f"No UMAP found in adata.obsm (available: {', '.join(adata.obsm.keys())})")
+
+def umap_kind(key):
+    # X_umap and X_umap_pca are the same (PCA-based) embedding
+    return "pca" if key in ("X_umap", "X_umap_pca") else key
+
+default_umap, umap_note = resolve_umap(adata, UMAP_FOR_PLOTS)
+if umap_note:
+    display(HTML(f"<p><b>Note:</b> {umap_note}</p>"))
+
+pca_umap = "X_umap_pca" if "X_umap_pca" in adata.obsm else "X_umap"
+comparison_umaps = [(key, title) for key, title in [("X_umap_scvi", "scVI UMAP"), (pca_umap, "PCA UMAP")]
+                    if key in adata.obsm and umap_kind(key) != umap_kind(default_umap)]
 ```
 
 ```{python}
@@ -98,8 +125,8 @@ sc.pl.embedding(adata, basis=default_umap, color=[selected_clustering])
 ```
 
 ```{python}
-if default_umap != 'X_umap' and 'X_umap' in adata.obsm:
-    sc.pl.embedding(adata, basis='X_umap', color=[selected_clustering], title='PCA UMAP')
+for key, title in comparison_umaps:
+    sc.pl.embedding(adata, basis=key, color=[selected_clustering], title=title)
 ```
 
 ```{python}

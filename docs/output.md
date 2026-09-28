@@ -133,6 +133,19 @@ Leiden clustering writes one `leiden_<resolution>` column per entry in
 `--clustering_resolutions`, and copies the **first** resolution into `leiden` as the default
 clustering. `--selected_clustering` in stage 2 picks which of these to use.
 
+Embeddings stored in the object's `obsm`:
+
+| Key           | Content                                                                                   |
+| ------------- | ----------------------------------------------------------------------------------------- |
+| `X_scvi`      | scVI latent representation (also as `X_emb`).                                             |
+| `X_umap_scvi` | UMAP on the scVI neighbour graph, the graph Leiden clustering uses. Plotted by default.   |
+| `X_pca`       | PCA embedding.                                                                            |
+| `X_umap_pca`  | UMAP on the PCA neighbour graph.                                                          |
+| `X_umap`      | Copy of `X_umap_pca`, kept only because tools such as `sc.pl.umap` expect this key.      |
+
+The PCA-based UMAP is stored as `X_umap_pca` so its name says what it is built on; `X_umap` alone
+does not, and without checking this pipeline's steps you would not know what it was computed from.
+
 ### Reports
 
 <details markdown="1">
@@ -140,7 +153,8 @@ clustering. `--selected_clustering` in stage 2 picks which of these to use.
 
 - `report/<name>_scdownstream_report.html`: a self-contained [Quarto](https://quarto.org/) report
   covering per-sample QC, filtering, integration, the UMAP embedding and the clustering at each
-  resolution. Tables are searchable and capped at `--report_table_row_limit` rows.
+  resolution. UMAP plots use `--umap_for_plots` (default `X_umap_scvi`). Tables are searchable and
+  capped at `--report_table_row_limit` rows.
 
 </details>
 
