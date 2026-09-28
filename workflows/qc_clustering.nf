@@ -133,7 +133,7 @@ workflow QC_CLUSTER {
         ch_h5ad = SCANPY_PCA.out.h5ad
         SCANPY_NEIGHBORS(ch_h5ad, 'X_pca', 'neighbors_pca' )
         ch_h5ad = SCANPY_NEIGHBORS.out.h5ad
-        SCANPY_UMAP(ch_h5ad, 'neighbors_pca', 'X_umap')
+        SCANPY_UMAP(ch_h5ad, 'neighbors_pca', 'X_umap_pca')
         ch_h5ad = SCANPY_UMAP.out.h5ad
 
     }
@@ -153,7 +153,7 @@ workflow QC_CLUSTER {
     // Summary report
     //
     if (!params.qc_only) {
-        SCANPY_GENERATE_REPORT_QC(ch_h5ad, "${projectDir}/modules/local/scanpy/report/templates/scdownstream_qc_clustering_report.qmd")
+        SCANPY_GENERATE_REPORT_QC(ch_h5ad, "${projectDir}/modules/local/scanpy/report/templates/scdownstream_qc_clustering_report.qmd", params.umap_for_plots)
     }
 
     //

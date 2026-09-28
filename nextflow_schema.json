@@ -322,6 +322,13 @@
                     "minimum": 1,
                     "description": "Table row limit for downstream analysis report.",
                     "help_text": "The top N entries will be displayed in the report to avoid overly large or slow HTML files."
+                },
+                "umap_for_plots": {
+                    "type": "string",
+                    "default": "X_umap_scvi",
+                    "pattern": "^X_[A-Za-z0-9_]+$",
+                    "description": "UMAP (key in adata.obsm) used for the default plots in the QC/clustering and analysis reports.",
+                    "help_text": "`X_umap_scvi` (default) is the UMAP on the scVI neighbour graph, the graph clustering uses. `X_umap_pca` is the UMAP on the PCA neighbour graph. `X_umap` holds a copy of `X_umap_pca` only because tools such as `sc.pl.umap` expect that key; on its own the name does not say what the UMAP is based on. The other UMAP is shown as a comparison. If the key is missing from the object, the report falls back to `X_umap_scvi`, then `X_umap_pca`, then `X_umap`, and says so."
                 }
             }
         },

@@ -26,6 +26,11 @@ sc.tl.umap(adata, random_state=0, key_added=key_added, neighbors_key=neighbors_k
 # This ensures hashes are stable
 adata.obsm[key_added] = np.round(adata.obsm[key_added], 10)
 
+# Optional copy under a second key, e.g. X_umap for tools such as sc.pl.umap that expect it
+alias_key = "${task.ext.alias_key ?: ''}"
+if alias_key:
+    adata.obsm[alias_key] = adata.obsm[key_added].copy()
+
 adata.write_h5ad(f"{prefix}.h5ad")
 df = pd.DataFrame(adata.obsm[key_added], index=adata.obs_names)
 df.to_pickle(f"X_{prefix}.pkl")
