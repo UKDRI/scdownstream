@@ -15,40 +15,12 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { SCDOWNSTREAM            } from './workflows/scdownstream'
 include { QC_CLUSTER              } from './workflows/qc_clustering'
 include { DOWNSTREAM_ANALYSIS     } from './workflows/downstream'
 include { DIFFERENTIAL_GENES      } from './workflows/differential_genes'
 include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_scdownstream_pipeline'
 include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_scdownstream_pipeline'
 include { samplesheetToList       } from 'plugin/nf-schema'
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    NAMED WORKFLOWS FOR PIPELINE
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
-
-//
-// WORKFLOW: Run main analysis pipeline depending on type of input
-//
-workflow NFCORE_SCDOWNSTREAM {
-
-    take:
-    samplesheet // channel: samplesheet read in from --input
-    ch_base  // value channel: [ val(meta), path(h5ad) ]
-
-    main:
-
-    //
-    // WORKFLOW: Run pipeline
-    //
-    SCDOWNSTREAM (
-        samplesheet,
-        ch_base
-    )
-    emit:
-    multiqc_report = SCDOWNSTREAM.out.multiqc_report // channel: /path/to/multiqc_report.html
-}
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -190,40 +162,9 @@ workflow differential_genes {
 workflow {
 
     main:
-    //
-    // SUBWORKFLOW: Run initialisation tasks
-    //
-    PIPELINE_INITIALISATION (
-        params.version,
-        params.validate_params,
-        params.monochrome_logs,
-        args,
-        params.outdir,
-        params.input
-    )
-
-    //
-    // WORKFLOW: Run main workflow
-    //
-    NFCORE_SCDOWNSTREAM (
-        PIPELINE_INITIALISATION.out.samplesheet,
-        params.base_adata
-            ? Channel.value([[id: "base"], file(params.base_adata, checkIfExists: true)])
-            : Channel.value([[], []])
-    )
-
-    //
-    // SUBWORKFLOW: Run completion tasks
-    //
-    PIPELINE_COMPLETION (
-        params.email,
-        params.email_on_fail,
-        params.plaintext_email,
-        params.outdir,
-        params.monochrome_logs,
-        params.hook_url,
-        NFCORE_SCDOWNSTREAM.out.multiqc_report
-    )
+    // Without -entry, run the first stage. Users should always choose the stage explicitly.
+    log.warn "No -entry given: running qc_clustering. Pass -entry qc_clustering, downstream or differential_genes explicitly."
+    qc_clustering()
 }
 
 /*

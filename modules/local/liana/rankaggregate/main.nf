@@ -24,4 +24,12 @@ process LIANA_RANKAGGREGATE {
     script:
     prefix = task.ext.prefix ?: "${meta.id}"
     template 'rank_aggregate.py'
+
+    stub:
+    prefix = task.ext.prefix ?: "${meta.id}"
+    """
+    touch ${prefix}.h5ad
+    touch ${prefix}.pkl
+    touch versions.yml
+    """
 }

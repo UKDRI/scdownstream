@@ -402,9 +402,9 @@
             "properties": {
                 "ortholog_hcop_directory": {
                     "type": "string",
-                    "default": "/nfsdata/genome/hcop/",
-                    "description": "Specify direcory path to HCOP ortholog files.",
-                    "help_text": "Files are assumed to be gzipped and follow the HCOP file naming conventions."
+                    "format": "directory-path",
+                    "description": "Directory holding the HCOP ortholog tables. Required for LIANA+ when `--species` is not human.",
+                    "help_text": "LIANA+ reads `<directory>/human_<species>_hcop_fifteen_column.txt.gz` (e.g. `human_mouse_hcop_fifteen_column.txt.gz`) to map its human ligand-receptor resource onto non-human data. Download the fifteen-column files from https://www.genenames.org/download/hcop/tsv/ (they are served from https://storage.googleapis.com/public-download-files/hcop/). Not needed for human data."
                 }
             }
         },

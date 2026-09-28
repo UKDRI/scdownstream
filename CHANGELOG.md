@@ -15,6 +15,8 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 - Three sequential entry points, replacing the single-pass workflow: `-entry qc_clustering`,
   `-entry downstream` and `-entry differential_genes`, chained by passing each stage's
   `<name>_finalized.h5ad` to the next as `--base_adata`.
+  The single-pass workflow (`workflows/scdownstream.nf`) has been removed; running without
+  `-entry` runs `qc_clustering` with a warning.
 - Pseudobulk differential expression: decoupler pseudobulk aggregation, count/cell filtering, split
   per group label, and PyDESeq2 per group label × contrast. Contrasts are read from a TSV following
   the nf-core/differentialabundance definition.
@@ -38,7 +40,7 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 - The curated tool set is now scrublet for doublet detection and scVI for integration; other tools
   remain in the codebase pending curation and validation.
 - Doublet detection now runs before ambient RNA correction and filtering.
-- LIANA+ uses local HCOP ortholog tables (`--ortholog_hcop_directory`) for non-human data.
+- LIANA+ uses local HCOP ortholog tables (`--ortholog_hcop_directory`, no default) for non-human data.
 - `rank_genes_groups` uses the Wilcoxon test.
 - `--integration_hvgs` default raised from 0 to 5000.
 - `--unify_gene_symbols` is no longer supported: HUGO-based unification only applies to human data.
@@ -52,7 +54,7 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Known issues`
 
-See [Status and known limitations](README.md#status-and-known-limitations).
+See [Status and known limitations](README.md#changes-and-known-limitations).
 
 ---
 

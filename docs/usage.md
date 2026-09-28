@@ -39,8 +39,8 @@ The pipeline is split into three sequential stages, each selected with Nextflow'
 `--name` sets the identifier used in output file names; it defaults to the entry-point name.
 
 > [!IMPORTANT]
-> Running without `-entry` selects the upstream single-pass workflow, which the three-stage design
-> replaced. It is retained for reference only and is no longer supported.
+> Always pass `-entry`. Without it the pipeline runs stage 1 (`qc_clustering`) and prints a warning.
+> The upstream single-pass workflow has been removed.
 
 ## Samplesheet input
 
@@ -238,7 +238,7 @@ nextflow run UKDRI/scdownstream -r dev_ukdri -entry downstream \
 | `--enrich_min_in_group_fraction`  | `0.25`                  | Minimum fraction of cells in the group expressing a gene for it to enter enrichment.                                                                    |
 | `--enrich_min_fold_change`        | `1.0`                   | Minimum fold change for a gene to enter enrichment.                                                                                                     |
 | `--enrich_max_out_group_fraction` | `0.5`                   | Maximum fraction of cells outside the group expressing a gene.                                                                                          |
-| `--ortholog_hcop_directory`       | `/nfsdata/genome/hcop/` | Directory of HCOP ortholog tables for LIANA+ — see [Reference data](#reference-data).                                                                   |
+| `--ortholog_hcop_directory`       | `null`                  | Directory of HCOP ortholog tables; required for LIANA+ on non-human data — see [Reference data](#reference-data).                                       |
 | `--markers_uns_key`               | `rank_genes_groups`     | `uns` key holding the marker results to export.                                                                                                         |
 | `--markers_thr_adj_pvalue`        | `0.05`                  | Adjusted p-value threshold for the exported markers.                                                                                                    |
 | `--markers_n_top`                 | `100`                   | Number of top markers per group to export.                                                                                                              |
@@ -349,15 +349,16 @@ regardless.
 
 Every process runs from a public container image, so nothing has to be built by hand. Nextflow
 pulls each image on first use. Under the `singularity` or `apptainer` profile it converts the image
-to a `.sif` in `$NXF_SINGULARITY_CACHEDIR`. Two images are specific to this fork, each built from a
-Dockerfile in the repository:
+to a `.sif` in `$NXF_SINGULARITY_CACHEDIR`. Two images are specific to this fork. They are hosted on
+Docker Hub and pulled the same way; their Dockerfiles are kept in the repository only as the recipe
+they were built from:
 
-| Image                                     | Used by                                                                                            | Dockerfile                                             |
+| Image (Docker Hub)                        | Used by                                                                                            | Recipe                                                 |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
 | `docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4` | `SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`, `SCANPY_ENRICH` | `modules/local/scanpy/report/Dockerfile`               |
 | `docker.io/nhecker/pydeseq2:0.1`                    | `DIFFERENTIAL_GENES_PER_CONTRAST`                                                                  | `modules/local/pydeseq2/differential_genes/Dockerfile` |
 
-Both are built `FROM gcfntnu/scanpy:1.11.4`. `DECOUPLER_PSEUDOBULK`, `FILTER_PSEUDOBULK` and
+Both extend the public `gcfntnu/scanpy:1.11.4` image. `DECOUPLER_PSEUDOBULK`, `FILTER_PSEUDOBULK` and
 `SCANPY_EXPORT_MARKERS` use that public image directly. The images are published for `linux/amd64`
 only.
 
@@ -367,11 +368,21 @@ note in the [README](../README.md#container-images).
 
 ## Reference data
 
-**HCOP orthologs (LIANA+).** `--ortholog_hcop_directory` defaults to the UK DRI path
-`/nfsdata/genome/hcop/`. LIANA+ reads `<directory>/human_<species>_hcop_fifteen_column.txt.gz` from
-it to map its human-derived ligand–receptor resource onto non-human data. Off-site runs must
-override the parameter and provide the corresponding
-[HCOP](https://www.genenames.org/tools/hcop/) table.
+**HCOP orthologs (LIANA+).** LIANA+ maps its human-derived ligand–receptor resource onto
+non-human data using HCOP ortholog tables. For any `--species` other than human, download the
+fifteen-column table for your species from the
+[HGNC HCOP downloads](https://www.genenames.org/download/hcop/tsv/), e.g.
+
+```bash
+mkdir -p hcop
+curl -o hcop/human_mouse_hcop_fifteen_column.txt.gz \
+    https://storage.googleapis.com/public-download-files/hcop/human_mouse_hcop_fifteen_column.txt.gz
+```
+
+and pass the directory with `--ortholog_hcop_directory hcop`. LIANA+ reads
+`<directory>/human_<species>_hcop_fifteen_column.txt.gz`, so keep the original file name.
+`--ortholog_hcop_directory` has no default. `-entry downstream` stops with an error if it is
+missing for a non-human species, and human data does not need it.
 
 **CellTypist models** are downloaded at runtime unless `--celltypist_model` is given a local `.pkl`
 path.

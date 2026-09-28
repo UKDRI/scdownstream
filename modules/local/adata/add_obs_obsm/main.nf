@@ -20,4 +20,11 @@ process ADATA_ADD_OBS_OBSM {
     script:
     prefix = task.ext.prefix ?: "${meta.id}"
     template('add_obs_obsm.py')
+
+    stub:
+    prefix = task.ext.prefix ?: "${meta.id}"
+    """
+    touch ${prefix}.h5ad
+    touch versions.yml
+    """
 }
