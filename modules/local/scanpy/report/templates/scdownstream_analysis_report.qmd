@@ -326,20 +326,30 @@ import math
 ntop_liana_dotplot = 20
 
 paths_images = {}
+clusters_without_interactions = []
 
 if 'liana_res' in adata.uns:
+    # LIANA+ skips clusters with too few cells (min_cells=5), and li.pl.dotplot raises for
+    # any requested label that is missing from liana_res, so only plot the clusters it scored
+    liana_sources = set(adata.uns['liana_res']['source'].astype(str))
+    liana_targets = set(adata.uns['liana_res']['target'].astype(str))
+    target_labels = [c for c in list_clusters if c in liana_targets]
+
     for clus in list_clusters:
-        
+        if clus not in liana_sources or not target_labels:
+            clusters_without_interactions.append(clus)
+            continue
+
         path_img = f"./dotplot_test_clus{clus}.png"
         paths_images[clus] = path_img
-                        
-        fig = li.pl.dotplot(adata = adata, 
+
+        fig = li.pl.dotplot(adata = adata,
               colour='magnitude_rank',
               size='specificity_rank',
               inverse_size=True,
               inverse_colour=True,
               source_labels=[clus],
-              target_labels=list_clusters,
+              target_labels=target_labels,
               top_n=ntop_liana_dotplot, 
               orderby='magnitude_rank',
               orderby_ascending=True,
@@ -355,6 +365,12 @@ import base64
 
 if 'liana_res' in adata.uns:
     df_liana = adata.uns['liana_res'].copy()
+
+    if clusters_without_interactions:
+        display(HTML(
+            f"<p>No LIANA+ interactions for cluster(s) {', '.join(clusters_without_interactions)}. "
+            "LIANA+ skips clusters with fewer than 5 cells.</p>"
+        ))
 
     tableid = 0
     
