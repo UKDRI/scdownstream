@@ -32,8 +32,8 @@ The pipeline is split into three sequential stages, each selected with Nextflow'
 
 | Stage | Entry point          | Required input                                          | Main output                                       |
 | ----- | -------------------- | ------------------------------------------------------- | ------------------------------------------------- |
-| 1     | `qc_clustering`      | `--input samplesheet.csv`                               | `<name>_finalized.h5ad`                           |
-| 2     | `downstream`         | `--base_adata` (stage 1 h5ad)                           | `<name>_finalized.h5ad`, `<name>_markers.json.gz` |
+| 1     | `qc_clustering`      | `--input samplesheet.csv`                               | `<name>_qc_clustering.h5ad`                       |
+| 2     | `downstream`         | `--base_adata` (stage 1 h5ad)                           | `<name>_downstream.h5ad`, `<name>_downstream_markers.json.gz` |
 | 3     | `differential_genes` | `--base_adata` (stage 2 h5ad) + `--diffgenes_contrasts` | per-contrast DE tables                            |
 
 `--name` sets the identifier used in output file names; it defaults to the entry-point name.
@@ -169,7 +169,7 @@ nextflow run UKDRI/scdownstream -r dev_ukdri -entry qc_clustering \
    --outdir results/qc_clustering
 ```
 
-Produces `results/qc_clustering/my_study_finalized.h5ad` (plus `.rds`), a Quarto QC/clustering report
+Produces `results/qc_clustering/my_study_qc_clustering.h5ad` (plus `.rds`), a Quarto QC/clustering report
 under `report/`, and a MultiQC report.
 
 | Parameter                         | Default          | Description                                                                                                                                                            |
@@ -218,7 +218,7 @@ Stage 2: marker genes per cluster, gene set enrichment, and LIANA+ cell–cell c
 ```bash
 nextflow run UKDRI/scdownstream -r dev_ukdri -entry downstream \
    -profile apptainer \
-   --base_adata results/qc_clustering/my_study_finalized.h5ad \
+   --base_adata results/qc_clustering/my_study_qc_clustering.h5ad \
    --name my_study \
    --species human \
    --outdir results/downstream
@@ -257,7 +257,7 @@ combination of group label and contrast.
 ```bash
 nextflow run UKDRI/scdownstream -r dev_ukdri -entry differential_genes \
    -profile apptainer \
-   --base_adata results/downstream/my_study_finalized.h5ad \
+   --base_adata results/downstream/my_study_downstream.h5ad \
    --diffgenes_contrasts contrasts.tsv \
    --diffgenes_group_col cell_type \
    --diffgenes_sample_col sample \

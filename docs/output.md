@@ -21,13 +21,13 @@ Produces, at the top level of the results directory:
 <details markdown="1">
 <summary>Output files</summary>
 
-- `<name>_finalized.h5ad`: the integrated, clustered AnnData object. **This is the input to
+- `<name>_qc_clustering.h5ad`: the integrated, clustered AnnData object, gzip-compressed. **This is the input to
   `-entry downstream`.**
-- `<name>_finalized.rds`: a SingleCellExperiment version of the same object.
+- `<name>_qc_clustering.rds`: a SingleCellExperiment version of the same object.
 
 </details>
 
-`<name>` is the value of `--name` (defaulting to `qc_clustering`).
+`<name>` is the value of `--name` (`scdownstream` if it is not set); the same applies to stage 2.
 
 > [!NOTE]
 > RDS conversion runs with `errorStrategy 'ignore'`, so the `.rds` file is best-effort: if conversion
@@ -151,7 +151,7 @@ does not, and without checking this pipeline's steps you would not know what it 
 <details markdown="1">
 <summary>Output files</summary>
 
-- `report/<name>_scdownstream_report.html`: a self-contained [Quarto](https://quarto.org/) report
+- `report/<name>_qc_clustering_report.html`: a self-contained [Quarto](https://quarto.org/) report
   covering per-sample QC, filtering, integration, the UMAP embedding and the clustering at each
   resolution. UMAP plots use `--umap_for_plots` (default `X_umap_scvi`). Tables are searchable and
   capped at `--report_table_row_limit` rows.
@@ -180,15 +180,15 @@ a `qc_clustering` run.
 <details markdown="1">
 <summary>Output files</summary>
 
-- `<name>_finalized.h5ad` / `<name>_finalized.rds`: the object with marker genes, enrichment results
+- `<name>_downstream.h5ad` (gzip-compressed) / `<name>_downstream.rds`: the object with marker genes, enrichment results
   and LIANA+ output added. **This is the input to `-entry differential_genes`.**
-- `<name>_markers.json.gz`: the marker genes per group, filtered by `--markers_thr_adj_pvalue`,
+- `<name>_downstream_markers.json.gz`: the marker genes per group, filtered by `--markers_thr_adj_pvalue`,
   `--markers_n_top`, `--markers_pct_nz` and `--markers_min_logfc`, in a compact JSON form for
   downstream tooling.
 - `scanpy/<name>/`: the object after `rank_genes_groups` (Wilcoxon) and after gene set enrichment.
 - `per_group/<name>/liana/`: [LIANA+](https://liana-py.readthedocs.io/) rank-aggregate cell–cell
   communication results.
-- `report/<name>_scdownstream_report.html`: a Quarto report covering the marker genes per group, the
+- `report/<name>_downstream_report.html`: a Quarto report covering the marker genes per group, the
   enrichment results and the cell–cell communication analysis.
 
 </details>

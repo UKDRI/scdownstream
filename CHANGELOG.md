@@ -14,7 +14,7 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 - Three sequential entry points, replacing the single-pass workflow: `-entry qc_clustering`,
   `-entry downstream` and `-entry differential_genes`, chained by passing each stage's
-  `<name>_finalized.h5ad` to the next as `--base_adata`.
+  `<name>_qc_clustering.h5ad` / `<name>_downstream.h5ad` to the next as `--base_adata`.
   The single-pass workflow (`workflows/scdownstream.nf`) has been removed; running without
   `-entry` runs `qc_clustering` with a warning.
 - Pseudobulk differential expression: decoupler pseudobulk aggregation, count/cell filtering, split
@@ -37,6 +37,10 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Changed`
 
+- Stage outputs are named after `--name` and the stage: `<name>_qc_clustering.h5ad`/`.rds`,
+  `<name>_downstream.h5ad`/`.rds`, `<name>_downstream_markers.json.gz`, and the reports
+  `<name>_qc_clustering_report.html` / `<name>_downstream_report.html` (previously
+  `integrated_scvi_finalized.*` for stage 1 and `<name>_finalized.*` for stage 2).
 - The curated tool set is now scrublet for doublet detection and scVI for integration; other tools
   remain in the codebase pending curation and validation.
 - Doublet detection now runs before ambient RNA correction and filtering.
