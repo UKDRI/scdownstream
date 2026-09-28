@@ -49,18 +49,18 @@ consumes the previous stage's finalized `.h5ad` via `--base_adata`.
 
 | Stage | Entry point                 | Required input                                                        | Main output                                                             |
 | ----- | --------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| 1     | `-entry qc_clustering`      | `--input samplesheet.csv`                                             | `<name>_finalized.h5ad`, MultiQC report, QC/clustering HTML report      |
-| 2     | `-entry downstream`         | `--base_adata <stage 1 h5ad>`                                         | `<name>_finalized.h5ad`, `<name>_markers.json.gz`, analysis HTML report |
+| 1     | `-entry qc_clustering`      | `--input samplesheet.csv`                                             | `<name>_qc_clustering.h5ad`, MultiQC report, QC/clustering HTML report |
+| 2     | `-entry downstream`         | `--base_adata <stage 1 h5ad>`                                         | `<name>_downstream.h5ad`, `<name>_downstream_markers.json.gz`, analysis HTML report |
 | 3     | `-entry differential_genes` | `--base_adata <stage 2 h5ad>` + `--diffgenes_contrasts contrasts.tsv` | per-contrast DE tables, pseudobulk h5ad, DE HTML report                 |
 
 ```text
 samplesheet.csv
       │
       ▼  -entry qc_clustering
-<name>_finalized.h5ad  ── QC, integration (scVI), UMAP, Leiden clustering
+<name>_qc_clustering.h5ad  ── QC, integration (scVI), UMAP, Leiden clustering
       │
       ▼  -entry downstream        --base_adata
-<name>_finalized.h5ad  ── marker genes, enrichment, LIANA+ cell–cell communication
+<name>_downstream.h5ad  ── marker genes, enrichment, LIANA+ cell–cell communication
       │
       ▼  -entry differential_genes  --base_adata  --diffgenes_contrasts
 differential_genes/    ── decoupler pseudobulk → PyDESeq2 per group × contrast
@@ -108,7 +108,7 @@ differential_genes/    ── decoupler pseudobulk → PyDESeq2 per group × con
 2. Gene set enrichment over those markers
 3. Cell–cell communication — [LIANA+](https://liana-py.readthedocs.io/) rank aggregation, using HCOP
    orthologs for non-human species
-4. Marker export to `<name>_markers.json.gz`, and h5ad/RDS finalisation
+4. Marker export to `<name>_downstream_markers.json.gz`, and h5ad/RDS finalisation
 5. A Quarto analysis report
 
 ### Stage 3 — `differential_genes`
@@ -182,7 +182,7 @@ Mapping it onto another species needs an HCOP ortholog table, which you download
    ```bash
    nextflow run UKDRI/scdownstream -r dev_ukdri -entry downstream \
       -profile apptainer \
-      --base_adata results/qc_clustering/my_study_finalized.h5ad \
+      --base_adata results/qc_clustering/my_study_qc_clustering.h5ad \
       --name my_study \
       --species mouse \
       --ortholog_hcop_directory hcop \
@@ -230,7 +230,7 @@ nextflow run UKDRI/scdownstream -r dev_ukdri -entry qc_clustering \
 ```bash
 nextflow run UKDRI/scdownstream -r dev_ukdri -entry downstream \
    -profile apptainer \
-   --base_adata results/qc_clustering/my_study_finalized.h5ad \
+   --base_adata results/qc_clustering/my_study_qc_clustering.h5ad \
    --name my_study \
    --species human \
    --outdir results/downstream
@@ -241,7 +241,7 @@ nextflow run UKDRI/scdownstream -r dev_ukdri -entry downstream \
 ```bash
 nextflow run UKDRI/scdownstream -r dev_ukdri -entry differential_genes \
    -profile apptainer \
-   --base_adata results/downstream/my_study_finalized.h5ad \
+   --base_adata results/downstream/my_study_downstream.h5ad \
    --diffgenes_contrasts contrasts.tsv \
    --diffgenes_group_col cell_type \
    --diffgenes_sample_col sample \
