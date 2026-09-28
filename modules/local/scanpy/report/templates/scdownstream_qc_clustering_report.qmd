@@ -34,6 +34,9 @@ path_adata = FILE
 
 ```{python}
 adata = sc.read(path_adata, backed="r")
+
+# Default UMAP for plots: the scVI-based one, matching the graph used for clustering
+default_umap = "X_umap_scvi" if "X_umap_scvi" in adata.obsm else "X_umap"
 ```
 
 ```{python}
@@ -95,28 +98,28 @@ adata.obsm['X_pca_umap'] =  adata.obsm['X_umap'].copy()
 Samples distribution
 
 ```{python}
-sc.pl.umap(adata, color=['sample'])
+sc.pl.embedding(adata, basis=default_umap, color=['sample'])
 ```
 
 ```{python}
-if 'X_umap_scvi' in adata.obsm:
-    sc.pl.embedding(adata, basis='X_umap_scvi', color=['sample'], title='scvi UMAP')
+if default_umap != 'X_umap' and 'X_umap' in adata.obsm:
+    sc.pl.embedding(adata, basis='X_umap', color=['sample'], title='PCA UMAP')
 ```
 
 QC metrics
 
 ```{python}
-sc.pl.umap(adata, color=['n_genes_by_counts', 'pct_counts_mt'])
+sc.pl.embedding(adata, basis=default_umap, color=['n_genes_by_counts', 'pct_counts_mt'])
 ```
 
 ```{python}
-sc.pl.umap(adata, color=['pct_counts_ribo', 'total_counts_hb'])
+sc.pl.embedding(adata, basis=default_umap, color=['pct_counts_ribo', 'total_counts_hb'])
 ```
 
 Distribution of predicted doublets
 
 ```{python}
-sc.pl.umap(adata, color=['predicted_doublet', 'doublet_score'])
+sc.pl.embedding(adata, basis=default_umap, color=['predicted_doublet', 'doublet_score'])
 ```
 
 ---
@@ -128,7 +131,7 @@ Celltypist uses pre-trained logistic regression models for predicting labels suc
 ```{python}
 predicted_labels = [ colname for colname in adata.obs.columns if colname.startswith('celltypist:') ]
 for label in predicted_labels:
-    sc.pl.umap(adata, color=label)
+    sc.pl.embedding(adata, basis=default_umap, color=label)
 ```
 
 ```{python}
@@ -163,15 +166,15 @@ list_clusters = sorted([int(x) for x in list_clusters])
 list_clusters = [str(x) for x in list_clusters]
 ```
 
-Clusterings on PCA-based UMAP 
+Clusterings on scvi-based UMAP
 
 ```{python}
 import matplotlib.pyplot as plt
 import math
 from matplotlib.pyplot import rc_context
 
-embedding = 'X_umap'
-title = "UMAP (PCA)"
+embedding = 'X_umap_scvi'
+title = "UMAP (scvi)"
 ncols = 3
 nrows = math.ceil(len(clustering_labels) / ncols)
 
@@ -199,15 +202,15 @@ with rc_context({'figure.figsize': (fig_width, fig_height)}):
         display(HTML(f"<p>No {title} was found.</p>"))
 ```
 
-Clusterings on scvi-based UMAP
+Clusterings on PCA-based UMAP
 
 ```{python}
 import matplotlib.pyplot as plt
 import math
 from matplotlib.pyplot import rc_context
 
-embedding = 'X_umap_scvi'
-title = "UMAP (scvi)"
+embedding = 'X_umap'
+title = "UMAP (PCA)"
 ncols = 3
 nrows = math.ceil(len(clustering_labels) / ncols)
 

@@ -38,6 +38,9 @@ ntop = NTOP
 
 ```{python}
 adata = sc.read(path_adata)
+
+# Default UMAP for plots: the scVI-based one, matching the graph used for clustering
+default_umap = "X_umap_scvi" if "X_umap_scvi" in adata.obsm else "X_umap"
 ```
 
 ```{python}
@@ -60,7 +63,7 @@ Celltypist uses pre-trained logistic regression models for predicting labels suc
 ```{python}
 predicted_labels = [ colname for colname in adata.obs.columns if colname.startswith('celltypist:') ]
 for label in predicted_labels:
-    sc.pl.umap(adata, color=label)
+    sc.pl.embedding(adata, basis=default_umap, color=label)
 ```
 
 ```{python}
@@ -91,12 +94,12 @@ adata.obs.value_counts(selected_clustering).rename_axis(selected_clustering).res
 ```
 
 ```{python}
-sc.pl.umap(adata, color=[selected_clustering])
+sc.pl.embedding(adata, basis=default_umap, color=[selected_clustering])
 ```
 
 ```{python}
-if 'X_umap_scvi' in adata.obsm:
-    sc.pl.embedding(adata, basis='X_umap_scvi', color=[selected_clustering], title='scvi UMAP')
+if default_umap != 'X_umap' and 'X_umap' in adata.obsm:
+    sc.pl.embedding(adata, basis='X_umap', color=[selected_clustering], title='PCA UMAP')
 ```
 
 ```{python}
