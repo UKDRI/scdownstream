@@ -177,6 +177,8 @@ under `report/`, and a MultiQC report.
 | `--input`                         | —                | Samplesheet (required).                                                                                                                                                |
 | `--metadata`                      | `null`           | Tab-separated per-sample metadata. Every column except `--metadata_sample_col` is added to the cells' `obs` — see [Per-sample metadata](#per-sample-metadata).         |
 | `--metadata_sample_col`           | `sample`         | Column of the `--metadata` file holding the samplesheet `sample` ids.                                                                                                  |
+| `--umap_color_by`                 | `''`             | Comma-separated `obs` columns to plot on the UMAPs in the report — see [UMAP colourings](#umap-colourings-in-the-reports). |
+| `--umap_color_by_embeddings`      | `X_umap_pca,X_umap_scvi`| UMAPs those columns are plotted on: before (PCA) and after (scVI) integration. |
 | `--name`                          | `qc_clustering`  | Identifier used in output file names.                                                                                                                                  |
 | `--species`                       | `human`          | `human` or `mouse`. Set explicitly for mouse data.                                                                                                                     |
 | `--qc_only`                       | `false`          | Stop after per-sample QC and cell type annotation; skip merging, integration, embeddings, clustering and the Quarto report.                                            |
@@ -257,6 +259,29 @@ Also avoid names that later steps write to `obs`: the QC metrics (`n_genes_by_co
 `celltypist:<model>` and `leiden_<resolution>`. Those steps would replace your column without a
 warning. Only `-entry qc_clustering` reads `--metadata`.
 
+### UMAP colourings in the reports
+
+`--umap_color_by` names `obs` columns to plot on the UMAPs, for example columns added with
+`--metadata`:
+
+```bash
+--metadata sample_metadata.tsv --umap_color_by diagnosis,sex,age
+```
+
+Both reports (the QC/clustering report of `qc_clustering` and the analysis report of `downstream`)
+then get a "Requested UMAP colourings" section with one block per UMAP in
+`--umap_color_by_embeddings`, each showing every requested column. The default,
+`X_umap_pca,X_umap_scvi`, shows the columns **before integration** (PCA UMAP) and **after
+integration** (scVI UMAP). This helps you judge what integration did: a technical variable such as
+a sequencing batch should mix after integration, while a biological one such as a cell type
+should still separate.
+
+- Numeric columns get a colour scale and categorical ones a legend. Columns with more than 50
+  categories are plotted without a legend.
+- Columns or UMAPs that are not in the object are skipped, with a note in the report listing what
+  is available. The report never fails because of them.
+- `--umap_for_plots` is separate: it still picks the UMAP for all other plots in the reports.
+
 ## `downstream`
 
 Stage 2: marker genes per cluster, gene set enrichment, and LIANA+ cell–cell communication.
@@ -292,6 +317,8 @@ nextflow run UKDRI/scdownstream -r dev_ukdri -entry downstream \
 | `--markers_min_logfc`             | `0`                     | Minimum log fold change for an exported marker.                                                                                                         |
 | `--report_table_row_limit`        | `250`                   | Maximum rows shown per table in the HTML report.                                                                                                        |
 | `--umap_for_plots`                | `X_umap_scvi`           | UMAP used for the report plots: `X_umap_scvi` (scVI graph) or `X_umap_pca` (PCA graph). Also applies to the stage 1 report.                            |
+| `--umap_color_by`                 | `''`                    | Comma-separated `obs` columns to plot on the UMAPs in both reports, e.g. `sex,diagnosis`. See [UMAP colourings](#umap-colourings-in-the-reports). |
+| `--umap_color_by_embeddings`      | `X_umap_pca,X_umap_scvi`| UMAPs the `--umap_color_by` columns are plotted on, one block each: before (PCA) and after (scVI) integration. |
 
 Marker genes are computed with `scanpy.tl.rank_genes_groups` using the **Wilcoxon** test.
 
