@@ -198,6 +198,8 @@ under `report/`, and a MultiQC report.
 | `--duplicate_var_resolution`      | `sum`            | How to resolve duplicate gene symbols: `mean`, `sum`, `max` or `make_unique`.                                                                                          |
 | `--aggregate_isoforms`            | `false`          | Aggregate isoform-level features.                                                                                                                                      |
 | `--n_hvgs`                        | `3000`           | Highly variable genes used for the PCA/UMAP embedding.                                                                                                                 |
+| `--pca_n_comps`                   | `50`             | Principal components computed and stored in `X_pca`. |
+| `--neighbors_n_pcs`               | all              | Principal components used as input for the PCA neighbour graph (and the PCA UMAP), the first N of `X_pca`. See [Choosing the number of PCs](#choosing-the-number-of-pcs). |
 | `--integration_methods`           | `scvi`           | Integration method. Keep `scvi` — see [Supported tool choices](#supported-tool-choices).                                                                               |
 | `--integration_hvgs`              | `5000`           | Highly variable genes used for integration.                                                                                                                            |
 | `--clustering_resolutions`        | `0.5,1.0`        | Comma-separated Leiden resolutions. One `leiden_<res>` column is written per resolution, and the **first** resolution is copied to `leiden` as the default clustering. |
@@ -258,6 +260,35 @@ Also avoid names that later steps write to `obs`: the QC metrics (`n_genes_by_co
 `total_counts`, `pct_counts_mt`, ...), `doublet_score` / `predicted_doublet`,
 `celltypist:<model>` and `leiden_<resolution>`. Those steps would replace your column without a
 warning. Only `-entry qc_clustering` reads `--metadata`.
+
+### Choosing the number of PCs
+
+Two parameters control the PCA-based embedding, and they are different things:
+
+- `--pca_n_comps` (default `50`) is how many principal components are **computed** and stored
+  in `X_pca`. On a small object the pipeline computes fewer, at most one less than the number of
+  cells or of genes used for PCA (the highly variable genes), and prints a warning.
+- `--neighbors_n_pcs` (default: all computed PCs) is how many of those PCs are **used** to build
+  the PCA neighbour graph, i.e. the first N columns of `X_pca`. The PCA UMAP (`X_umap_pca`) is
+  computed from this graph. It cannot be larger than `--pca_n_comps`.
+
+To pick a value, look at the elbow plot in the PCA section of the QC/clustering report. It shows
+the variance explained per PC, with a line at the number of PCs the graph used. Then rerun stage 1
+with the new value and `-resume`:
+
+```bash
+nextflow run UKDRI/scdownstream -r dev_ukdri -entry qc_clustering -resume \
+   <same options as before> \
+   --neighbors_n_pcs 20
+```
+
+With `-resume`, QC and scVI integration come from the cache; only the steps from the PCA graph
+onwards are rerun. Add `--pca_n_comps` only if you want more than 50 PCs. That also reruns the PCA
+itself.
+
+These parameters change the PCA graph and the PCA UMAP only. The scVI graph and the scVI UMAP,
+and the default clustering built on the scVI graph, stay the same unless you cluster on the PCA
+graph (`--cluster_neighbors neighbors_pca`).
 
 ### UMAP colourings in the reports
 
