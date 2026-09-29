@@ -253,6 +253,19 @@
                     "default": 3000,
                     "description": "Number of highly variable genes to use for data processing. If set to 0, the number of highly variable genes will be automatically determined. If set to a negative number, all genes will be used.",
                     "help_text": "This is the number of HVGs for single sample processing and after data integration."
+                },
+                "pca_n_comps": {
+                    "type": "integer",
+                    "default": 50,
+                    "minimum": 2,
+                    "description": "Number of principal components computed (stored in `X_pca`).",
+                    "help_text": "The PCA neighbour graph uses the first `--neighbors_n_pcs` of these components. Only set this higher if the elbow plot in the QC/clustering report suggests that more than 50 components are informative."
+                },
+                "neighbors_n_pcs": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "description": "Number of principal components used to build the PCA neighbour graph (and the PCA UMAP). Default: all computed PCs.",
+                    "help_text": "Must not exceed `--pca_n_comps`. Look at the elbow plot in the QC/clustering report, then rerun `-entry qc_clustering` with this option and `-resume`; the scVI integration is reused from the cache. This does not affect the scVI graph or the default clustering (which uses the scVI graph) unless `--cluster_neighbors neighbors_pca` is set."
                 }
             }
         },

@@ -56,6 +56,11 @@ workflow PIPELINE_INITIALISATION {
     )
 
     //
+    // Check parameter combinations the schema cannot express
+    //
+    validatePcaParameters()
+
+    //
     // Check config provided to the pipeline
     //
     UTILS_NFCORE_PIPELINE(
@@ -155,6 +160,15 @@ def validateInputParameters() {
 
     if (params.base_adata && 'scimilarity' in integration_methods && !params.scimilarity_model) {
         throw new Exception("If base_adata is provided and scimilarity is used as integration method, scimilarity_model must be provided.")
+    }
+}
+
+//
+// Check that the PCA neighbour graph only asks for PCs that SCANPY_PCA computes
+//
+def validatePcaParameters() {
+    if (params.neighbors_n_pcs && params.pca_n_comps && params.neighbors_n_pcs > params.pca_n_comps) {
+        throw new Exception("--neighbors_n_pcs (${params.neighbors_n_pcs}) cannot be larger than --pca_n_comps (${params.pca_n_comps}): the PCA graph can only use PCs that were computed.")
     }
 }
 
