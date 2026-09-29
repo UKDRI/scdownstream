@@ -133,8 +133,10 @@ else:
     adata.obs["label"] = "unknown"
 adata.obs["label"] = adata.obs["label"].astype("category")
 
-# Add "sample" column
-if "sample" in adata.obs and not adata.obs["sample"].equals("${meta.id}"):
+# Add "sample" column, keeping a differing pre-existing one as "sample_original"
+if "sample" in adata.obs and not (adata.obs["sample"].astype(str) == "${meta.id}").all():
+    if "sample_original" in adata.obs:
+        raise ValueError("obs['sample'] holds values other than '${meta.id}', but obs['sample_original'] already exists, so it cannot be kept.")
     adata.obs["sample_original"] = adata.obs["sample"]
 adata.obs["sample"] = "${meta.id}"
 adata.obs["sample"] = adata.obs["sample"].astype("category")
