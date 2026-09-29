@@ -58,7 +58,7 @@ workflow DOWNSTREAM_ANALYSIS {
     //
     // Summary report
     //
-    SCANPY_GENERATE_REPORT(ch_h5ad, "${projectDir}/modules/local/scanpy/report/templates/scdownstream_analysis_report.qmd", clustering_name, params.report_table_row_limit, params.umap_for_plots)
+    SCANPY_GENERATE_REPORT(ch_h5ad, "${projectDir}/modules/local/scanpy/report/templates/scdownstream_analysis_report.qmd", clustering_name, params.report_table_row_limit, params.umap_for_plots, params.umap_color_by ?: '', params.umap_color_by_embeddings ?: '')
 
 
     emit:

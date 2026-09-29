@@ -345,6 +345,18 @@
                     "pattern": "^X_[A-Za-z0-9_]+$",
                     "description": "UMAP (key in adata.obsm) used for the default plots in the QC/clustering and analysis reports.",
                     "help_text": "`X_umap_scvi` (default) is the UMAP on the scVI neighbour graph, the graph clustering uses. `X_umap_pca` is the UMAP on the PCA neighbour graph. `X_umap` holds a copy of `X_umap_pca` only because tools such as `sc.pl.umap` expect that key; on its own the name does not say what the UMAP is based on. The other UMAP is shown as a comparison. If the key is missing from the object, the report falls back to `X_umap_scvi`, then `X_umap_pca`, then `X_umap`, and says so."
+                },
+                "umap_color_by": {
+                    "type": "string",
+                    "description": "Comma-separated obs columns to plot on the UMAPs in the QC/clustering and analysis reports, e.g. `sex,diagnosis`.",
+                    "help_text": "Each column is plotted on every UMAP listed in `--umap_color_by_embeddings`. Columns missing from the object are listed in the report and skipped. Columns added with `--metadata` can be used. Applies to the reports of `-entry qc_clustering` and `-entry downstream`."
+                },
+                "umap_color_by_embeddings": {
+                    "type": "string",
+                    "default": "X_umap_pca,X_umap_scvi",
+                    "pattern": "^X_[A-Za-z0-9_]+(,X_[A-Za-z0-9_]+)*$",
+                    "description": "Comma-separated UMAPs (keys in adata.obsm) on which the `--umap_color_by` columns are plotted.",
+                    "help_text": "`X_umap_pca` is the UMAP before integration (PCA neighbour graph); `X_umap_scvi` is the UMAP after integration (scVI neighbour graph). The report shows one block per UMAP. Keys missing from the object are skipped with a note."
                 }
             }
         },
