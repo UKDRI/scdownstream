@@ -5,6 +5,8 @@
 */
 
 include { LOAD_H5AD                            } from '../subworkflows/local/load_h5ad'
+include { ADATA_ADDSAMPLE                      } from '../modules/local/adata/addsample'
+include { ADATA_ADDMETADATA                    } from '../modules/local/adata/addmetadata'
 include { QUALITY_CONTROL                      } from '../subworkflows/local/quality_control'
 include { UNIFY                                } from '../subworkflows/local/unify'
 include { CELLTYPE_ASSIGNMENT                  } from '../subworkflows/local/celltype_assignment'
@@ -35,6 +37,7 @@ workflow QC_CLUSTER {
     take:
     ch_samplesheet // channel: samplesheet read in from --input
     ch_base        // channel: [ val(meta), path(h5ad) ]
+    ch_metadata    // value channel: path(tsv), or [] if --metadata is not set
 
     main:
 
@@ -64,6 +67,36 @@ workflow QC_CLUSTER {
     LOAD_H5AD(ch_samplesheet)
     ch_h5ad = LOAD_H5AD.out.h5ad
     ch_versions = ch_versions.mix(LOAD_H5AD.out.versions)
+
+    //
+    // Record the sample in obs and add the per-sample metadata from --metadata
+    //
+    // Only the object that becomes the cells goes through these steps: filtered if the
+    // samplesheet has one, otherwise unfiltered (QUALITY_CONTROL derives filtered from it).
+    // When both exist, unfiltered is only used for ambient correction and is left untouched.
+    //
+    ch_cells = ch_h5ad.map { meta, filtered, unfiltered -> [meta, filtered ?: unfiltered] }
+
+    ADATA_ADDSAMPLE(ch_cells)
+    ch_versions = ch_versions.mix(ADATA_ADDSAMPLE.out.versions)
+    ch_cells = ADATA_ADDSAMPLE.out.h5ad
+
+    if (params.metadata) {
+        ADATA_ADDMETADATA(ch_cells, ch_metadata, params.metadata_sample_col)
+        ch_versions = ch_versions.mix(ADATA_ADDMETADATA.out.versions)
+        ch_cells = ADATA_ADDMETADATA.out.h5ad
+    }
+
+    //
+    // Put the annotated object back into the slot it came from. Keyed on meta.id so that
+    // QUALITY_CONTROL receives the original meta unchanged.
+    //
+    ch_h5ad = ch_h5ad
+        .map { meta, filtered, unfiltered -> [meta.id, meta, filtered, unfiltered] }
+        .join(ch_cells.map { meta, h5ad -> [meta.id, h5ad] }, by: 0, failOnMismatch: true, failOnDuplicate: true)
+        .map { _id, meta, filtered, unfiltered, annotated ->
+            filtered ? [meta, annotated, unfiltered] : [meta, [], annotated]
+        }
 
     //
     // Quality control per sample

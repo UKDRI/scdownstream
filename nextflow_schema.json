@@ -23,6 +23,22 @@
                     "help_text": "You will need to create a design file with information about the samples in your experiment before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row. See [usage docs](https://nf-co.re/scdownstream/usage#samplesheet-input).",
                     "fa_icon": "fas fa-file-csv"
                 },
+                "metadata": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/tab-separated-values",
+                    "pattern": "^\\S+\\.(tsv|txt)$",
+                    "description": "Path to a tab-separated file with per-sample metadata to add to the cells' obs.",
+                    "help_text": "Tab-separated file with a header row and one row per sample. The column named by `--metadata_sample_col` holds the `sample` ids from the samplesheet; every other column is added to the `obs` table of that sample's cells. A metadata column that already exists in `obs` is an error. Only used by `-entry qc_clustering`.",
+                    "fa_icon": "fas fa-table"
+                },
+                "metadata_sample_col": {
+                    "type": "string",
+                    "default": "sample",
+                    "description": "Column in the `--metadata` file that holds the samplesheet sample ids.",
+                    "fa_icon": "fas fa-columns"
+                },
                 "outdir": {
                     "type": "string",
                     "format": "directory-path",
