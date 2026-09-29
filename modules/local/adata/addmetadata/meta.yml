@@ -63,6 +63,6 @@ output:
           pattern: "versions.yml"
 
 authors:
-  - "@nhecker"
+  - "@heckern"
 maintainers:
-  - "@nhecker"
+  - "@heckern"
