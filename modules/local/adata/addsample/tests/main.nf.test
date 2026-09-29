@@ -1,0 +1,52 @@
+nextflow_process {
+
+    name "Test Process ADATA_ADDSAMPLE"
+    script "modules/local/adata/addsample/main.nf"
+    process "ADATA_ADDSAMPLE"
+
+    tag "modules"
+    tag "modules_local"
+
+    test("Should run without failures") {
+
+        when {
+            process {
+                """
+                input[0] = Channel.of([
+                    [id: 'test'],
+                    file(params.modules_testdata_base_path + 'genomics/homo_sapiens/scrnaseq/h5ad/combined_filtered_matrix.h5ad', checkIfExists: true)
+                ])
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert snapshot(process.out).match()
+        }
+
+    }
+
+    test("Should run without failures - stub") {
+
+        options '-stub'
+
+        when {
+            process {
+                """
+                input[0] = Channel.of([
+                    [id: 'test'],
+                    file(params.modules_testdata_base_path + 'genomics/homo_sapiens/scrnaseq/h5ad/combined_filtered_matrix.h5ad', checkIfExists: true)
+                ])
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert snapshot(process.out).match()
+        }
+
+    }
+
+}

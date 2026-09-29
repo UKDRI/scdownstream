@@ -75,7 +75,8 @@ differential_genes/    ── decoupler pseudobulk → PyDESeq2 per group × con
 
 ### Stage 1 — `qc_clustering`
 
-1. Load and convert inputs to h5ad (h5ad, 10x h5, RDS, CSV)
+1. Load and convert inputs to h5ad (h5ad, 10x h5, RDS, CSV), add a `sample` column to `obs`, and
+   optionally per-sample metadata from a TSV (`--metadata`)
 2. Per-sample quality control
    1. QC metrics for raw counts ([`MultiQC`](http://multiqc.info/))
    2. Doublet detection — [scrublet](https://scanpy.readthedocs.io/en/stable/api/generated/scanpy.pp.scrublet.html)
@@ -220,10 +221,18 @@ barcodes.
 nextflow run UKDRI/scdownstream -r dev_ukdri -entry qc_clustering \
    -profile apptainer \
    --input samplesheet.csv \
+   --metadata sample_metadata.tsv \
+   --umap_color_by diagnosis,sex \
    --name my_study \
    --species human \
    --outdir results/qc_clustering
 ```
+
+`--metadata` is optional: a tab-separated file with one row per sample, whose columns (donor,
+diagnosis, sex, ...) are added to every cell's `obs`. See
+[Per-sample metadata](docs/usage.md#per-sample-metadata). `--umap_color_by` plots such columns on
+the PCA and scVI UMAPs in the reports, i.e. before and after integration. See
+[UMAP colourings](docs/usage.md#umap-colourings-in-the-reports).
 
 **Stage 2 — downstream analysis:**
 

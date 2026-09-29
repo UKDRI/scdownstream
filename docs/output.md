@@ -39,8 +39,14 @@ Produces, at the top level of the results directory:
 <summary>Output files</summary>
 
 - `load_h5ad/`: the result of converting RDS, 10x h5 and CSV inputs to h5ad.
+- `load/`: the per-sample objects with the `sample` obs column added (`<sample>_sample.h5ad`) and,
+  with `--metadata`, the per-sample metadata columns added (`<sample>_metadata.h5ad`).
 
 </details>
+
+The `sample` column and the `--metadata` columns are added to `obs` before QC. So they are in every
+later object, including `<name>_qc_clustering.h5ad` and `<name>_downstream.h5ad`. See
+[Per-sample metadata](usage.md#per-sample-metadata).
 
 ### Quality control
 
@@ -153,8 +159,10 @@ does not, and without checking this pipeline's steps you would not know what it 
 
 - `report/<name>_qc_clustering_report.html`: a self-contained [Quarto](https://quarto.org/) report
   covering per-sample QC, filtering, integration, the UMAP embedding and the clustering at each
-  resolution. UMAP plots use `--umap_for_plots` (default `X_umap_scvi`). Tables are searchable and
-  capped at `--report_table_row_limit` rows.
+  resolution. UMAP plots use `--umap_for_plots` (default `X_umap_scvi`). With `--umap_color_by`,
+  a "Requested UMAP plots" section plots those `obs` columns on each UMAP in
+  `--umap_color_by_embeddings` (by default before and after integration). Tables are searchable
+  and capped at `--report_table_row_limit` rows.
 
 </details>
 
@@ -189,7 +197,8 @@ a `qc_clustering` run.
 - `per_group/<name>/liana/`: [LIANA+](https://liana-py.readthedocs.io/) rank-aggregate cell–cell
   communication results.
 - `report/<name>_downstream_report.html`: a Quarto report covering the marker genes per group, the
-  enrichment results and the cell–cell communication analysis.
+  enrichment results and the cell–cell communication analysis. With `--umap_color_by`, it also
+  has the "Requested UMAP plots" section described for stage 1.
 
 </details>
 

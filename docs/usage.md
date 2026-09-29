@@ -175,6 +175,10 @@ under `report/`, and a MultiQC report.
 | Parameter                         | Default          | Description                                                                                                                                                            |
 | --------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--input`                         | —                | Samplesheet (required).                                                                                                                                                |
+| `--metadata`                      | `null`           | Tab-separated per-sample metadata. Every column except `--metadata_sample_col` is added to the cells' `obs` — see [Per-sample metadata](#per-sample-metadata).         |
+| `--metadata_sample_col`           | `sample`         | Column of the `--metadata` file holding the samplesheet `sample` ids.                                                                                                  |
+| `--umap_color_by`                 | `''`             | Comma-separated `obs` columns to plot on the UMAPs in the report — see [UMAP colourings](#umap-colourings-in-the-reports). |
+| `--umap_color_by_embeddings`      | `X_umap_pca,X_umap_scvi`| UMAPs those columns are plotted on: before (PCA) and after (scVI) integration. |
 | `--name`                          | `qc_clustering`  | Identifier used in output file names.                                                                                                                                  |
 | `--species`                       | `human`          | `human` or `mouse`. Set explicitly for mouse data.                                                                                                                     |
 | `--qc_only`                       | `false`          | Stop after per-sample QC and cell type annotation; skip merging, integration, embeddings, clustering and the Quarto report.                                            |
@@ -211,6 +215,73 @@ scVI itself is tuned with `--scvi_n_latent` (30), `--scvi_n_hidden` (128), `--sc
 > `--species` defaults to `human`. Set it explicitly for mouse data: the human default is applied
 > silently, and gene set enrichment and LIANA+ ortholog mapping would then use the wrong species.
 
+### Per-sample metadata
+
+Right after loading, before QC, every sample's cells get a `sample` column in `obs` holding the
+samplesheet `sample` id. If the input object already has a `sample` column with other values, they
+are kept as `sample_original` and a warning is printed; if `sample_original` also exists, the
+pipeline stops rather than overwrite it.
+
+To add further per-sample annotations (donor, diagnosis, sex, age, ...), pass `--metadata` a
+tab-separated file with a header row and one row per sample:
+
+```tsv
+sample	donor	diagnosis	sex	age
+sample1	D01	AD	F	71
+sample2	D02	control	M	68
+```
+
+- The column named by `--metadata_sample_col` (default `sample`) holds the samplesheet `sample`
+  ids. It is matched against the `sample` column in `obs`, and is not added itself.
+- Every other column is added to `obs` for all cells of that sample. Numeric columns stay numeric;
+  everything else, including `true`/`false`, is stored as a categorical of strings. Empty cells
+  become missing values.
+- Rows for samples that are not in the run are ignored.
+
+The pipeline stops with an error when:
+
+- a sample in the run has no row in the file;
+- a sample id is empty or appears twice;
+- the header has duplicate or empty column names (often a trailing tab);
+- a metadata column already exists in the input object's `obs`;
+- a metadata column is named `batch`, `label` or `sample_original`. The pipeline creates these
+  itself, so rename them, e.g. `batch` to `seq_batch`.
+
+The columns are added before QC, so they are in every object from then on: the per-sample QC
+objects (also with `--qc_only`), the merged and integrated object, and the stage outputs used by
+`downstream` and `differential_genes`. That means you can use them as scVI covariates
+(`--scvi_categorical_covariates`, `--scvi_continuous_covariates`), and as `variable` or `blocking`
+in the [contrasts file](#the-contrasts-file). With `--base_adata`, the metadata columns are kept
+even if the base object lacks them; its cells then get `unknown` (or `NaN` for numeric columns).
+
+Also avoid names that later steps write to `obs`: the QC metrics (`n_genes_by_counts`,
+`total_counts`, `pct_counts_mt`, ...), `doublet_score` / `predicted_doublet`,
+`celltypist:<model>` and `leiden_<resolution>`. Those steps would replace your column without a
+warning. Only `-entry qc_clustering` reads `--metadata`.
+
+### UMAP colourings in the reports
+
+`--umap_color_by` names `obs` columns to plot on the UMAPs, for example columns added with
+`--metadata`:
+
+```bash
+--metadata sample_metadata.tsv --umap_color_by diagnosis,sex,age
+```
+
+Both reports (the QC/clustering report of `qc_clustering` and the analysis report of `downstream`)
+then get a "Requested UMAP plots" section with one block per UMAP in
+`--umap_color_by_embeddings`, each showing every requested column. The default,
+`X_umap_pca,X_umap_scvi`, shows the columns **before integration** (PCA UMAP) and **after
+integration** (scVI UMAP). This helps you judge what integration did: a technical variable such as
+a sequencing batch should mix after integration, while a biological one such as a cell type
+should still separate.
+
+- Numeric columns get a colour scale and categorical ones a legend. Columns with more than 50
+  categories are plotted without a legend.
+- Columns or UMAPs that are not in the object are skipped, with a note in the report listing what
+  is available. The report never fails because of them.
+- `--umap_for_plots` is separate: it still picks the UMAP for all other plots in the reports.
+
 ## `downstream`
 
 Stage 2: marker genes per cluster, gene set enrichment, and LIANA+ cell–cell communication.
@@ -246,6 +317,8 @@ nextflow run UKDRI/scdownstream -r dev_ukdri -entry downstream \
 | `--markers_min_logfc`             | `0`                     | Minimum log fold change for an exported marker.                                                                                                         |
 | `--report_table_row_limit`        | `250`                   | Maximum rows shown per table in the HTML report.                                                                                                        |
 | `--umap_for_plots`                | `X_umap_scvi`           | UMAP used for the report plots: `X_umap_scvi` (scVI graph) or `X_umap_pca` (PCA graph). Also applies to the stage 1 report.                            |
+| `--umap_color_by`                 | `''`                    | Comma-separated `obs` columns to plot on the UMAPs in both reports, e.g. `sex,diagnosis`. See [UMAP colourings](#umap-colourings-in-the-reports). |
+| `--umap_color_by_embeddings`      | `X_umap_pca,X_umap_scvi`| UMAPs the `--umap_color_by` columns are plotted on, one block each: before (PCA) and after (scVI) integration. |
 
 Marker genes are computed with `scanpy.tl.rank_genes_groups` using the **Wilcoxon** test.
 

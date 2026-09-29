@@ -34,6 +34,14 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 - `--memory_scale`, which scales every memory request in `conf/base.config`.
 - `--qc_only`, to stop after per-sample QC and cell type annotation.
 - Per-sample `n_hvgs` and `automatic_cell_filtering` columns in the samplesheet schema.
+- `--metadata` / `--metadata_sample_col` for `-entry qc_clustering`: per-sample metadata from a TSV,
+  added to `obs` before QC by the new `ADATA_ADDMETADATA` module. It stops on a missing sample,
+  duplicate ids or a column that already exists in `obs`. The columns are kept through the merge,
+  also with `--base_adata`.
+- `--umap_color_by` / `--umap_color_by_embeddings`: both Quarto reports plot the named `obs`
+  columns on each listed UMAP, by default the PCA and scVI UMAPs (before and after integration).
+- `ADATA_ADDSAMPLE` sets the `sample` column in `obs` right after loading, instead of only in
+  `ADATA_UNIFY`. A differing existing `sample` column is kept as `sample_original`.
 
 ### `Changed`
 
@@ -52,6 +60,10 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 - Most intermediate outputs are now published only when `--save_intermediates` is set; the finalized
   objects are published at the top level of `--outdir`.
 - Cell type predictions are merged into the per-sample objects as `obs` columns during finalisation.
+- `ADATA_UNIFY` only copies an existing `sample` column to `sample_original` when its values differ
+  from the sample id. Before, its check was always true, so any `sample` column was copied.
+- `ADATA_MERGE` always keeps the `sample` column (and the `--metadata` columns). Before, with a
+  `--base_adata` that had no `sample` column, it was dropped from the merged object.
 - Documentation rewritten for the fork: README, `docs/usage.md`, `docs/output.md`, a new
   `ACKNOWLEDGEMENTS.md`, and an updated `CITATIONS.md`. Cluster-specific guidance lives on the
   UK DRI Informatics wiki rather than in the repository.

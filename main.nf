@@ -49,7 +49,10 @@ workflow qc_clustering {
         PIPELINE_INITIALISATION.out.samplesheet,
         params.base_adata
             ? Channel.value([[id: params.name ? params.name : "qc_clustering" ], file(params.base_adata, checkIfExists: true)])
-            : Channel.value([[], []])
+            : Channel.value([[], []]),
+        params.metadata
+            ? Channel.value(file(params.metadata, checkIfExists: true))
+            : Channel.value([])
     )
 
     //

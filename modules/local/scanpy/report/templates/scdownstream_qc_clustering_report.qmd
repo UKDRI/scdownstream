@@ -17,6 +17,8 @@ format:
 
 FILE = "scdownstream.h5ad"
 UMAP_FOR_PLOTS = "X_umap_scvi"
+UMAP_COLOR_BY = ""
+UMAP_COLOR_BY_EMBEDDINGS = "X_umap_pca,X_umap_scvi"
 ```
 
 
@@ -53,17 +55,16 @@ def resolve_umap(adata, requested):
             return key, note
     raise ValueError(f"No UMAP found in adata.obsm (available: {', '.join(adata.obsm.keys())})")
 
-def umap_kind(key):
-    # X_umap and X_umap_pca are the same (PCA-based) embedding
-    return "pca" if key in ("X_umap", "X_umap_pca") else key
-
 default_umap, umap_note = resolve_umap(adata, UMAP_FOR_PLOTS)
 if umap_note:
     display(HTML(f"<p><b>Note:</b> {umap_note}</p>"))
 
 pca_umap = "X_umap_pca" if "X_umap_pca" in adata.obsm else "X_umap"
+# X_umap and X_umap_pca are the same (PCA-based) embedding
+pca_umaps = ("X_umap", "X_umap_pca")
 comparison_umaps = [(key, title) for key, title in [("X_umap_scvi", "scVI UMAP"), (pca_umap, "PCA UMAP")]
-                    if key in adata.obsm and umap_kind(key) != umap_kind(default_umap)]
+                    if key in adata.obsm and key != default_umap
+                    and not (key in pca_umaps and default_umap in pca_umaps)]
 ```
 
 ```{python}
@@ -143,6 +144,138 @@ Distribution of predicted doublets
 
 ```{python}
 sc.pl.embedding(adata, basis=default_umap, color=['predicted_doublet', 'doublet_score'])
+```
+
+---
+
+## <font color='green'>Requested UMAP plots</font>
+
+```{python}
+# Requested UMAP colourings: the obs columns in --umap_color_by, one figure per embedding in
+# --umap_color_by_embeddings (outer loop: embeddings, inner loop: columns). The plots use a small
+# in-memory AnnData holding only those columns and embeddings, so scanpy's sanitize step (strings
+# to categories) never writes to the report object, which may be opened backed.
+import math
+from html import escape as html_escape
+
+import anndata as ad
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from IPython.display import display, HTML
+
+color_by_max_legend_categories = 50
+
+def parse_list_param(value):
+    # comma-separated -P value; quarto passes an empty value as null
+    if value is None:
+        return []
+    items = [item.strip() for item in str(value).split(",")]
+    return list(dict.fromkeys(item for item in items if item and item.lower() not in ("none", "null")))
+
+def color_by_title(key):
+    if key in ['X_umap', 'X_umap_pca']:
+        name = "Before integration (PCA UMAP)"
+    elif key == "X_umap_scvi":
+        name = "After integration (scVI UMAP)"
+    else:
+        name = key.removeprefix("X_umap_") + " UMAP"
+
+    return name
+
+def color_by_note(text):
+    display(HTML(f"<p><b>Note:</b> {text}</p>"))
+
+def html_list(names):
+    return ", ".join(html_escape(str(name)) for name in names)
+
+color_by_cols = parse_list_param(UMAP_COLOR_BY)
+
+if not color_by_cols:
+    display(HTML("<p>No columns requested. Set <code>--umap_color_by</code> (e.g. <code>sex,diagnosis</code>) "
+                 "to plot obs columns here.</p>"))
+else:
+    # embeddings: accept X_umap_pca or umap_pca; X_umap and X_umap_pca are the same, keep the first requested
+    color_by_obsm, missing_embeddings, unusable_embeddings, seen_titles = {}, [], [], set()
+    for name in parse_list_param(UMAP_COLOR_BY_EMBEDDINGS):
+        key = next((k for k in (name, f"X_{name}") if k in adata.obsm), None)
+        if key is None:
+            missing_embeddings.append(name)
+            continue
+        if color_by_title(key) in seen_titles:
+            continue
+        coords = np.asarray(adata.obsm[key])
+        if coords.ndim != 2 or coords.shape[1] < 2:
+            unusable_embeddings.append(key)
+            continue
+        seen_titles.add(color_by_title(key))
+        color_by_obsm[key] = coords
+
+    missing_cols = [col for col in color_by_cols if col not in adata.obs.columns]
+    color_by_cols = [col for col in color_by_cols if col in adata.obs.columns]
+
+    if missing_embeddings:
+        color_by_note(f"Embedding(s) not found in adata.obsm and skipped: {html_list(missing_embeddings)}. "
+                      f"Available: {html_list(adata.obsm.keys())}.")
+    if unusable_embeddings:
+        color_by_note(f"Embedding(s) with fewer than two dimensions skipped: {html_list(unusable_embeddings)}.")
+    if missing_cols:
+        color_by_note(f"Column(s) not found in adata.obs and skipped: {html_list(missing_cols)}. "
+                      f"Available: {html_list(adata.obs.columns)}.")
+    if not color_by_obsm:
+        color_by_note("No embedding to plot. Set <code>--umap_color_by_embeddings</code> "
+                      "(e.g. <code>X_umap_pca,X_umap_scvi</code>).")
+    if not color_by_cols:
+        color_by_note("None of the requested columns is in adata.obs.")
+
+    if color_by_obsm and color_by_cols:
+        color_by_obs = adata.obs[color_by_cols].copy()
+        for col in color_by_cols:
+            values = color_by_obs[col]
+            if isinstance(values.dtype, pd.CategoricalDtype):
+                color_by_obs[col] = values.cat.remove_unused_categories()
+            elif pd.api.types.is_object_dtype(values) or pd.api.types.is_string_dtype(values):
+                try:
+                    color_by_obs[col] = values.astype("category")
+                except TypeError:
+                    color_by_obs[col] = values.astype(str).astype("category")
+        adata_color_by = ad.AnnData(obs=color_by_obs, obsm=color_by_obsm)
+
+        many_categories = [col for col in color_by_cols
+                           if isinstance(color_by_obs[col].dtype, pd.CategoricalDtype)
+                           and len(color_by_obs[col].cat.categories) > color_by_max_legend_categories]
+        if many_categories:
+            color_by_note(f"Legend hidden for column(s) with more than {color_by_max_legend_categories} "
+                          f"categories: {html_list(many_categories)}.")
+
+        ncols = min(3, len(color_by_cols))
+        nrows = math.ceil(len(color_by_cols) / ncols)
+        failed_panels = []
+
+        for key in color_by_obsm:
+            display(HTML(f"<h3>{html_escape(color_by_title(key))}</h3>"))
+            fig, axs = plt.subplots(nrows, ncols, figsize=(ncols * 6, nrows * 5), squeeze=False,
+                                    layout="constrained")
+            panels = axs.ravel()
+
+            for ax, col in zip(panels, color_by_cols):
+                legend_kwargs = {"legend_loc": None} if col in many_categories else {}
+                try:
+                    sc.pl.embedding(adata_color_by, basis=key, color=col, ax=ax, show=False, title=col,
+                                    **legend_kwargs)
+                except Exception as err:
+                    ax.clear()
+                    ax.set_axis_off()
+                    failed_panels.append(f"{html_escape(str(col))} on {html_escape(key)} ({html_escape(str(err))})")
+
+            for ax in panels[len(color_by_cols):]:
+                ax.set_axis_off()
+
+            plt.show()
+            plt.close(fig)
+
+        if failed_panels:
+            color_by_note(f"Could not plot: {'; '.join(failed_panels)}.")
 ```
 
 ---

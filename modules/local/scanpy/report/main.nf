@@ -12,6 +12,8 @@ process SCANPY_GENERATE_REPORT {
     val(clustering_name)
     val(ntop)
     val(umap_for_plots)
+    val(umap_color_by)
+    val(umap_color_by_embeddings)
 
     output:
     tuple val(meta), path("*.html"), emit: html
@@ -22,6 +24,11 @@ process SCANPY_GENERATE_REPORT {
 
     script:
     prefix = task.ext.prefix ?: "${meta.id}"
+    // Only pass the colouring parameters when set; the report defaults cover the empty case
+    color_by_args = [
+        umap_color_by ? "-P \"UMAP_COLOR_BY:${umap_color_by}\"" : '',
+        umap_color_by_embeddings ? "-P \"UMAP_COLOR_BY_EMBEDDINGS:${umap_color_by_embeddings}\"" : '',
+    ].findAll().join(' ')
     """
     export NUMBA_CACHE_DIR=./tmp/numba
     export MPLCONFIGDIR=./tmp/matplotlib
@@ -35,6 +42,7 @@ process SCANPY_GENERATE_REPORT {
         -P CLUSTERING_NAME:${clustering_name} \\
         -P NTOP:${ntop} \\
         -P "UMAP_FOR_PLOTS:${umap_for_plots}" \\
+        ${color_by_args} \\
         --to html
 
     cat <<-END_VERSIONS > versions.yml
@@ -68,6 +76,8 @@ process SCANPY_GENERATE_REPORT_QC {
     tuple val(meta), path(h5ad)
     path(ipynb_template)
     val(umap_for_plots)
+    val(umap_color_by)
+    val(umap_color_by_embeddings)
 
     output:
     tuple val(meta), path("*.html"), emit: html
@@ -78,6 +88,11 @@ process SCANPY_GENERATE_REPORT_QC {
 
     script:
     prefix = task.ext.prefix ?: "${meta.id}"
+    // Only pass the colouring parameters when set; the report defaults cover the empty case
+    color_by_args = [
+        umap_color_by ? "-P \"UMAP_COLOR_BY:${umap_color_by}\"" : '',
+        umap_color_by_embeddings ? "-P \"UMAP_COLOR_BY_EMBEDDINGS:${umap_color_by_embeddings}\"" : '',
+    ].findAll().join(' ')
     """
     export NUMBA_CACHE_DIR=./tmp/numba
     export MPLCONFIGDIR=./tmp/matplotlib
@@ -89,6 +104,7 @@ process SCANPY_GENERATE_REPORT_QC {
         --output ${prefix}.html \\
         -P FILE:${h5ad} \\
         -P "UMAP_FOR_PLOTS:${umap_for_plots}" \\
+        ${color_by_args} \\
         --to html
 
     cat <<-END_VERSIONS > versions.yml
