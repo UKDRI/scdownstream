@@ -269,7 +269,7 @@ warning. Only `-entry qc_clustering` reads `--metadata`.
 ```
 
 Both reports (the QC/clustering report of `qc_clustering` and the analysis report of `downstream`)
-then get a "Requested UMAP colourings" section with one block per UMAP in
+then get a "Requested UMAP plots" section with one block per UMAP in
 `--umap_color_by_embeddings`, each showing every requested column. The default,
 `X_umap_pca,X_umap_scvi`, shows the columns **before integration** (PCA UMAP) and **after
 integration** (scVI UMAP). This helps you judge what integration did: a technical variable such as

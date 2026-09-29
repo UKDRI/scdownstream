@@ -55,17 +55,16 @@ def resolve_umap(adata, requested):
             return key, note
     raise ValueError(f"No UMAP found in adata.obsm (available: {', '.join(adata.obsm.keys())})")
 
-def umap_kind(key):
-    # X_umap and X_umap_pca are the same (PCA-based) embedding
-    return "pca" if key in ("X_umap", "X_umap_pca") else key
-
 default_umap, umap_note = resolve_umap(adata, UMAP_FOR_PLOTS)
 if umap_note:
     display(HTML(f"<p><b>Note:</b> {umap_note}</p>"))
 
 pca_umap = "X_umap_pca" if "X_umap_pca" in adata.obsm else "X_umap"
+# X_umap and X_umap_pca are the same (PCA-based) embedding
+pca_umaps = ("X_umap", "X_umap_pca")
 comparison_umaps = [(key, title) for key, title in [("X_umap_scvi", "scVI UMAP"), (pca_umap, "PCA UMAP")]
-                    if key in adata.obsm and umap_kind(key) != umap_kind(default_umap)]
+                    if key in adata.obsm and key != default_umap
+                    and not (key in pca_umaps and default_umap in pca_umaps)]
 ```
 
 ```{python}
@@ -149,9 +148,7 @@ sc.pl.embedding(adata, basis=default_umap, color=['predicted_doublet', 'doublet_
 
 ---
 
-## <font color='green'>Requested UMAP colourings</font>
-
-The obs columns named by `--umap_color_by` are shown on each UMAP in `--umap_color_by_embeddings`, e.g. before (PCA UMAP) and after (scVI UMAP) integration, to see whether integration removed a technical effect or a biological signal.
+## <font color='green'>Requested UMAP plots</font>
 
 ```{python}
 # Requested UMAP colourings: the obs columns in --umap_color_by, one figure per embedding in
@@ -177,11 +174,14 @@ def parse_list_param(value):
     return list(dict.fromkeys(item for item in items if item and item.lower() not in ("none", "null")))
 
 def color_by_title(key):
-    if umap_kind(key) == "pca":
-        return "Before integration (PCA UMAP)"
-    if key == "X_umap_scvi":
-        return "After integration (scVI UMAP)"
-    return key
+    if key in ['X_umap', 'X_umap_pca']:
+        name = "Before integration (PCA UMAP)"
+    elif key == "X_umap_scvi":
+        name = "After integration (scVI UMAP)"
+    else:
+        name = key.removeprefix("X_umap_") + " UMAP"
+
+    return name
 
 def color_by_note(text):
     display(HTML(f"<p><b>Note:</b> {text}</p>"))
@@ -196,19 +196,19 @@ if not color_by_cols:
                  "to plot obs columns here.</p>"))
 else:
     # embeddings: accept X_umap_pca or umap_pca; X_umap and X_umap_pca are the same, keep the first requested
-    color_by_obsm, missing_embeddings, unusable_embeddings, seen_kinds = {}, [], [], set()
+    color_by_obsm, missing_embeddings, unusable_embeddings, seen_titles = {}, [], [], set()
     for name in parse_list_param(UMAP_COLOR_BY_EMBEDDINGS):
         key = next((k for k in (name, f"X_{name}") if k in adata.obsm), None)
         if key is None:
             missing_embeddings.append(name)
             continue
-        if umap_kind(key) in seen_kinds:
+        if color_by_title(key) in seen_titles:
             continue
         coords = np.asarray(adata.obsm[key])
         if coords.ndim != 2 or coords.shape[1] < 2:
             unusable_embeddings.append(key)
             continue
-        seen_kinds.add(umap_kind(key))
+        seen_titles.add(color_by_title(key))
         color_by_obsm[key] = coords
 
     missing_cols = [col for col in color_by_cols if col not in adata.obs.columns]
