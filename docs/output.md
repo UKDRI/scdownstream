@@ -159,7 +159,9 @@ does not, and without checking this pipeline's steps you would not know what it 
 
 - `report/<name>_qc_clustering_report.html`: a self-contained [Quarto](https://quarto.org/) report
   covering per-sample QC, filtering, integration, the UMAP embedding and the clustering at each
-  resolution. UMAP plots use `--umap_for_plots` (default `X_umap_scvi`). With `--umap_color_by`,
+  resolution. The PCA section has an elbow plot of the variance explained per PC, marking the
+  number of PCs the PCA graph used (`--neighbors_n_pcs`). UMAP plots use `--umap_for_plots`
+  (default `X_umap_scvi`). With `--umap_color_by`,
   a "Requested UMAP plots" section plots those `obs` columns on each UMAP in
   `--umap_color_by_embeddings` (by default before and after integration). Tables are searchable
   and capped at `--report_table_row_limit` rows.

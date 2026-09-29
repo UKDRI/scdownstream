@@ -39,6 +39,15 @@ kwargs = {
     "key_added": "${key_added}"
 }
 
+n_pcs = "${task.ext.n_pcs ?: ''}"
+if n_pcs:
+    n_pcs = int(n_pcs)
+    n_available = adata.obsm["${rep}"].shape[1]
+    if n_pcs > n_available:
+        print(f"WARNING: n_pcs={n_pcs} exceeds the {n_available} dimensions of ${rep}, using {n_available}")
+        n_pcs = n_available
+    kwargs["n_pcs"] = n_pcs
+
 sc.pp.neighbors(adata, **kwargs)
 
 adata.write_h5ad(f"{prefix}.h5ad")

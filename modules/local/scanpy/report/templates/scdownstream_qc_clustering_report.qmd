@@ -106,6 +106,35 @@ sc.pl.pca(
 )
 ```
 
+Variance explained per PC (elbow plot)
+
+```{python}
+import matplotlib.pyplot as plt
+import numpy as np
+
+if "variance_ratio" not in adata.uns.get("pca", {}):
+    display(HTML("<p><b>Note:</b> No PCA variance ratio found in adata.uns['pca'], elbow plot skipped.</p>"))
+else:
+    variance_ratio = np.asarray(adata.uns["pca"]["variance_ratio"])
+    n_computed = len(variance_ratio)
+    n_used = adata.uns.get("neighbors_pca", {}).get("params", {}).get("n_pcs")
+    n_used = int(n_used) if n_used is not None else n_computed
+
+    fig, ax = plt.subplots(figsize=(7, 4))
+    ax.scatter(np.arange(1, n_computed + 1), variance_ratio, s=15)
+    ax.axvline(n_used, color="grey", linestyle="--", label=f"PCs used for the PCA graph: {n_used}")
+    ax.set_yscale("log")
+    ax.set_xlabel("PC")
+    ax.set_ylabel("variance ratio")
+    ax.legend()
+    plt.show()
+    plt.close(fig)
+
+    display(HTML(f"<p>The PCA neighbour graph (and the PCA UMAP) uses the first {n_used} of {n_computed} PCs. "
+                 "To change it, rerun with <code>--neighbors_n_pcs</code> (and <code>--pca_n_comps</code> "
+                 "to compute more PCs) and <code>-resume</code>.</p>"))
+```
+
 Loadings indicate the most informative genes across the first PCs
 
 ```{python}

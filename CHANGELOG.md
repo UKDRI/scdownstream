@@ -38,6 +38,9 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
   added to `obs` before QC by the new `ADATA_ADDMETADATA` module. It stops on a missing sample,
   duplicate ids or a column that already exists in `obs`. The columns are kept through the merge,
   also with `--base_adata`.
+- `--pca_n_comps` (PCs computed, default 50) and `--neighbors_n_pcs` (PCs used for the PCA
+  neighbour graph and the PCA UMAP, default all), plus an elbow plot in the QC/clustering report
+  to choose them. With the defaults the results are unchanged.
 - `--umap_color_by` / `--umap_color_by_embeddings`: both Quarto reports plot the named `obs`
   columns on each listed UMAP, by default the PCA and scVI UMAPs (before and after integration).
 - `ADATA_ADDSAMPLE` sets the `sample` column in `obs` right after loading, instead of only in
