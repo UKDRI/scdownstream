@@ -175,6 +175,8 @@ under `report/`, and a MultiQC report.
 | Parameter                         | Default          | Description                                                                                                                                                            |
 | --------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--input`                         | —                | Samplesheet (required).                                                                                                                                                |
+| `--metadata`                      | `null`           | Tab-separated per-sample metadata. Every column except `--metadata_sample_col` is added to the cells' `obs` — see [Per-sample metadata](#per-sample-metadata).         |
+| `--metadata_sample_col`           | `sample`         | Column of the `--metadata` file holding the samplesheet `sample` ids.                                                                                                  |
 | `--name`                          | `qc_clustering`  | Identifier used in output file names.                                                                                                                                  |
 | `--species`                       | `human`          | `human` or `mouse`. Set explicitly for mouse data.                                                                                                                     |
 | `--qc_only`                       | `false`          | Stop after per-sample QC and cell type annotation; skip merging, integration, embeddings, clustering and the Quarto report.                                            |
@@ -210,6 +212,50 @@ scVI itself is tuned with `--scvi_n_latent` (30), `--scvi_n_hidden` (128), `--sc
 > [!NOTE]
 > `--species` defaults to `human`. Set it explicitly for mouse data: the human default is applied
 > silently, and gene set enrichment and LIANA+ ortholog mapping would then use the wrong species.
+
+### Per-sample metadata
+
+Right after loading, before QC, every sample's cells get a `sample` column in `obs` holding the
+samplesheet `sample` id. If the input object already has a `sample` column with other values, they
+are kept as `sample_original` and a warning is printed; if `sample_original` also exists, the
+pipeline stops rather than overwrite it.
+
+To add further per-sample annotations (donor, diagnosis, sex, age, ...), pass `--metadata` a
+tab-separated file with a header row and one row per sample:
+
+```tsv
+sample	donor	diagnosis	sex	age
+sample1	D01	AD	F	71
+sample2	D02	control	M	68
+```
+
+- The column named by `--metadata_sample_col` (default `sample`) holds the samplesheet `sample`
+  ids. It is matched against the `sample` column in `obs`, and is not added itself.
+- Every other column is added to `obs` for all cells of that sample. Numeric columns stay numeric;
+  everything else, including `true`/`false`, is stored as a categorical of strings. Empty cells
+  become missing values.
+- Rows for samples that are not in the run are ignored.
+
+The pipeline stops with an error when:
+
+- a sample in the run has no row in the file;
+- a sample id is empty or appears twice;
+- the header has duplicate or empty column names (often a trailing tab);
+- a metadata column already exists in the input object's `obs`;
+- a metadata column is named `batch`, `label` or `sample_original`. The pipeline creates these
+  itself, so rename them, e.g. `batch` to `seq_batch`.
+
+The columns are added before QC, so they are in every object from then on: the per-sample QC
+objects (also with `--qc_only`), the merged and integrated object, and the stage outputs used by
+`downstream` and `differential_genes`. That means you can use them as scVI covariates
+(`--scvi_categorical_covariates`, `--scvi_continuous_covariates`), and as `variable` or `blocking`
+in the [contrasts file](#the-contrasts-file). With `--base_adata`, the metadata columns are kept
+even if the base object lacks them; its cells then get `unknown` (or `NaN` for numeric columns).
+
+Also avoid names that later steps write to `obs`: the QC metrics (`n_genes_by_counts`,
+`total_counts`, `pct_counts_mt`, ...), `doublet_score` / `predicted_doublet`,
+`celltypist:<model>` and `leiden_<resolution>`. Those steps would replace your column without a
+warning. Only `-entry qc_clustering` reads `--metadata`.
 
 ## `downstream`
 

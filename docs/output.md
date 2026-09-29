@@ -39,8 +39,14 @@ Produces, at the top level of the results directory:
 <summary>Output files</summary>
 
 - `load_h5ad/`: the result of converting RDS, 10x h5 and CSV inputs to h5ad.
+- `load/`: the per-sample objects with the `sample` obs column added (`<sample>_sample.h5ad`) and,
+  with `--metadata`, the per-sample metadata columns added (`<sample>_metadata.h5ad`).
 
 </details>
+
+The `sample` column and the `--metadata` columns are added to `obs` before QC. So they are in every
+later object, including `<name>_qc_clustering.h5ad` and `<name>_downstream.h5ad`. See
+[Per-sample metadata](usage.md#per-sample-metadata).
 
 ### Quality control
 
