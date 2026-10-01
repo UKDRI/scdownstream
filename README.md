@@ -80,13 +80,14 @@ differential_genes/    ── decoupler pseudobulk → PyDESeq2 per group × con
 2. Per-sample quality control
    1. QC metrics for raw counts ([`MultiQC`](http://multiqc.info/))
    2. Doublet detection — [scrublet](https://scanpy.readthedocs.io/en/stable/api/generated/scanpy.pp.scrublet.html)
-      (doublets are **annotated, not removed** — see [Status](#changes-and-known-limitations))
+      (doublets are **annotated, not removed** unless `--doublet_removal` is set)
    3. Ambient RNA correction — [decontX](https://bioconductor.org/packages/release/bioc/html/decontX.html)
       (default), [soupX](https://cran.r-project.org/web/packages/SoupX/readme/README.html),
       [CellBender](https://cellbender.readthedocs.io/en/latest/),
       [scAR](https://docs.scvi-tools.org/en/stable/user_guide/models/scar.html)
    4. Cell filtering — fixed thresholds, or automatic N-MAD outlier thresholds via
-      `--automatic_cell_filtering`
+      `--automatic_cell_filtering`; with `--filtering_keep_outliers` the outliers are kept and
+      marked in `obs["outlier"]` instead of removed
 3. Cell type annotation — [CellTypist](https://www.celltypist.org/) and/or
    [SingleR](https://bioconductor.org/packages/release/bioc/html/SingleR.html) with
    [celldex](https://bioconductor.org/packages/release/data/experiment/html/celldex.html) references
@@ -292,9 +293,9 @@ Both extend the public `gcfntnu/scanpy:1.11.4` image, which `DECOUPLER_PSEUDOBUL
 This pipeline is **work in development**. The following are known and, for now, expected behaviours.
 Several of them silently affect results, so please read before interpreting output.
 
-1. **Doublets are flagged, not removed.** scrublet writes its scores and predictions into the object,
-   but the doublet removal step is currently disabled. Filter on the doublet annotation yourself.
-   `--doublet_detection_threshold` is not currently supported.
+1. **Doublets are flagged, not removed, by default.** scrublet writes its scores and predictions
+   into the object. Set `--doublet_removal` to remove them right after detection, with
+   `--doublet_detection_threshold` methods having to agree (default 1).
 2. **Keep `scvi` in `--integration_methods`.** Everything after the merge is built on the scVI latent
    space; a selection that omits `scvi` produces no output and no error.
 3. **Per-sample QC overrides in the samplesheet are ignored.** The per-sample `min_genes`,

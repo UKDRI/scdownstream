@@ -186,7 +186,10 @@ under `report/`, and a MultiQC report.
 | `--ambient_correction`            | `decontx`        | `none`, `decontx`, `cellbender`, `soupx` or `scar`.                                                                                                                    |
 | `--ambient_corrected_integration` | `false`          | Use ambient-corrected counts for integration rather than storing them as extra layers.                                                                                 |
 | `--doublet_detection`             | `scrublet`       | Doublet detection method, or `none` to skip. See [Supported tool choices](#supported-tool-choices).                                                                    |
+| `--doublet_removal`               | `false`          | Remove cells called doublets by at least `--doublet_detection_threshold` methods, right after doublet detection. Off: doublets are only annotated. See [Doublets and QC outliers](#doublets-and-qc-outliers). |
+| `--doublet_detection_threshold`   | `1`              | With `--doublet_removal`: number of `--doublet_detection` methods that must call a cell a doublet. |
 | `--automatic_cell_filtering`      | `false`          | Derive filtering thresholds automatically from N-MAD outlier detection instead of using the fixed thresholds below.                                                    |
+| `--filtering_keep_outliers`       | `false`          | Keep cells that fail the QC thresholds and mark them in `obs["outlier"]` instead of removing them. See [Doublets and QC outliers](#doublets-and-qc-outliers). |
 | `--min_genes`                     | `200`            | Minimum genes per cell.                                                                                                                                                |
 | `--max_genes`                     | `false`          | Maximum genes per cell (`false` disables).                                                                                                                             |
 | `--min_cells`                     | `5`              | Minimum cells per gene.                                                                                                                                                |
@@ -217,6 +220,34 @@ scVI itself is tuned with `--scvi_n_latent` (30), `--scvi_n_hidden` (128), `--sc
 > `--species` defaults to `human`. Set it explicitly for mouse data: the human default is applied
 > silently, and gene set enrichment and LIANA+ ortholog mapping would then use the wrong species.
 
+### Doublets and QC outliers
+
+Per-sample QC runs in this order: QC metrics, doublet detection, ambient RNA correction, then cell
+filtering on the QC thresholds (fixed, or automatic N-MAD thresholds with
+`--automatic_cell_filtering`). Two options decide what happens to the cells that are caught:
+
+- **Doublets**: by default they are only annotated. scrublet writes `doublet_score` and
+  `predicted_doublet` to `obs`, and no cells are removed. With `--doublet_removal`, cells called
+  doublets by at least `--doublet_detection_threshold` of the `--doublet_detection` methods
+  (default 1, i.e. any method) are removed right after detection, and the MultiQC cell-count table
+  gets a "dedoubleted" row. Cells scrublet cannot score count as not doublets.
+- **QC outliers**: by default, cells that fail the QC thresholds are removed. With
+  `--filtering_keep_outliers` they are kept and marked in a bool `obs["outlier"]` column (`True` =
+  fails at least one threshold). They then go through integration, clustering and the reports, so
+  you can see where they fall on the UMAP and in which clusters before deciding to remove them. The
+  QC/clustering report then shows a "QC outliers" section: a UMAP coloured by `outlier`, a table of
+  outliers per sample and violin plots of the QC metrics. Gene filtering (`--min_cells`,
+  `--min_counts_gene`) still applies, counted over all kept cells, outliers included.
+
+The two options are independent: you can, for example, remove doublets and keep QC outliers.
+
+> [!NOTE]
+> Cells with no counts in the highly variable genes used for integration are still dropped before
+> scVI, also with `--filtering_keep_outliers`. This can remove a few near-empty outlier cells from
+> the merged object.
+
+To drop the marked outliers later, subset the object, e.g. `adata = adata[~adata.obs["outlier"]].copy()`.
+
 ### Per-sample metadata
 
 Right after loading, before QC, every sample's cells get a `sample` column in `obs` holding the
@@ -246,8 +277,8 @@ The pipeline stops with an error when:
 - a sample id is empty or appears twice;
 - the header has duplicate or empty column names (often a trailing tab);
 - a metadata column already exists in the input object's `obs`;
-- a metadata column is named `batch`, `label` or `sample_original`. The pipeline creates these
-  itself, so rename them, e.g. `batch` to `seq_batch`.
+- a metadata column is named `batch`, `label`, `sample_original` or `outlier`. The pipeline
+  creates these itself, so rename them, e.g. `batch` to `seq_batch`.
 
 The columns are added before QC, so they are in every object from then on: the per-sample QC
 objects (also with `--qc_only`), the merged and integrated object, and the stage outputs used by
@@ -430,15 +461,15 @@ schema is broader than this list, and values outside it are not yet supported.
 
 Two consequences of the current tool set are worth knowing before you interpret results:
 
-- **Doublets are annotated, not removed.** scrublet writes its scores and its `predicted_doublet`
-  call into the object; no cells are dropped. Filter on that annotation yourself in downstream
-  analysis. `--doublet_detection_threshold` has no effect.
+- **Doublets are annotated, not removed, by default.** scrublet writes its scores and its
+  `predicted_doublet` call into the object. Set `--doublet_removal` to remove them; see
+  [Doublets and QC outliers](#doublets-and-qc-outliers).
 - **scVI drives everything after the merge.** The embeddings, clustering and reports are built on the
   scVI latent space, and `--cluster_neighbors` defaults to `neighbors_scvi` accordingly. Keep `scvi`
   in `--integration_methods`; if it is omitted, the post-merge steps produce no output and no error.
 
 **Inactive parameters.** The following are accepted but currently have no effect:
-`--doublet_detection_threshold`, `--skip_enrichment`, `--skip_liana`, `--skip_rankgenesgroups`,
+`--skip_enrichment`, `--skip_liana`, `--skip_rankgenesgroups`,
 `--pseudobulk`, `--pseudobulk_groupby_labels`, `--pseudobulk_min_num_cells`, `--cluster_per_label`,
 `--cluster_global`, `--base_embeddings`, `--base_label_col`. `--prep_cellxgene` and
 `--unify_gene_symbols` are no longer supported and should be left at their defaults —
