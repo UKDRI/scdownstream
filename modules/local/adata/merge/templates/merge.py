@@ -28,7 +28,7 @@ obs_col_intersection = list(obs_col_intersection.union(force_obs_cols.split(",")
 sorted(obs_col_intersection)
 
 def get_columns(adata):
-    return {dtype: adata.obs.select_dtypes(include=dtype).columns for dtype in ["object", "category", "number"]}
+    return {dtype: adata.obs.select_dtypes(include=dtype).columns for dtype in ["object", "category", "number", "bool"]}
 
 column_dtypes = defaultdict(set)
 
@@ -48,13 +48,19 @@ for column, dtypes in column_dtypes.items():
     else:
         column_defaults[column] = np.nan if dtypes.copy().pop() == "number" else "unknown"
 
+# Bool columns stay bool only when every object has them as bool (no default needed); otherwise they become strings
+bool_columns = {
+    column for column, dtypes in column_dtypes.items()
+    if dtypes == {"bool"} and all(column in adata.obs.columns for adata in adatas)
+}
+
 for adata in adatas:
     for col in set(obs_col_intersection).difference(adata.obs.columns):
         adata.obs[col] = column_defaults[col]
     adata.obs = adata.obs[obs_col_intersection]
 
     for col in obs_col_intersection:
-        if column_dtypes[col] == {"number"}:
+        if column_dtypes[col] == {"number"} or col in bool_columns:
             continue
         adata.obs[col] = adata.obs[col].astype(str).astype("category")
 

@@ -30,7 +30,8 @@ df = pd.read_csv(sizes_path, sep="\\t")
 
 df = df.pivot(columns="state", index="sample", values="size")
 
-state_order = ["unfiltered", "filtered", "thresholded", "dedoubleted"]
+# pipeline order: doublet removal runs before the QC thresholds
+state_order = ["unfiltered", "filtered", "dedoubleted", "thresholded"]
 state_order = [col for col in state_order if col in df.columns]
 
 df = df[state_order].T

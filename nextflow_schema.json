@@ -131,7 +131,13 @@
                 "doublet_detection_threshold": {
                     "type": "integer",
                     "default": 1,
-                    "description": "Number of tools that need to agree on a doublet for it to be called as such"
+                    "description": "Number of tools that need to agree on a doublet for it to be called as such. Used with `--doublet_removal`.",
+                    "help_text": "With `--doublet_removal`, a cell is removed if at least this many of the methods in `--doublet_detection` call it a doublet (default 1: any method). Without `--doublet_removal`, no cells are removed and this value has no effect."
+                },
+                "doublet_removal": {
+                    "type": "boolean",
+                    "description": "Remove cells called doublets by at least --doublet_detection_threshold methods, right after doublet detection.",
+                    "help_text": "By default, no cells are removed and doublets are only annotated: `predicted_doublet` in obs holds the scrublet call (if scrublet is among the `--doublet_detection` methods). With this option, cells called doublets by at least `--doublet_detection_threshold` of the methods in `--doublet_detection` are removed right after doublet detection, before ambient correction and QC filtering. This is independent of `--filtering_keep_outliers`, which only affects the QC thresholds."
                 },
                 "cellbender_epochs": {
                     "type": "integer",
@@ -143,6 +149,12 @@
                     "default": false,
                     "description": "Perform automatic filtering of cells based.",
                     "help_text": "automatic_cell_filtering must be a boolean."
+                },
+                "filtering_keep_outliers": {
+                    "type": "boolean",
+                    "description": "Keep cells that fail the QC thresholds and mark them in obs['outlier'] instead of removing them.",
+                    "help_text": "Works with both the fixed thresholds (`--min_genes`, `--max_genes`, `--min_counts`, `--max_counts`, `--max_mito_percentage`) and the automatic thresholds (`--automatic_cell_filtering`). The marked cells stay in the data and go through integration, clustering and the reports, so they can be inspected (e.g. on the UMAP) before deciding to remove them. Gene filtering (`--min_cells`, `--min_counts_gene`) is unchanged.",
+                    "fa_icon": "fas fa-flag"
                 },
                 "min_cells": {
                     "type": "integer",
