@@ -75,12 +75,13 @@ if not new_cols:
     raise ValueError(f"ADATA_ADDMETADATA: {metadata_file} must have at least one column besides '{sample_col}'")
 
 # Columns the pipeline creates itself later on (ADATA_UNIFY): "label" and "batch" would make it
-# fail or silently change the batch key, "sample_original" is where it keeps an old sample column
-reserved = [c for c in new_cols if c in ("batch", "label", "sample_original")]
+# fail or silently change the batch key, "sample_original" is where it keeps an old sample column.
+# "outlier" is written by SCANPY_FILTER with --filtering_keep_outliers.
+reserved = [c for c in new_cols if c in ("batch", "label", "sample_original", "outlier")]
 if reserved:
     raise ValueError(
-        f"ADATA_ADDMETADATA: metadata column name(s) {', '.join(reserved)} are reserved by the pipeline; "
-        "rename them in the TSV (e.g. 'batch' -> 'seq_batch')"
+        f"ADATA_ADDMETADATA: metadata column name(s) {', '.join(reserved)} are reserved by the pipeline "
+        "(batch, label, sample_original, outlier); rename them in the TSV (e.g. 'batch' -> 'seq_batch')"
     )
 
 clashing = [c for c in new_cols if c in adata.obs.columns]

@@ -73,9 +73,11 @@ Note the step order in this fork: **doublet detection runs before ambient RNA co
 filtering**.
 
 > [!WARNING]
-> Doublets are **annotated, not removed**. The `obs` columns written by scrublet mark predicted
-> doublets, but no cells are dropped — see
-> [Supported tool choices](usage.md#supported-tool-choices).
+> By default, doublets are **annotated, not removed**: the `obs` columns written by scrublet
+> (`doublet_score`, `predicted_doublet`) mark predicted doublets, but no cells are dropped. With
+> `--doublet_removal` they are removed right after detection. With `--filtering_keep_outliers`,
+> cells that fail the QC thresholds are kept and marked in a bool `obs["outlier"]` column instead
+> of removed. See [Doublets and QC outliers](usage.md#doublets-and-qc-outliers).
 
 ### Cell type annotation
 
@@ -161,7 +163,9 @@ does not, and without checking this pipeline's steps you would not know what it 
   covering per-sample QC, filtering, integration, the UMAP embedding and the clustering at each
   resolution. The PCA section has an elbow plot of the variance explained per PC, marking the
   number of PCs the PCA graph used (`--neighbors_n_pcs`). UMAP plots use `--umap_for_plots`
-  (default `X_umap_scvi`). With `--umap_color_by`,
+  (default `X_umap_scvi`). With `--filtering_keep_outliers`, a "QC outliers" part of the UMAP
+  section shows where the marked outliers fall, how many there are per sample, and their QC
+  metrics compared with the other cells. With `--umap_color_by`,
   a "Requested UMAP plots" section plots those `obs` columns on each UMAP in
   `--umap_color_by_embeddings` (by default before and after integration). Tables are searchable
   and capped at `--report_table_row_limit` rows.

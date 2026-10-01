@@ -36,7 +36,8 @@ path_plt = "${prefix}_distributions.png"
 fig = sc.pl.scrublet_score_distribution(adata, return_fig=True)
 fig.savefig(path_plt)
 
-adata.obs["predicted_doublet"] = adata.obs["predicted_doublet"].astype(bool)
+# cells scrublet could not score get NaN; count them as not doublets
+adata.obs["predicted_doublet"] = adata.obs["predicted_doublet"].fillna(False).astype(bool)
 
 # save anndata
 adata.write_h5ad(f"{prefix}.h5ad")

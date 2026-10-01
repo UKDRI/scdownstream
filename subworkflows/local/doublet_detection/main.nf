@@ -21,13 +21,13 @@ workflow DOUBLET_DETECTION {
         if (methods.contains('scds')) {
             SCDS(ch_h5ad)
             ch_predictions = ch_predictions.mix(SCDS.out.predictions)
-            ch_versions = SCDS.out.versions
+            ch_versions = ch_versions.mix(SCDS.out.versions)
         }
 
         if (methods.contains('solo')) {
             SCVITOOLS_SOLO(ch_h5ad)
             ch_predictions = ch_predictions.mix(SCVITOOLS_SOLO.out.predictions)
-            ch_versions = SCVITOOLS_SOLO.out.versions
+            ch_versions = ch_versions.mix(SCVITOOLS_SOLO.out.versions)
         }
 
         if (methods.contains('scrublet')) {
@@ -37,7 +37,7 @@ workflow DOUBLET_DETECTION {
             }
             SCANPY_SCRUBLET(ch_scrublet.input, ch_scrublet.batch_col)
             ch_predictions = ch_predictions.mix(SCANPY_SCRUBLET.out.predictions)
-            ch_versions = SCANPY_SCRUBLET.out.versions
+            ch_versions = ch_versions.mix(SCANPY_SCRUBLET.out.versions)
 	    ch_h5ad = SCANPY_SCRUBLET.out.h5ad
 	    ch_multiqc_files = ch_multiqc_files.mix(SCANPY_SCRUBLET.out.multiqc_files)
         }
@@ -45,17 +45,28 @@ workflow DOUBLET_DETECTION {
         if (methods.contains('doubletdetection')) {
             DOUBLETDETECTION(ch_h5ad)
             ch_predictions = ch_predictions.mix(DOUBLETDETECTION.out.predictions)
-            ch_versions = DOUBLETDETECTION.out.versions
+            ch_versions = ch_versions.mix(DOUBLETDETECTION.out.versions)
         }
 
-        // DOUBLET_REMOVAL(
-        //    ch_h5ad.join(ch_predictions.groupTuple()),
-        //threshold,
-        //)
-
-        // ch_h5ad = DOUBLET_REMOVAL.out.h5ad
-        // ch_multiqc_files = ch_multiqc_files.mix(DOUBLET_REMOVAL.out.multiqc_files)
-	// ch_versions = ch_versions.mix(DOUBLET_REMOVAL.out.versions)	
+        // Remove cells called doublets by at least `threshold` methods (--doublet_removal).
+        // Otherwise no cells are removed (scrublet's call stays in obs['predicted_doublet']).
+        if (params.doublet_removal) {
+            // Keyed on meta.id; the meta of ch_h5ad is kept unchanged
+            DOUBLET_REMOVAL(
+                ch_h5ad.map { meta, h5ad -> [meta.id, meta, h5ad] }
+                    .join(
+                        ch_predictions.map { meta, predictions -> [meta.id, predictions] }.groupTuple(),
+                        by: 0,
+                        failOnMismatch: true,
+                        failOnDuplicate: true,
+                    )
+                    .map { _id, meta, h5ad, predictions -> [meta, h5ad, predictions] },
+                threshold,
+            )
+            ch_h5ad = DOUBLET_REMOVAL.out.h5ad
+            ch_multiqc_files = ch_multiqc_files.mix(DOUBLET_REMOVAL.out.multiqc_files)
+            ch_versions = ch_versions.mix(DOUBLET_REMOVAL.out.versions)
+        }
     }
 
     emit:

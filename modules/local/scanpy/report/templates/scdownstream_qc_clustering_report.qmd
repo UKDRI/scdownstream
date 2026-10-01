@@ -175,6 +175,51 @@ Distribution of predicted doublets
 sc.pl.embedding(adata, basis=default_umap, color=['predicted_doublet', 'doublet_score'])
 ```
 
+QC outliers
+
+```{python}
+# Cells that fail the QC thresholds but were kept (--filtering_keep_outliers). The plots use a small
+# in-memory AnnData, so scanpy never writes to the backed report object.
+import anndata as ad
+import numpy as np
+import pandas as pd
+
+if "outlier" not in adata.obs:
+    display(HTML("<p>No <code>outlier</code> column: cells failing the QC thresholds were removed "
+                 "(rerun with <code>--filtering_keep_outliers</code> to keep and mark them).</p>"))
+else:
+    outlier_colors = ["lightgrey", "tab:red"]  # False, True
+    outlier_metrics = [m for m in ["n_genes_by_counts", "total_counts", "pct_counts_mt"] if m in adata.obs]
+
+    # bool, or "True"/"False" strings after merging
+    is_outlier = (adata.obs["outlier"].astype(str) == "True").to_numpy()
+    n_outliers = int(is_outlier.sum())
+    display(HTML(f"<p>{n_outliers} of {adata.n_obs} cells ({100 * n_outliers / adata.n_obs:.1f}%) fail the QC "
+                 "thresholds and are kept, marked in <code>obs['outlier']</code>.</p>"))
+
+    outlier_table = (
+        pd.DataFrame({"sample": adata.obs["sample"].astype(str).to_numpy(), "outlier": is_outlier})
+        .groupby("sample")
+        .agg(cells=("outlier", "size"), outliers=("outlier", "sum"))
+        .reset_index()
+    )
+    outlier_total = pd.DataFrame({"sample": ["total"], "cells": [adata.n_obs], "outliers": [n_outliers]})
+    outlier_table = pd.concat([outlier_table, outlier_total], ignore_index=True)
+    outlier_table["% outliers"] = (100 * outlier_table["outliers"] / outlier_table["cells"]).round(1)
+    display(HTML(outlier_table.to_html(index=False)))
+
+    # outliers last, so they are drawn on top of the other cells
+    order = np.argsort(is_outlier, kind="stable")
+    outlier_obs = adata.obs[outlier_metrics].iloc[order].copy()
+    outlier_obs["outlier"] = pd.Categorical(np.where(is_outlier[order], "True", "False"), categories=["False", "True"])
+    adata_outlier = ad.AnnData(obs=outlier_obs, obsm={default_umap: np.asarray(adata.obsm[default_umap])[order]})
+
+    sc.pl.embedding(adata_outlier, basis=default_umap, color="outlier", palette=outlier_colors)
+    if outlier_metrics:
+        # no strip plot: one dot per cell is slow and unreadable for large data sets
+        sc.pl.violin(adata_outlier, outlier_metrics, groupby="outlier", stripplot=False)
+```
+
 ---
 
 ## <font color='green'>Requested UMAP plots</font>

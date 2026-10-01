@@ -30,11 +30,15 @@ def get_thresholds(adata, metric: str, nmads: list[int, int]):
 
    """
     mat = adata.obs[metric]
-    
-    lower = np.median(mat) - nmads[0] * stat.median_abs_deviation(mat)
-    upper = np.median(mat) + nmads[1] * stat.median_abs_deviation(mat) 
 
-    lower = 0 if upper < 0 else lower
+    # ignore NaN (pct_counts_mt of cells with zero counts); those cells still fail the filter mask
+    median = np.nanmedian(mat)
+    mad = stat.median_abs_deviation(mat, nan_policy="omit")
+
+    lower = median - nmads[0] * mad
+    upper = median + nmads[1] * mad
+
+    lower = 0 if lower < 0 else lower
     upper = 0 if upper < 0 else upper
 
     return [lower, upper]
@@ -49,6 +53,7 @@ prefix = "${prefix}"
 symbol_col = "${symbol_col}"
 mito_genes = "${mito_genes}"
 automatic_filtering = "${automatic_cell_filtering}" == "true"
+keep_outliers = "${task.ext.keep_outliers ?: false}" == "true"
 
 ## (currently) fixed parameters
 selected_metrics = ['n_genes_by_counts', 'total_counts', 'pct_counts_mt']
@@ -108,10 +113,6 @@ else:
     else:   
         max_genes = np.max(adata.obs['n_genes_by_counts']) + 1
 
-    adata = adata[adata.obs.pct_counts_mt < max_pct_mt, :].copy()
-    sc.pp.filter_cells(adata, min_counts=min_counts)
-    sc.pp.filter_cells(adata, min_genes=min_genes)
-
     thresholds_metric = {
         'n_genes_by_counts': [min_genes, max_genes],
         'total_counts': [min_counts, max_counts],
@@ -153,16 +154,38 @@ with rc_context({'figure.figsize': (fig_width, fig_height)}):
 
 ## filtering
 
-# filter cells
+# filter cells: one mask over all criteria; genes and counts per cell are counted on adata.X
 min_genes, max_genes = thresholds_metric['n_genes_by_counts']
 min_counts, max_counts = thresholds_metric['total_counts']
 _ , max_pct_mt = thresholds_metric['pct_counts_mt']
 
-adata = adata[adata.obs.pct_counts_mt < max_pct_mt, :].copy()
-sc.pp.filter_cells(adata, min_genes=min_genes)
-sc.pp.filter_cells(adata, max_genes=max_genes)
-sc.pp.filter_cells(adata, min_counts=min_counts)
-sc.pp.filter_cells(adata, max_counts=max_counts)
+pass_min_genes, n_genes = sc.pp.filter_cells(adata, min_genes=min_genes, inplace=False)
+pass_max_genes, _ = sc.pp.filter_cells(adata, max_genes=max_genes, inplace=False)
+pass_min_counts, n_counts = sc.pp.filter_cells(adata, min_counts=min_counts, inplace=False)
+pass_max_counts, _ = sc.pp.filter_cells(adata, max_counts=max_counts, inplace=False)
+
+cell_mask = (
+    (adata.obs['pct_counts_mt'].to_numpy() < max_pct_mt)
+    & pass_min_genes & pass_max_genes & pass_min_counts & pass_max_counts
+)
+n_outliers = int((~cell_mask).sum())
+
+# the columns the in-place sc.pp.filter_cells calls add
+adata.obs['n_genes'] = n_genes
+adata.obs['n_counts'] = n_counts
+
+if keep_outliers:
+    if 'outlier' in adata.obs:
+        print("WARNING: obs column 'outlier' already exists and is overwritten")
+    adata.obs['outlier'] = ~cell_mask
+else:
+    adata = adata[cell_mask].copy()
+
+adata.uns['cell_filtering'] = {
+    'thresholds': {metric: [float(lower), float(upper)] for metric, (lower, upper) in thresholds_metric.items()},
+    'keep_outliers': keep_outliers,
+    'n_outliers': n_outliers
+}
 
 # filter genes
 sc.pp.filter_genes(adata, min_counts=int("${min_counts_gene}"))
@@ -186,7 +209,11 @@ with open("${prefix}_mqc.json", "w") as f_json:
             image_html += 'Red lines indicate automatically determined thresholds based on N median absolute deviations (MADs).'
         else:
             image_html += 'Red lines indicate default or user specified thresholds.'
-        
+        if keep_outliers:
+            image_html += f' {n_outliers} cells marked as outliers (kept). '
+        else:
+            image_html += f' {n_outliers} cells removed. '
+
         image_html += "Thresholds:<br>"
         image_html += "<table style='border-collapse: separate; border-spacing: 0.5em;'>"
         image_html += "<tr style='background-color: #F3F4F6'><th>Metric</th><th>lower bound</th><th>upper bound</th></tr>"
