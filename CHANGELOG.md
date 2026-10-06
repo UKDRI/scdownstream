@@ -69,6 +69,11 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 - Most intermediate outputs are now published only when `--save_intermediates` is set; the finalized
   objects are published at the top level of `--outdir`.
 - Cell type predictions are merged into the per-sample objects as `obs` columns during finalisation.
+- `--ambient_correction` now defaults to `none` (was `decontx`): the expected input,
+  nf-core/scrnaseq output, is usually already CellBender-corrected. By default DecontX only wrote an
+  extra `ambient_corrected_decontx` layer, so results based on `X` do not change; the run gets
+  faster and that layer is no longer written. Pass `--ambient_correction decontx` for the previous
+  behaviour.
 - `ADATA_UNIFY` only copies an existing `sample` column to `sample_original` when its values differ
   from the sample id. Before, its check was always true, so any `sample` column was copied.
 - `ADATA_MERGE` always keeps the `sample` column (and the `--metadata` columns). Before, with a
