@@ -183,7 +183,7 @@ under `report/`, and a MultiQC report.
 | `--species`                       | `human`          | `human` or `mouse`. Set explicitly for mouse data.                                                                                                                     |
 | `--qc_only`                       | `false`          | Stop after per-sample QC and cell type annotation; skip merging, integration, embeddings, clustering and the Quarto report.                                            |
 | `--mito_genes`                    | `null`           | File or pattern identifying mitochondrial genes, used for the mitochondrial percentage metric.                                                                         |
-| `--ambient_correction`            | `decontx`        | `none`, `decontx`, `cellbender`, `soupx` or `scar`.                                                                                                                    |
+| `--ambient_correction`            | `none`           | `none`, `decontx`, `cellbender`, `soupx` or `scar`. Off by default, because the expected input is already CellBender-corrected. See [Ambient RNA correction](#ambient-rna-correction). |
 | `--ambient_corrected_integration` | `false`          | Use ambient-corrected counts for integration rather than storing them as extra layers.                                                                                 |
 | `--doublet_detection`             | `scrublet`       | Doublet detection method, or `none` to skip. See [Supported tool choices](#supported-tool-choices).                                                                    |
 | `--doublet_removal`               | `false`          | Remove cells called doublets by at least `--doublet_detection_threshold` methods, right after doublet detection. Off: doublets are only annotated. See [Doublets and QC outliers](#doublets-and-qc-outliers). |
@@ -454,7 +454,7 @@ schema is broader than this list, and values outside it are not yet supported.
 | Step                   | Parameter                                   | Supported values                                           |
 | ---------------------- | ------------------------------------------- | ---------------------------------------------------------- |
 | Doublet detection      | `--doublet_detection`                       | `scrublet` (default), `none`                               |
-| Ambient RNA correction | `--ambient_correction`                      | `decontx` (default), `soupx`, `cellbender`, `scar`, `none` |
+| Ambient RNA correction | `--ambient_correction`                      | `none` (default), `decontx`, `soupx`, `cellbender`, `scar` |
 | Integration            | `--integration_methods`                     | `scvi` (default)                                           |
 | Clustering             | `--clustering_resolutions`                  | Leiden, one or more resolutions                            |
 | Cell type annotation   | `--celltypist_model`, `--celldex_reference` | CellTypist, SingleR / celldex                              |
@@ -561,15 +561,19 @@ monaco_immune,label.fine,/path/to/monaco_immune.tar
 
 ## Ambient RNA correction
 
-Ambient RNA correction removes contaminating RNA from cell-free droplets. Select the method globally
-with `--ambient_correction` (`decontx` by default; also `cellbender`, `soupx`, `scar`, or `none`):
+Ambient RNA correction removes contaminating RNA from cell-free droplets. It is **off by default**
+(`--ambient_correction none`), because the expected input, nf-core/scrnaseq output, has usually
+already been corrected with CellBender, and correcting it again adds nothing. For input that was not
+corrected upstream (e.g. plain CellRanger output), select a method with `--ambient_correction`:
+`decontx`, `cellbender`, `soupx` or `scar`.
 
 ```bash
 nextflow run UKDRI/scdownstream -r dev_ukdri -entry qc_clustering \
    --ambient_correction cellbender --input samplesheet.csv --outdir results
 ```
 
-Correction can be disabled per sample from the samplesheet:
+With a method set, correction can be switched off for individual samples from the samplesheet
+(with the default `none`, the column has no effect):
 
 ```csv title="samplesheet.csv"
 sample,filtered,unfiltered,ambient_correction

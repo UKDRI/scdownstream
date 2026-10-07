@@ -81,10 +81,11 @@ differential_genes/    ── decoupler pseudobulk → PyDESeq2 per group × con
    1. QC metrics for raw counts ([`MultiQC`](http://multiqc.info/))
    2. Doublet detection — [scrublet](https://scanpy.readthedocs.io/en/stable/api/generated/scanpy.pp.scrublet.html)
       (doublets are **annotated, not removed** unless `--doublet_removal` is set)
-   3. Ambient RNA correction — [decontX](https://bioconductor.org/packages/release/bioc/html/decontX.html)
-      (default), [soupX](https://cran.r-project.org/web/packages/SoupX/readme/README.html),
-      [CellBender](https://cellbender.readthedocs.io/en/latest/),
-      [scAR](https://docs.scvi-tools.org/en/stable/user_guide/models/scar.html)
+   3. Ambient RNA correction — off by default (the expected input is already CellBender-corrected);
+      [decontX](https://bioconductor.org/packages/release/bioc/html/decontX.html),
+      [soupX](https://cran.r-project.org/web/packages/SoupX/readme/README.html),
+      [CellBender](https://cellbender.readthedocs.io/en/latest/) or
+      [scAR](https://docs.scvi-tools.org/en/stable/user_guide/models/scar.html) via `--ambient_correction`
    4. Cell filtering — fixed thresholds, or automatic N-MAD outlier thresholds via
       `--automatic_cell_filtering`; with `--filtering_keep_outliers` the outliers are kept and
       marked in `obs["outlier"]` instead of removed
@@ -135,7 +136,7 @@ This fork focuses on a curated set of tools — the approaches we have validated
 | Step                    | Supported                                                     |
 | ----------------------- | ------------------------------------------------------------- |
 | Doublet detection       | `scrublet`                                                    |
-| Ambient RNA correction  | `decontx` (default), `soupx`, `cellbender`, `scar`, or `none` |
+| Ambient RNA correction  | `none` (default), `decontx`, `soupx`, `cellbender`, or `scar` |
 | Integration             | `scvi`                                                        |
 | Clustering              | Leiden, at multiple resolutions                               |
 | Cell type annotation    | CellTypist, SingleR / celldex                                 |
