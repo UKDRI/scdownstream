@@ -9,6 +9,7 @@ include { FILTER_PSEUDOBULK                 } from '../modules/local/decoupler/f
 include { ADATA_SPLITCOL as SPLIT_PER_GROUP } from '../modules/local/adata/splitcol'
 include { DIFFERENTIAL_GENES_PER_CONTRAST   } from '../modules/local/pydeseq2/differential_genes'
 include { PYDESEQ2_GENERATE_REPORT          } from '../modules/local/pydeseq2/report'
+include { PYDESEQ2_EXPORT_MARKERS           } from '../modules/local/pydeseq2/export_markers'
 include { softwareVersionsToYAML            } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 
 /*
@@ -91,6 +92,20 @@ workflow DIFFERENTIAL_GENES {
         .map { meta, tsv -> "${tsv.name}\t${meta.subset}\t${meta.contrast}" }
         .collectFile(name: 'de_manifest.tsv', newLine: true, sort: true)
 
+    // The marker export additionally needs the contrast definition (variable, target and
+    // reference level) next to each result file. It gets a manifest of its own so that meta
+    // and the report's ch_de_manifest stay as they are. The contrast is looked up by name
+    // with combine(by: 0) rather than join: every contrast yields one result per group
+    // instance, and join would pair only the first of them with the contrast. meta.contrast
+    // is taken from ch_contrasts upstream, so every result finds its contrast.
+    ch_de_markers_manifest = DIFFERENTIAL_GENES_PER_CONTRAST.out.tsv
+        .map { meta, tsv -> [meta.contrast, meta.subset, tsv] }
+        .combine(ch_contrasts.map { contrast -> [contrast.contrast_name, contrast] }, by: 0)
+        .map { contrast_name, subset, tsv, contrast ->
+            "${tsv.name}\t${subset}\t${contrast_name}\t${contrast.variable}\t${contrast.target_group}\t${contrast.reference_group}"
+        }
+        .collectFile(name: 'de_markers_manifest.tsv', newLine: true, sort: true)
+
     // Versions of the modules that produced the results above, collated into a single file
     // so the report can list them. The report's own versions are mixed into ch_versions
     // only afterwards - feeding them back in here would close a cycle.
@@ -111,6 +126,23 @@ workflow DIFFERENTIAL_GENES {
         ch_module_versions,
     )
     ch_versions = ch_versions.mix(PYDESEQ2_GENERATE_REPORT.out.versions)
+
+    //
+    // MODULE: Marker-gene JSON with the top differential genes per group label, contrast and direction
+    //
+    // Its versions join ch_versions only here, after ch_module_versions was collated for the
+    // report, so the report does not depend on this module.
+    PYDESEQ2_EXPORT_MARKERS(
+        ch_de_tsvs,
+        ch_de_markers_manifest,
+        params.name ?: 'markers',
+        group_col,
+        params.diffgenes_markers_thr_adj_pvalue,
+        params.diffgenes_markers_n_top,
+        params.diffgenes_markers_min_logfc,
+        params.markers_sep,
+    )
+    ch_versions = ch_versions.mix(PYDESEQ2_EXPORT_MARKERS.out.versions)
 
     //
     // Collate and save software versions

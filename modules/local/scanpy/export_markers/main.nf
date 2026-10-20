@@ -16,7 +16,8 @@ process SCANPY_EXPORT_MARKERS {
     val(n_top)
     val(pct_nz_group)
     val(min_logfc)
-    
+    val(sep)
+
     output:
     tuple val(meta), path("*.json.gz"), emit: json
     //path "versions.yml", emit: versions
