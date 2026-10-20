@@ -19,6 +19,11 @@ group_col = "${group_col}"
 thr_adj_pvalue = float("${thr_adj_pvalue}")
 n_top = int("${n_top}")
 min_logfc = float("${min_logfc}")
+# Separator between the parts of a set id (genes<sep><contrast><sep><subset><sep><direction>)
+sep = "${sep}"
+
+if sep == "":
+    raise ValueError("The set id separator (--markers_sep) must not be empty")
 
 # Columns written by DIFFERENTIAL_GENES_PER_CONTRAST (pydeseq2 DeseqStats.results_df).
 numeric_cols = ["baseMean", "log2FoldChange", "lfcSE", "stat", "pvalue", "padj"]
@@ -94,6 +99,14 @@ for entry in read_manifest(manifest_path):
     target = entry["target_group"]
     reference = entry["reference_group"]
 
+    # The id parts must not contain the separator, otherwise ids cannot be split again.
+    for part_name, part in [("contrast", contrast), (f"{group_col} value", subset)]:
+        if sep in part:
+            raise ValueError(
+                f"The {part_name} '{part}' contains the set id separator '{sep}', so its "
+                f"set ids could not be split; choose a different --markers_sep"
+            )
+
     df = read_results(entry["file"])
     significant = df[(df["padj"] < thr_adj_pvalue) & (df["log2FoldChange"].abs() >= min_logfc)]
 
@@ -120,7 +133,7 @@ for entry in read_manifest(manifest_path):
         # Empty sets are omitted, as in the downstream marker JSON.
         if df_set.shape[0] == 0:
             continue
-        set_id = f"genes_{subset}_{contrast}_{direction}"
+        set_id = f"genes{sep}{contrast}{sep}{subset}{sep}{direction}"
         if set_id in marker_sets_by_id:
             raise ValueError(f"Duplicate marker set id '{set_id}' (manifest file {entry['file']})")
         marker_sets_by_id[set_id] = to_set(df_set, f"{base_description} - {label}")
@@ -132,6 +145,7 @@ params = {
     "threshold_adj_pvalue": thr_adj_pvalue,
     "min_logfc": min_logfc,
     "group_col": group_col,
+    "set_id_separator": sep,
 }
 
 marker_sets = {

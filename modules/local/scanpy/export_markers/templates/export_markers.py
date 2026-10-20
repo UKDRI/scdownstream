@@ -27,6 +27,11 @@ thr_adj_pvalue = float("${thr_adj_pvalue}")
 n_top = int("${n_top}")
 pct_nz_group = float("${pct_nz_group}")
 min_logfc = float("${min_logfc}")
+# Separator between the parts of a set id (genes<sep>cluster<sep><cluster>)
+sep = "${sep}"
+
+if sep == "":
+    raise ValueError("The set id separator (--markers_sep) must not be empty")
 
 
 # main
@@ -40,14 +45,22 @@ params = {
     'n_top': n_top,
     'threshold_adj_pvalue': thr_adj_pvalue,
     'pct_nz_group': pct_nz_group,
-    'min_logfc':  min_logfc
+    'min_logfc':  min_logfc,
+    'set_id_separator': sep
     }
 
 cluster_markers = {}
 
 for cluster in np.unique(adata.obs[obs_key]):
 
-    name_short = 'genes_cluster_' + cluster
+    # The id parts must not contain the separator, otherwise ids cannot be split again.
+    if sep in str(cluster):
+        raise ValueError(
+            f"The {obs_key} value '{cluster}' contains the set id separator '{sep}', so its "
+            f"set id could not be split; choose a different --markers_sep"
+        )
+
+    name_short = f"genes{sep}cluster{sep}{cluster}"
     name_long= 'Differential genes - ' + obs_key + ' - cluster ' + cluster
 
     df_markers = sc.get.rank_genes_groups_df(adata, cluster, key=uns_key)

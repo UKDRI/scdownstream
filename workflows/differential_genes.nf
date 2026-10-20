@@ -140,6 +140,7 @@ workflow DIFFERENTIAL_GENES {
         params.diffgenes_markers_thr_adj_pvalue,
         params.diffgenes_markers_n_top,
         params.diffgenes_markers_min_logfc,
+        params.markers_sep,
     )
     ch_versions = ch_versions.mix(PYDESEQ2_EXPORT_MARKERS.out.versions)
 

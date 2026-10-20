@@ -415,15 +415,23 @@
                 "markers_min_logfc": {
                     "type": "number",
                     "default": 0,
-                    "minimum:": 0,
+                    "minimum": 0,
                     "description": "Minimum log-fold change to consider gene as marker gene."
                 },
                 "markers_n_top": {
                     "type": "integer",
                     "default": 100,
-                    "minimum:": 1,
+                    "minimum": 1,
                     "description": "Number of N top genes to pick as marker genes.",
-                    "help": "If more than N genes satisfy the marker gene thresholds the top N are saved in the marker gene json file."
+                    "help_text": "If more than N genes satisfy the marker gene thresholds the top N are saved in the marker gene json file."
+                },
+                "markers_sep": {
+                    "type": "string",
+                    "default": "__",
+                    "minLength": 1,
+                    "pattern": "^[^\"'\\\\$\\s]+$",
+                    "description": "Separator between the parts of the set ids in the marker-gene JSONs.",
+                    "help_text": "Applies to `-entry downstream` and `-entry differential_genes`. Set ids are `genes<sep>cluster<sep><cluster>` in the downstream marker-gene JSON and `genes<sep><contrast><sep><group><sep><up|down>` in the differential genes marker-gene JSON, e.g. `genes__AD_vs_ctrl__Microglia__up`. The run stops if a cluster value, group value or contrast id contains the separator, so the ids can always be split back into their parts. Quotes, backslashes, `$` and whitespace are not allowed."
                 }
             }
         },

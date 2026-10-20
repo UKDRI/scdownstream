@@ -15,6 +15,7 @@ process PYDESEQ2_EXPORT_MARKERS {
     val(thr_adj_pvalue)
     val(n_top)
     val(min_logfc)
+    val(sep)
 
     output:
     path("${prefix}.json.gz"), emit: json
