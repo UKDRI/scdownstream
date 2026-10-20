@@ -197,7 +197,7 @@ a `qc_clustering` run.
 - `<name>_downstream.h5ad` (gzip-compressed) / `<name>_downstream.rds`: the object with marker genes, enrichment results
   and LIANA+ output added. **This is the input to `-entry differential_genes`.**
 - `<name>_downstream_markers.json.gz`: the marker genes per group (one set per cluster, id
-  `genes__cluster__<cluster>`; the separator is `--markers_sep`), filtered by `--markers_thr_adj_pvalue`,
+  `genes--cluster--<cluster>`; the separator is `--markers_sep`), filtered by `--markers_thr_adj_pvalue`,
   `--markers_n_top`, `--markers_pct_nz` and `--markers_min_logfc`, in a compact JSON form for
   downstream tooling.
 - `scanpy/<name>/`: the object after `rank_genes_groups` (Wilcoxon) and after gene set enrichment.
@@ -233,9 +233,10 @@ directories (or given different `--name` values) to avoid overwriting each other
   every group label — pseudobulk composition, per-contrast result tables and summary counts.
 - `<name>_differential_genes.json.gz`: the top differential genes per group label and
   contrast, in the same compact JSON form as `<name>_downstream_markers.json.gz`. Each group label ×
-  contrast gives two sets: `genes__<contrast>__<group_label>__up` (higher in the target group,
-  ranked by the Wald statistic) and `genes__<contrast>__<group_label>__down` (lower in the target
-  group), e.g. `genes__AD_vs_ctrl__Microglia__up`. The separator (`__` by default) is
+  contrast gives two sets: `genes--<contrast>--<group_label>--up` (higher in the target group,
+  ranked by the Wald statistic) and `genes--<contrast>--<group_label>--down` (lower in the target
+  group), e.g. `genes--AD_vs_ctrl--Microglia--up`. The separator (`--` by default, because contrast ids often
+  contain `__`) is
   `--markers_sep` and is recorded in `params.set_id_separator`, so the ids can be split into their
   parts; the run stops if a group value or contrast id contains it. Genes need an adjusted p-value
   below `--diffgenes_markers_thr_adj_pvalue` and an absolute log2 fold change of at least

@@ -42,8 +42,8 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
   differential genes per group label and contrast (separate `_up` / `_down` sets), in the same JSON
   structure as the downstream marker file. New `--diffgenes_markers_n_top`,
   `--diffgenes_markers_thr_adj_pvalue` and `--diffgenes_markers_min_logfc`.
-- `--markers_sep` (default `__`): separator in the set ids of both marker-gene JSONs. Ids are
-  `genes__<contrast>__<group>__<up|down>` (differential_genes) and `genes__cluster__<cluster>`
+- `--markers_sep` (default `--`): separator in the set ids of both marker-gene JSONs. Ids are
+  `genes--<contrast>--<group>--<up|down>` (differential_genes) and `genes--cluster--<cluster>`
   (downstream; previously `genes_cluster_<cluster>`, so tools reading that file need the new ids).
   The separator is recorded in `params.set_id_separator`.
 - Schema: the minimums of `--markers_min_logfc` and `--markers_n_top` are now enforced (a typo,

@@ -427,11 +427,11 @@
                 },
                 "markers_sep": {
                     "type": "string",
-                    "default": "__",
+                    "default": "--",
                     "minLength": 1,
                     "pattern": "^[^\"'\\\\$\\s]+$",
                     "description": "Separator between the parts of the set ids in the marker-gene JSONs.",
-                    "help_text": "Applies to `-entry downstream` and `-entry differential_genes`. Set ids are `genes<sep>cluster<sep><cluster>` in the downstream marker-gene JSON and `genes<sep><contrast><sep><group><sep><up|down>` in the differential genes marker-gene JSON, e.g. `genes__AD_vs_ctrl__Microglia__up`. The run stops if a cluster value, group value or contrast id contains the separator, so the ids can always be split back into their parts. Quotes, backslashes, `$` and whitespace are not allowed."
+                    "help_text": "Applies to `-entry downstream` and `-entry differential_genes`. Set ids are `genes<sep>cluster<sep><cluster>` in the downstream marker-gene JSON and `genes<sep><contrast><sep><group><sep><up|down>` in the differential genes marker-gene JSON, e.g. `genes--AD_vs_ctrl--Microglia--up`. The run stops if a cluster value, group value or contrast id contains the separator, so the ids can always be split back into their parts. The default `--` is used because contrast ids often contain `__` (e.g. `condition__treated__vs__control`). To change it, set `markers_sep` in a `-params-file`: a value starting with `-` is awkward to pass on the command line. Quotes, backslashes, `$` and whitespace are not allowed."
                 }
             }
         },
