@@ -658,6 +658,28 @@
                     "minimum": 2,
                     "description": "Minimum number of pseudobulk samples per side of a contrast",
                     "help_text": "The threshold applies to each side of the contrast independently: both the target level and the reference level must be backed by at least this many pseudobulk samples. It is evaluated after the object has been split per instance of the group label, so a group label with too few samples on either side is skipped and produces no results table, rather than failing the run. Values below 2 are rejected because a contrast with a single sample on one side cannot be tested at all."
+                },
+                "diffgenes_markers_n_top": {
+                    "type": "integer",
+                    "default": 100,
+                    "minimum": 1,
+                    "description": "Number of top differential genes per group label, contrast and direction in the marker-gene JSON.",
+                    "help_text": "For every instance of the group label and every contrast, genes higher in the target group (`..._up`) and genes lower in the target group (`..._down`) are listed in separate sets, each ranked by the Wald statistic and cut to the top N genes that pass the adjusted p-value and log2 fold change thresholds. The sets are written to `<name>_differential_genes_markers.json.gz`, which has the same structure as the marker-gene JSON of the downstream workflow."
+                },
+                "diffgenes_markers_thr_adj_pvalue": {
+                    "type": "number",
+                    "default": 0.05,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Adjusted p-value threshold for the marker-gene JSON.",
+                    "help_text": "Genes need an adjusted p-value below this threshold to be listed in the marker-gene JSON. Genes higher and lower in the target group are listed in separate sets (`..._up` / `..._down`), ranked by the Wald statistic, and written to `<name>_differential_genes_markers.json.gz`, which has the same structure as the marker-gene JSON of the downstream workflow."
+                },
+                "diffgenes_markers_min_logfc": {
+                    "type": "number",
+                    "default": 0,
+                    "minimum": 0,
+                    "description": "Minimum absolute log2 fold change for the marker-gene JSON.",
+                    "help_text": "Genes need an absolute log2 fold change of at least this value to be listed in the marker-gene JSON. Genes higher and lower in the target group are listed in separate sets (`..._up` / `..._down`), ranked by the Wald statistic, and written to `<name>_differential_genes_markers.json.gz`, which has the same structure as the marker-gene JSON of the downstream workflow."
                 }
             }
         },
