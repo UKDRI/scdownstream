@@ -25,11 +25,11 @@ process PYDESEQ2_EXPORT_MARKERS {
     task.ext.when == null || task.ext.when
 
     script:
-    prefix = task.ext.prefix ?: "differential_genes_markers"
+    prefix = task.ext.prefix ?: "differential_genes"
     template('export_markers.py')
 
     stub:
-    prefix = task.ext.prefix ?: "differential_genes_markers"
+    prefix = task.ext.prefix ?: "differential_genes"
     """
     touch "${prefix}.json.gz"
 

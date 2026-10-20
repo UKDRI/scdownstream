@@ -38,7 +38,7 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
   added to `obs` before QC by the new `ADATA_ADDMETADATA` module. It stops on a missing sample,
   duplicate ids or a column that already exists in `obs`. The columns are kept through the merge,
   also with `--base_adata`.
-- `-entry differential_genes` writes `<name>_differential_genes_markers.json.gz`: the top
+- `-entry differential_genes` writes `<name>_differential_genes.json.gz`: the top
   differential genes per group label and contrast (separate `_up` / `_down` sets), in the same JSON
   structure as the downstream marker file. New `--diffgenes_markers_n_top`,
   `--diffgenes_markers_thr_adj_pvalue` and `--diffgenes_markers_min_logfc`.

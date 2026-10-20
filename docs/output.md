@@ -231,7 +231,7 @@ directories (or given different `--name` values) to avoid overwriting each other
       `stat`, `pvalue`, `padj`. Log fold changes are **target vs reference**.
 - `report/<name>_differential_genes_report.html`: a Quarto report summarising every contrast across
   every group label — pseudobulk composition, per-contrast result tables and summary counts.
-- `<name>_differential_genes_markers.json.gz`: the top differential genes per group label and
+- `<name>_differential_genes.json.gz`: the top differential genes per group label and
   contrast, in the same compact JSON form as `<name>_downstream_markers.json.gz`. Each group label ×
   contrast gives two sets: `genes__<contrast>__<group_label>__up` (higher in the target group,
   ranked by the Wald statistic) and `genes__<contrast>__<group_label>__down` (lower in the target
