@@ -377,6 +377,7 @@ nextflow run UKDRI/scdownstream -r dev_ukdri -entry downstream \
 | `--markers_n_top`                 | `100`                   | Number of top markers per group to export.                                                                                                              |
 | `--markers_pct_nz`                | `0.1`                   | Minimum fraction of non-zero expressing cells for an exported marker.                                                                                   |
 | `--markers_min_logfc`             | `0`                     | Minimum log fold change for an exported marker.                                                                                                         |
+| `--markers_sep`                   | `__`                    | Separator between the parts of the set ids in both marker-gene JSONs (`genes__cluster__<cluster>`, `genes__<contrast>__<group>__<up\|down>`). Applies to `downstream` and `differential_genes`. |
 | `--report_table_row_limit`        | `250`                   | Maximum rows shown per table in the HTML report.                                                                                                        |
 | `--umap_for_plots`                | `X_umap_scvi`           | UMAP used for the report plots: `X_umap_scvi` (scVI graph) or `X_umap_pca` (PCA graph). Also applies to the stage 1 report.                            |
 | `--umap_color_by`                 | `''`                    | Comma-separated `obs` columns to plot on the UMAPs in both reports, e.g. `sex,diagnosis`. See [UMAP colourings](#umap-colourings-in-the-reports). |
@@ -416,6 +417,7 @@ nextflow run UKDRI/scdownstream -r dev_ukdri -entry differential_genes \
 | `--diffgenes_markers_n_top`| `100`   | Maximum genes per group label, contrast and direction in `<name>_differential_genes_markers.json.gz`. |
 | `--diffgenes_markers_thr_adj_pvalue`| `0.05`  | Adjusted p-value threshold for the marker-gene JSON. |
 | `--diffgenes_markers_min_logfc`| `0`     | Minimum absolute log2 fold change for the marker-gene JSON. |
+| `--markers_sep`            | `__`    | Separator in the set ids of the marker-gene JSON, e.g. `genes__AD_vs_ctrl__Microglia__up`. Shared with `downstream`. |
 | `--report_table_row_limit` | `250`   | Maximum rows shown per table in the HTML report.                                                                                    |
 
 ### The contrasts file
