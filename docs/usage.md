@@ -413,6 +413,9 @@ nextflow run UKDRI/scdownstream -r dev_ukdri -entry differential_genes \
 | `--diffgenes_min_counts`   | `1000`  | Drop pseudobulk samples with fewer total counts.                                                                                    |
 | `--diffgenes_min_cells`    | `10`    | Drop pseudobulk samples aggregated from fewer cells.                                                                                |
 | `--diffgenes_min_samples`  | `2`     | Minimum pseudobulk samples required **on each side** of a contrast.                                                                 |
+| `--diffgenes_markers_n_top`| `100`   | Maximum genes per group label, contrast and direction in `<name>_differential_genes_markers.json.gz`. |
+| `--diffgenes_markers_thr_adj_pvalue`| `0.05`  | Adjusted p-value threshold for the marker-gene JSON. |
+| `--diffgenes_markers_min_logfc`| `0`     | Minimum absolute log2 fold change for the marker-gene JSON. |
 | `--report_table_row_limit` | `250`   | Maximum rows shown per table in the HTML report.                                                                                    |
 
 ### The contrasts file

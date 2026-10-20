@@ -230,11 +230,20 @@ directories (or given different `--name` values) to avoid overwriting each other
       `stat`, `pvalue`, `padj`. Log fold changes are **target vs reference**.
 - `report/<name>_differential_genes_report.html`: a Quarto report summarising every contrast across
   every group label — pseudobulk composition, per-contrast result tables and summary counts.
+- `<name>_differential_genes_markers.json.gz`: the top differential genes per group label and
+  contrast, in the same compact JSON form as `<name>_downstream_markers.json.gz`. Each group label ×
+  contrast gives two sets: `genes_<group_label>_<contrast>_up` (higher in the target group, ranked
+  by the Wald statistic) and `..._down` (lower in the target group). Genes need an adjusted p-value
+  below `--diffgenes_markers_thr_adj_pvalue` and an absolute log2 fold change of at least
+  `--diffgenes_markers_min_logfc`; each set holds at most `--diffgenes_markers_n_top` genes, and
+  empty sets are left out. Per gene: `list_name`, `list_p_value`, `list_p_value_adjusted`,
+  `list_logFC` (log2 fold change), `list_score` (Wald statistic) and `list_base_mean` (pseudobulk
+  has no per-cell detection rates, so there are no `pct_nz` lists).
 
 </details>
 
-Only the `pseudobulk/` intermediates are gated on `--save_intermediates`; the DE tables and the
-report are always published.
+Only the `pseudobulk/` intermediates are gated on `--save_intermediates`; the DE tables, the
+marker JSON and the report are always published.
 
 > [!WARNING]
 > A (group label, contrast) combination with fewer than `--diffgenes_min_samples` pseudobulk samples
