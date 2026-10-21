@@ -13,7 +13,7 @@ _A UK DRI fork of [nf-core/scdownstream](https://github.com/nf-core/scdownstream
 > The original authors and contributors are credited in
 > [`ACKNOWLEDGEMENTS.md`](ACKNOWLEDGEMENTS.md).
 
-[![Nextflow](https://img.shields.io/badge/nextflow-%E2%89%A524.10.5-green?style=flat&logo=nextflow&logoColor=white&color=%230DC09D)](https://www.nextflow.io/)
+[![Nextflow](https://img.shields.io/badge/nextflow-%E2%89%A525.10.0-green?style=flat&logo=nextflow&logoColor=white&color=%230DC09D)](https://www.nextflow.io/)
 [![run with apptainer](https://img.shields.io/badge/run%20with-apptainer-1d355c.svg?labelColor=000000)](https://apptainer.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?labelColor=000000)](LICENSE)
 
@@ -31,7 +31,7 @@ part of the [scverse](https://scverse.org/) ecosystem that this pipeline is buil
 to large count matrices without the size limits that SingleCellExperiment and Seurat objects run into
 in R.
 
-The pipeline is organised as **three sequential stages**, each its own Nextflow entry point, so that
+The pipeline is organised as **three sequential stages**, each selected with `--stage`, so that
 long-running analyses can be checkpointed and re-run independently.
 
 It inherits the learnings and implementations of the following pipelines (alphabetical), via
@@ -42,34 +42,35 @@ nf-core/scdownstream:
 - [scRAFIKI](https://github.com/Mye-InfoBank/scRAFIKI)
 - [YASCP](https://github.com/wtsi-hgi/yascp)
 
-## Entry points
+## Stages
 
-The pipeline is always invoked with an explicit `-entry`. The three stages are **sequential**: each
+The pipeline is always invoked with an explicit `--stage`. The three stages are **sequential**: each
 consumes the previous stage's finalized `.h5ad` via `--base_adata`.
 
-| Stage | Entry point                 | Required input                                                        | Main output                                                             |
-| ----- | --------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| 1     | `-entry qc_clustering`      | `--input samplesheet.csv`                                             | `<name>_qc_clustering.h5ad`, MultiQC report, QC/clustering HTML report |
-| 2     | `-entry downstream`         | `--base_adata <stage 1 h5ad>`                                         | `<name>_downstream.h5ad`, `<name>_downstream_markers.json.gz`, analysis HTML report |
-| 3     | `-entry differential_genes` | `--base_adata <stage 2 h5ad>` + `--diffgenes_contrasts contrasts.tsv` | per-contrast DE tables, pseudobulk h5ad, DE HTML report                 |
+| Stage | Option                       | Required input                                                        | Main output                                                             |
+| ----- | ---------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| 1     | `--stage qc_clustering`      | `--input samplesheet.csv`                                             | `<name>_qc_clustering.h5ad`, MultiQC report, QC/clustering HTML report |
+| 2     | `--stage downstream`         | `--base_adata <stage 1 h5ad>`                                         | `<name>_downstream.h5ad`, `<name>_downstream_markers.json.gz`, analysis HTML report |
+| 3     | `--stage differential_genes` | `--base_adata <stage 2 h5ad>` + `--diffgenes_contrasts contrasts.tsv` | per-contrast DE tables, pseudobulk h5ad, DE HTML report                 |
 
 ```text
 samplesheet.csv
       │
-      ▼  -entry qc_clustering
+      ▼  --stage qc_clustering
 <name>_qc_clustering.h5ad  ── QC, integration (scVI), UMAP, Leiden clustering
       │
-      ▼  -entry downstream        --base_adata
+      ▼  --stage downstream        --base_adata
 <name>_downstream.h5ad  ── marker genes, enrichment, LIANA+ cell–cell communication
       │
-      ▼  -entry differential_genes  --base_adata  --diffgenes_contrasts
+      ▼  --stage differential_genes  --base_adata  --diffgenes_contrasts
 differential_genes/    ── decoupler pseudobulk → PyDESeq2 per group × contrast
 ```
 
 > [!IMPORTANT]
-> **Always pass `-entry`**, so it is explicit which stage runs and on what input. Without it the
-> pipeline falls back to stage 1 (`qc_clustering`) and prints a warning; it never runs `downstream`
-> or `differential_genes` on its own. The upstream single-pass workflow has been removed.
+> **`--stage` is required**, so it is explicit which stage runs and on what input. Without it the
+> pipeline stops with an error before any task runs. Nextflow's `-entry` flag is no longer used:
+> Nextflow 26.04's strict syntax parser does not support it. The upstream single-pass workflow has
+> been removed.
 
 ## Pipeline steps
 
@@ -149,7 +150,7 @@ above — see [Supported tool choices](docs/usage.md#supported-tool-choices) for
 
 You need:
 
-- **[Nextflow](https://www.nextflow.io/docs/latest/install.html) ≥ 24.10.5**, which requires Java 17
+- **[Nextflow](https://www.nextflow.io/docs/latest/install.html) ≥ 25.10.0**, which requires Java 17
   or later.
 - **[Apptainer](https://apptainer.org/docs/admin/latest/installation.html)** (or Singularity). This is
   the recommended way to run the pipeline. Docker also works, but see the Docker Hub pull-limit
@@ -165,7 +166,7 @@ how to run the pipeline on the cluster.
 
 ### Running the pipeline on non-human species
 
-Cell–cell communication (LIANA+, in `-entry downstream`) uses a human ligand–receptor resource.
+Cell–cell communication (LIANA+, in `--stage downstream`) uses a human ligand–receptor resource.
 Mapping it onto another species needs an HCOP ortholog table, which you download once:
 
 1. **Set `--species` on every stage.** Supported values are `human` (default) and `mouse`.
@@ -180,10 +181,10 @@ Mapping it onto another species needs an HCOP ortholog table, which you download
        https://storage.googleapis.com/public-download-files/hcop/human_mouse_hcop_fifteen_column.txt.gz
    ```
 
-3. **Pass the directory to `-entry downstream`** with `--ortholog_hcop_directory`:
+3. **Pass the directory to `--stage downstream`** with `--ortholog_hcop_directory`:
 
    ```bash
-   nextflow run UKDRI/scdownstream -r dev_ukdri -entry downstream \
+   nextflow run UKDRI/scdownstream -r dev_ukdri --stage downstream \
       -profile apptainer \
       --base_adata results/qc_clustering/my_study_qc_clustering.h5ad \
       --name my_study \
@@ -192,7 +193,7 @@ Mapping it onto another species needs an HCOP ortholog table, which you download
       --outdir results/downstream
    ```
 
-Without it, `-entry downstream` stops with an error for a non-human `--species`. Human data does not
+Without it, `--stage downstream` stops with an error for a non-human `--species`. Human data does not
 need it. See [Reference data](docs/usage.md#reference-data) for details.
 
 ## Quick start
@@ -220,7 +221,7 @@ barcodes.
 **Stage 1 — QC, integration and clustering:**
 
 ```bash
-nextflow run UKDRI/scdownstream -r dev_ukdri -entry qc_clustering \
+nextflow run UKDRI/scdownstream -r dev_ukdri --stage qc_clustering \
    -profile apptainer \
    --input samplesheet.csv \
    --metadata sample_metadata.tsv \
@@ -239,7 +240,7 @@ the PCA and scVI UMAPs in the reports, i.e. before and after integration. See
 **Stage 2 — downstream analysis:**
 
 ```bash
-nextflow run UKDRI/scdownstream -r dev_ukdri -entry downstream \
+nextflow run UKDRI/scdownstream -r dev_ukdri --stage downstream \
    -profile apptainer \
    --base_adata results/qc_clustering/my_study_qc_clustering.h5ad \
    --name my_study \
@@ -250,7 +251,7 @@ nextflow run UKDRI/scdownstream -r dev_ukdri -entry downstream \
 **Stage 3 — differential expression:**
 
 ```bash
-nextflow run UKDRI/scdownstream -r dev_ukdri -entry differential_genes \
+nextflow run UKDRI/scdownstream -r dev_ukdri --stage differential_genes \
    -profile apptainer \
    --base_adata results/downstream/my_study_downstream.h5ad \
    --diffgenes_contrasts contrasts.tsv \
@@ -308,8 +309,8 @@ Several of them silently affect results, so please read before interpreting outp
 6. **Set `--species` explicitly.** It defaults to `human`, and mouse data analysed under the human
    default produces wrong enrichment and cell–cell communication results without any error. See
    [Running the pipeline on non-human species](#running-the-pipeline-on-non-human-species).
-7. **The upstream single-pass workflow has been removed.** Always pass `-entry`; without it the
-   pipeline runs `qc_clustering` (see the note above).
+7. **The upstream single-pass workflow has been removed.** Always pass `--stage`; `-entry` is
+   no longer used (see the note above).
 8. **`--unify_gene_symbols` is no longer supported.** HUGO-based gene symbol unification only
     applies to human data and is not reliable enough to recommend. Gene symbols are still harmonised
     across samples without it.
@@ -321,7 +322,7 @@ Several of them silently affect results, so please read before interpreting outp
 
 ## Documentation
 
-- [Usage](docs/usage.md) — samplesheet format, all parameters, per-entry-point guidance
+- [Usage](docs/usage.md) — samplesheet format, all parameters, per-stage guidance
 - [Output](docs/output.md) — the files each stage produces and how to read them
 - [UK DRI Informatics wiki](https://wiki.informatics.ukdri.ac.uk/en/Pipelines/nfcore_scdownstream) —
   running the pipeline on the UK DRI cluster

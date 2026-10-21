@@ -10,8 +10,15 @@
             "type": "object",
             "fa_icon": "fas fa-terminal",
             "description": "Define where the pipeline should find input data and save output data.",
-            "required": ["outdir"],
+            "required": ["stage", "outdir"],
             "properties": {
+                "stage": {
+                    "type": "string",
+                    "enum": ["qc_clustering", "downstream", "differential_genes"],
+                    "description": "Pipeline stage to run",
+                    "help_text": "The pipeline runs as three sequential stages: `qc_clustering` (QC, integration and clustering from `--input`), `downstream` (marker genes, enrichment and cell-cell communication on the `--base_adata` written by `qc_clustering`) and `differential_genes` (pseudobulk differential expression on the `--base_adata` written by `downstream`, with `--diffgenes_contrasts`). Each stage consumes the finalized h5ad of the previous one. This parameter replaces Nextflow's `-entry` option, which the strict syntax parser does not support.",
+                    "fa_icon": "fas fa-stream"
+                },
                 "input": {
                     "type": "string",
                     "format": "file-path",
@@ -30,7 +37,7 @@
                     "mimetype": "text/tab-separated-values",
                     "pattern": "^\\S+\\.(tsv|txt)$",
                     "description": "Path to a tab-separated file with per-sample metadata to add to the cells' obs.",
-                    "help_text": "Tab-separated file with a header row and one row per sample. The column named by `--metadata_sample_col` holds the `sample` ids from the samplesheet; every other column is added to the `obs` table of that sample's cells. A metadata column that already exists in `obs` is an error. Only used by `-entry qc_clustering`.",
+                    "help_text": "Tab-separated file with a header row and one row per sample. The column named by `--metadata_sample_col` holds the `sample` ids from the samplesheet; every other column is added to the `obs` table of that sample's cells. A metadata column that already exists in `obs` is an error. Only used by `--stage qc_clustering`.",
                     "fa_icon": "fas fa-table"
                 },
                 "metadata_sample_col": {
@@ -278,7 +285,7 @@
                     "type": "integer",
                     "minimum": 2,
                     "description": "Number of principal components used to build the PCA neighbour graph (and the PCA UMAP). Default: all computed PCs.",
-                    "help_text": "Must not exceed `--pca_n_comps`. Look at the elbow plot in the QC/clustering report, then rerun `-entry qc_clustering` with this option and `-resume`; the scVI integration is reused from the cache. This does not affect the scVI graph or the default clustering (which uses the scVI graph) unless `--cluster_neighbors neighbors_pca` is set."
+                    "help_text": "Must not exceed `--pca_n_comps`. Look at the elbow plot in the QC/clustering report, then rerun `--stage qc_clustering` with this option and `-resume`; the scVI integration is reused from the cache. This does not affect the scVI graph or the default clustering (which uses the scVI graph) unless `--cluster_neighbors neighbors_pca` is set."
                 }
             }
         },
@@ -375,7 +382,7 @@
                 "umap_color_by": {
                     "type": "string",
                     "description": "Comma-separated obs columns to plot on the UMAPs in the QC/clustering and analysis reports, e.g. `sex,diagnosis`.",
-                    "help_text": "Each column is plotted on every UMAP listed in `--umap_color_by_embeddings`. Columns missing from the object are listed in the report and skipped. Columns added with `--metadata` can be used. Applies to the reports of `-entry qc_clustering` and `-entry downstream`."
+                    "help_text": "Each column is plotted on every UMAP listed in `--umap_color_by_embeddings`. Columns missing from the object are listed in the report and skipped. Columns added with `--metadata` can be used. Applies to the reports of `--stage qc_clustering` and `--stage downstream`."
                 },
                 "umap_color_by_embeddings": {
                     "type": "string",
@@ -431,7 +438,7 @@
                     "minLength": 1,
                     "pattern": "^[^\"'\\\\$\\s]+$",
                     "description": "Separator between the parts of the set ids in the marker-gene JSONs.",
-                    "help_text": "Applies to `-entry downstream` and `-entry differential_genes`. Set ids are `genes<sep>cluster<sep><cluster>` in the downstream marker-gene JSON and `genes<sep><contrast><sep><group><sep><up|down>` in the differential genes marker-gene JSON, e.g. `genes--AD_vs_ctrl--Microglia--up`. The run stops if a cluster value, group value or contrast id contains the separator, so the ids can always be split back into their parts. The default `--` is used because contrast ids often contain `__` (e.g. `condition__treated__vs__control`). To change it, set `markers_sep` in a `-params-file`: a value starting with `-` is awkward to pass on the command line. Quotes, backslashes, `$` and whitespace are not allowed."
+                    "help_text": "Applies to `--stage downstream` and `--stage differential_genes`. Set ids are `genes<sep>cluster<sep><cluster>` in the downstream marker-gene JSON and `genes<sep><contrast><sep><group><sep><up|down>` in the differential genes marker-gene JSON, e.g. `genes--AD_vs_ctrl--Microglia--up`. The run stops if a cluster value, group value or contrast id contains the separator, so the ids can always be split back into their parts. The default `--` is used because contrast ids often contain `__` (e.g. `condition__treated__vs__control`). To change it, set `markers_sep` in a `-params-file`: a value starting with `-` is awkward to pass on the command line. Quotes, backslashes, `$` and whitespace are not allowed."
                 }
             }
         },

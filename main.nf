@@ -165,9 +165,34 @@ workflow differential_genes {
 workflow {
 
     main:
-    // Without -entry, run the first stage. Users should always choose the stage explicitly.
-    log.warn "No -entry given: running qc_clustering. Pass -entry qc_clustering, downstream or differential_genes explicitly."
-    qc_clustering()
+    // Dispatch on --stage. The strict syntax parser does not support -entry, so the
+    // three named workflows above are selected here instead.
+    if (params.help || params.help_full) {
+        // nf-schema already printed the help at pipeline start; run no stage, even with --stage
+    }
+    else if (params.version) {
+        // Prints the version and exits
+        PIPELINE_INITIALISATION (
+            params.version,
+            params.validate_params,
+            params.monochrome_logs,
+            args,
+            params.outdir,
+            params.input
+        )
+    }
+    else if (params.stage == 'qc_clustering') {
+        qc_clustering()
+    }
+    else if (params.stage == 'downstream') {
+        downstream()
+    }
+    else if (params.stage == 'differential_genes') {
+        differential_genes()
+    }
+    else {
+        error "Invalid or missing --stage '${params.stage}'. Valid values: qc_clustering, downstream, differential_genes."
+    }
 }
 
 /*
