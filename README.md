@@ -90,9 +90,7 @@ differential_genes/    ── decoupler pseudobulk → PyDESeq2 per group × con
    4. Cell filtering — fixed thresholds, or automatic N-MAD outlier thresholds via
       `--automatic_cell_filtering`; with `--filtering_keep_outliers` the outliers are kept and
       marked in `obs["outlier"]` instead of removed
-3. Cell type annotation — [CellTypist](https://www.celltypist.org/) and/or
-   [SingleR](https://bioconductor.org/packages/release/bioc/html/SingleR.html) with
-   [celldex](https://bioconductor.org/packages/release/data/experiment/html/celldex.html) references
+3. Cell type annotation — [CellTypist](https://www.celltypist.org/)
 4. Harmonise gene symbol, batch and cell type columns across samples, resolving duplicate gene
    symbols
 5. Merge and integrate — [scVI](https://docs.scvi-tools.org/en/stable/user_guide/models/scvi.html)
@@ -140,7 +138,7 @@ This fork focuses on a curated set of tools — the approaches we have validated
 | Ambient RNA correction  | `none` (default), `decontx`, `soupx`, `cellbender`, or `scar` |
 | Integration             | `scvi`                                                        |
 | Clustering              | Leiden, at multiple resolutions                               |
-| Cell type annotation    | CellTypist, SingleR / celldex                                 |
+| Cell type annotation    | CellTypist                                                    |
 | Differential expression | PyDESeq2 on decoupler pseudobulk                              |
 
 Further tools will be added as they are curated and validated. Until then, please use the values

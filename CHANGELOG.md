@@ -103,12 +103,18 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 - The stage is now selected with the required `--stage qc_clustering|downstream|differential_genes`
   parameter instead of Nextflow's `-entry` flag, which the strict parser does not support. Job
   scripts that pass `-entry <stage>` must pass `--stage <stage>` instead.
-- `SINGLER` no longer passes a closure instead of the `[meta, ref, version]` tuple to
-  `CELLDEX_FETCHREFERENCE` under the strict parser, which failed every run with a celldex reference.
 - `--help` works under the strict parser again: nf-schema is bumped from 2.4.2, whose `validation`
   options the strict parser does not recognise, to 2.7.3. That version requires Nextflow ≥ 25.10.0,
   so the minimum Nextflow version is raised from 24.10.5. `--help` / `--help_full` print the help and
   never run a stage, even when `--stage` is given.
+
+### `Removed`
+
+- SingleR / celldex cell type annotation: `--celldex_reference`, the `CELLDEX_FETCHREFERENCE` and
+  `CELLTYPES_SINGLER` modules, the `SINGLER` subworkflow and `assets/schema_singler.json`. No UK DRI
+  run used it; cell type annotation is CellTypist only, and scANVI-based annotation is planned
+  instead. A params file that still sets `celldex_reference` gets an unrecognised-parameter warning,
+  and the value is ignored.
 
 ### `Known issues`
 

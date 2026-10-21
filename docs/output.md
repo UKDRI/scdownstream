@@ -86,7 +86,6 @@ filtering**.
 
 - `celltypes/`
   - `celltypist/`: the annotated `h5ad` and the predictions as a `pkl`.
-  - `singler/`: the annotated `h5ad`, the predictions as a `csv`, and diagnostic plots as `pdf`.
 - `adata/`: objects produced by merging predictions back into the sample AnnData.
 
 </details>

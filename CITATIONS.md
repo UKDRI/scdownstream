@@ -99,14 +99,6 @@ Upstream nf-core/scdownstream, and therefore this fork, drew on the learnings an
 
   > Domínguez Conde C, Xu C, Jarvis LB, et al. Cross-tissue immune cell analysis reveals tissue-specific features in humans. Science. 2022 May 13;376(6594):eabl5197. doi: 10.1126/science.abl5197. PubMed PMID: 35549406; PubMed Central PMCID: PMC9835110.
 
-- [SingleR](https://pubmed.ncbi.nlm.nih.gov/30643263/)
-
-  > Aran D, Looney AP, Liu L, Wu E, Fong V, Hsu A, et al. Reference-based analysis of lung single-cell sequencing reveals a transitional profibrotic macrophage. Nat Immunol. 2019;20(2):163-172. doi: 10.1038/s41590-018-0276-y. Epub 2018 Dec 17. PubMed PMID: 30531964; PubMed Central PMCID: PMC6350770.
-
-- [celldex](https://pubmed.ncbi.nlm.nih.gov/30643263/)
-
-  > Aran D, Looney AP, Liu L, Wu E, Fong V, Hsu A, Chak S, Naikawadi RP, Wolters PJ, Abate AR, Butte AJ, Bhattacharya M (2019). "Reference-based analysis of lung single-cell sequencing reveals a transitional profibrotic macrophage." Nat. Immunol., 20, 163-172. doi:10.1038/s41590-018-0276-y.
-
 ### Clustering and dimensionality reduction
 
 - [Leiden](https://pubmed.ncbi.nlm.nih.gov/30914743/)

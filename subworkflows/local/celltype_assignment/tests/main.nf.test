@@ -7,13 +7,12 @@ nextflow_workflow {
     tag "subworkflows"
     tag "subworkflows_local"
 
-    test("Should run with both celltypist and singler") {
+    test("Should run with celltypist") {
 
         when {
             params {
                 outdir = "$outputDir"
                 celltypist_model = "Adult_COVID19_PBMC"
-                celldex_reference = "https://raw.githubusercontent.com/nf-core/test-datasets/scdownstream/singleR/references.csv"
             }
             workflow {
                 """
@@ -45,7 +44,6 @@ nextflow_workflow {
             params {
                 outdir = "$outputDir"
                 celltypist_model = "Adult_COVID19_PBMC"
-                celldex_reference = "https://raw.githubusercontent.com/nf-core/test-datasets/scdownstream/singleR/references.csv"
             }
             workflow {
                 """
