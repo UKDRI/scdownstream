@@ -209,7 +209,6 @@ under `report/`, and a MultiQC report.
 | `--clustering_resolutions`        | `0.5,1.0`        | Comma-separated Leiden resolutions. One `leiden_<res>` column is written per resolution, and the **first** resolution is copied to `leiden` as the default clustering. |
 | `--cluster_neighbors`             | `neighbors_scvi` | Neighbour graph used for clustering. The default assumes scVI integration.                                                                                             |
 | `--celltypist_model`              | `null`           | Comma-separated [CellTypist](https://www.celltypist.org/models) model names, or a path to a custom `.pkl` model.                                                       |
-| `--celldex_reference`             | `null`           | CSV describing celldex references for SingleR — see [Cell type annotation](#cell-type-annotation).                                                                     |
 | `--scvi_model` / `--scanvi_model` | `null`           | Pre-trained model for reference mapping — see [Reference mapping](#reference-mapping).                                                                                 |
 | `--save_intermediates`            | `false`          | Publish intermediate objects as well as the final ones.                                                                                                                |
 
@@ -463,7 +462,7 @@ schema is broader than this list, and values outside it are not yet supported.
 | Ambient RNA correction | `--ambient_correction`                      | `none` (default), `decontx`, `soupx`, `cellbender`, `scar` |
 | Integration            | `--integration_methods`                     | `scvi` (default)                                           |
 | Clustering             | `--clustering_resolutions`                  | Leiden, one or more resolutions                            |
-| Cell type annotation   | `--celltypist_model`, `--celldex_reference` | CellTypist, SingleR / celldex                              |
+| Cell type annotation   | `--celltypist_model`                        | CellTypist                                                 |
 
 Two consequences of the current tool set are worth knowing before you interpret results:
 
@@ -529,9 +528,6 @@ missing for a non-human species, and human data does not need it.
 **CellTypist models** are downloaded at runtime unless `--celltypist_model` is given a local `.pkl`
 path.
 
-**celldex references** may be given by name (downloaded at runtime) or as paths to pre-downloaded tar
-archives — useful where the compute nodes have no internet access.
-
 ## Cell type annotation
 
 ### CellTypist
@@ -539,27 +535,6 @@ archives — useful where the compute nodes have no internet access.
 Specify one or more models with `--celltypist_model` (comma-separated). Available models are listed
 at [celltypist.org](https://www.celltypist.org/models). A path containing `/` is treated as a custom
 model file.
-
-### SingleR
-
-`--celldex_reference` takes a CSV describing the celldex references to use. The available references
-are described in the
-[celldex package documentation](https://bioconductor.org/packages/devel/data/experiment/manuals/celldex/man/celldex.pdf).
-
-Referring to references by name:
-
-```csv title="celldex_references.csv"
-id,label,reference,version
-hpca,label.main,hpca,2024-02-26
-monaco_immune,label.fine,monaco_immune,2024-02-26
-```
-
-Referring to pre-downloaded tar archives by path:
-
-```csv title="celldex_references.csv"
-hpca,label.main,/path/to/hpca.tar
-monaco_immune,label.fine,/path/to/monaco_immune.tar
-```
 
 > [!NOTE]
 > Cell type predictions are merged into the per-sample objects as `obs` columns during the
