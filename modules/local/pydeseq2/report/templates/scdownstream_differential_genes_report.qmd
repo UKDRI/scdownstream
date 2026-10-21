@@ -572,7 +572,7 @@ environment itself, so it describes the software that produced the report.
 ```{python}
 def pipeline_versions(path: str) -> pd.DataFrame:
     """
-    Software versions collected by Nextflow from the modules of this entry point.
+    Software versions collected by Nextflow from the modules of this stage.
 
     The file is the collated versions.yml of the pipeline: one mapping per process, each
     holding the tools that process reported. It is flattened into one row per tool so the

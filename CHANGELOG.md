@@ -12,11 +12,11 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Added`
 
-- Three sequential entry points, replacing the single-pass workflow: `-entry qc_clustering`,
-  `-entry downstream` and `-entry differential_genes`, chained by passing each stage's
+- Three sequential stages, selected with `--stage`, replacing the single-pass workflow: `--stage qc_clustering`,
+  `--stage downstream` and `--stage differential_genes`, chained by passing each stage's
   `<name>_qc_clustering.h5ad` / `<name>_downstream.h5ad` to the next as `--base_adata`.
-  The single-pass workflow (`workflows/scdownstream.nf`) has been removed; running without
-  `-entry` runs `qc_clustering` with a warning.
+  The single-pass workflow (`workflows/scdownstream.nf`) has been removed. `--stage` is
+  required.
 - Pseudobulk differential expression: decoupler pseudobulk aggregation, count/cell filtering, split
   per group label, and PyDESeq2 per group label × contrast. Contrasts are read from a TSV following
   the nf-core/differentialabundance definition.
@@ -34,11 +34,11 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 - `--memory_scale`, which scales every memory request in `conf/base.config`.
 - `--qc_only`, to stop after per-sample QC and cell type annotation.
 - Per-sample `n_hvgs` and `automatic_cell_filtering` columns in the samplesheet schema.
-- `--metadata` / `--metadata_sample_col` for `-entry qc_clustering`: per-sample metadata from a TSV,
+- `--metadata` / `--metadata_sample_col` for `--stage qc_clustering`: per-sample metadata from a TSV,
   added to `obs` before QC by the new `ADATA_ADDMETADATA` module. It stops on a missing sample,
   duplicate ids or a column that already exists in `obs`. The columns are kept through the merge,
   also with `--base_adata`.
-- `-entry differential_genes` writes `<name>_differential_genes.json.gz`: the top
+- `--stage differential_genes` writes `<name>_differential_genes.json.gz`: the top
   differential genes per group label and contrast (separate `_up` / `_down` sets), in the same JSON
   structure as the downstream marker file. New `--diffgenes_markers_n_top`,
   `--diffgenes_markers_thr_adj_pvalue` and `--diffgenes_markers_min_logfc`.
@@ -91,6 +91,24 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 - Documentation rewritten for the fork: README, `docs/usage.md`, `docs/output.md`, a new
   `ACKNOWLEDGEMENTS.md`, and an updated `CITATIONS.md`. Cluster-specific guidance lives on the
   UK DRI Informatics wiki rather than in the repository.
+
+### `Fixed`
+
+- The pipeline now parses under Nextflow 26.04's strict syntax parser (the default since 26.04),
+  without the `NXF_SYNTAX_PARSER=v1` fallback, and `nextflow lint` reports no errors. The
+  `test_offline` profile, whose config file was never committed, is removed. The `validation`
+  block no longer reads `manifest.*` or `validation.help.*`, so the nf-core banner and citation
+  text are gone from `--help` and the parameter summary. `ANNDATA_GETSIZE` no longer declares
+  `prefix` twice. The unused `CLUSTER` and `PER_GROUP` subworkflows are removed.
+- The stage is now selected with the required `--stage qc_clustering|downstream|differential_genes`
+  parameter instead of Nextflow's `-entry` flag, which the strict parser does not support. Job
+  scripts that pass `-entry <stage>` must pass `--stage <stage>` instead.
+- `SINGLER` no longer passes a closure instead of the `[meta, ref, version]` tuple to
+  `CELLDEX_FETCHREFERENCE` under the strict parser, which failed every run with a celldex reference.
+- `--help` works under the strict parser again: nf-schema is bumped from 2.4.2, whose `validation`
+  options the strict parser does not recognise, to 2.7.3. That version requires Nextflow ≥ 25.10.0,
+  so the minimum Nextflow version is raised from 24.10.5. `--help` / `--help_full` print the help and
+  never run a stage, even when `--stage` is given.
 
 ### `Known issues`
 

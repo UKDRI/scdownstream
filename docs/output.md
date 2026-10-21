@@ -5,7 +5,7 @@
 This document describes the output produced by the pipeline. All paths are relative to the directory
 given by `--outdir`.
 
-Because the pipeline is split into [three entry points](usage.md#choosing-an-entry-point), each stage
+Because the pipeline is split into [three stages](usage.md#choosing-a-stage), each stage
 writes into its own results directory and produces a different subset of the tree below. The sections
 are grouped by stage.
 
@@ -22,7 +22,7 @@ Produces, at the top level of the results directory:
 <summary>Output files</summary>
 
 - `<name>_qc_clustering.h5ad`: the integrated, clustered AnnData object, gzip-compressed. **This is the input to
-  `-entry downstream`.**
+  `--stage downstream`.**
 - `<name>_qc_clustering.rds`: a SingleCellExperiment version of the same object.
 
 </details>
@@ -195,7 +195,7 @@ a `qc_clustering` run.
 <summary>Output files</summary>
 
 - `<name>_downstream.h5ad` (gzip-compressed) / `<name>_downstream.rds`: the object with marker genes, enrichment results
-  and LIANA+ output added. **This is the input to `-entry differential_genes`.**
+  and LIANA+ output added. **This is the input to `--stage differential_genes`.**
 - `<name>_downstream_markers.json.gz`: the marker genes per group (one set per cluster, id
   `genes--cluster--<cluster>`; the separator is `--markers_sep`), filtered by `--markers_thr_adj_pvalue`,
   `--markers_n_top`, `--markers_pct_nz` and `--markers_min_logfc`, in a compact JSON form for
@@ -281,6 +281,6 @@ troubleshoot failures and to record launch commands, run times and resource usag
 ## Directories referenced elsewhere but not produced
 
 Some publishing rules inherited from upstream target steps that are not part of the curated workflow.
-The three entry points do not write them: `cluster_dimred/`, `pseudobulking/`,
+The three stages do not write them: `cluster_dimred/`, `pseudobulking/`,
 `per_group/<id>/paga/`, `finalized/`, and the
 `quality_control/doublet_detection/{solo,doubletdetection,scds}/` directories.

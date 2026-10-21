@@ -7,7 +7,7 @@
 
 ## Contents
 
-- [Choosing an entry point](#choosing-an-entry-point)
+- [Choosing a stage](#choosing-a-stage)
 - [Samplesheet input](#samplesheet-input)
 - [Filtered and unfiltered matrices](#filtered-and-unfiltered-matrices)
 - [Running the pipeline](#running-the-pipeline)
@@ -24,27 +24,28 @@
 - [Core Nextflow arguments](#core-nextflow-arguments)
 - [Custom configuration](#custom-configuration)
 
-## Choosing an entry point
+## Choosing a stage
 
-The pipeline is split into three sequential stages, each selected with Nextflow's `-entry` flag.
-**`-entry` is always required.** Each stage consumes the previous stage's finalized `.h5ad` via
+The pipeline is split into three sequential stages, each selected with the `--stage` parameter.
+**`--stage` is always required.** Each stage consumes the previous stage's finalized `.h5ad` via
 `--base_adata`.
 
-| Stage | Entry point          | Required input                                          | Main output                                       |
+| Stage | `--stage`            | Required input                                          | Main output                                       |
 | ----- | -------------------- | ------------------------------------------------------- | ------------------------------------------------- |
 | 1     | `qc_clustering`      | `--input samplesheet.csv`                               | `<name>_qc_clustering.h5ad`                       |
 | 2     | `downstream`         | `--base_adata` (stage 1 h5ad)                           | `<name>_downstream.h5ad`, `<name>_downstream_markers.json.gz` |
 | 3     | `differential_genes` | `--base_adata` (stage 2 h5ad) + `--diffgenes_contrasts` | per-contrast DE tables                            |
 
-`--name` sets the identifier used in output file names; it defaults to the entry-point name.
+`--name` sets the identifier used in output file names; it defaults to the stage name.
 
 > [!IMPORTANT]
-> Always pass `-entry`. Without it the pipeline runs stage 1 (`qc_clustering`) and prints a warning.
-> The upstream single-pass workflow has been removed.
+> Without a valid `--stage` the pipeline stops with an error before any task runs. Nextflow's
+> `-entry` flag is no longer used: Nextflow 26.04's strict syntax parser does not support it. The
+> upstream single-pass workflow has been removed.
 
 ## Samplesheet input
 
-The samplesheet is required by `-entry qc_clustering`. It is a comma-separated file with a header row
+The samplesheet is required by `--stage qc_clustering`. It is a comma-separated file with a header row
 and at least two columns: `sample`, and at least one of `filtered` / `unfiltered`.
 
 ```bash
@@ -118,7 +119,7 @@ The pipeline handles three cases:
 ## Running the pipeline
 
 ```bash
-nextflow run UKDRI/scdownstream -r dev_ukdri -entry qc_clustering \
+nextflow run UKDRI/scdownstream -r dev_ukdri --stage qc_clustering \
    --input ./samplesheet.csv \
    --outdir ./results \
    -profile apptainer
@@ -136,7 +137,7 @@ work                # Nextflow working files
 For repeated runs, put the parameters in a YAML or JSON file and pass it with `-params-file`:
 
 ```bash
-nextflow run UKDRI/scdownstream -r dev_ukdri -entry qc_clustering -profile apptainer -params-file params.yaml
+nextflow run UKDRI/scdownstream -r dev_ukdri --stage qc_clustering -profile apptainer -params-file params.yaml
 ```
 
 ```yaml title="params.yaml"
@@ -161,7 +162,7 @@ Stage 1: per-sample QC, cell type annotation, merging, scVI integration,
 embeddings and Leiden clustering.
 
 ```bash
-nextflow run UKDRI/scdownstream -r dev_ukdri -entry qc_clustering \
+nextflow run UKDRI/scdownstream -r dev_ukdri --stage qc_clustering \
    -profile apptainer \
    --input samplesheet.csv \
    --name my_study \
@@ -290,7 +291,7 @@ even if the base object lacks them; its cells then get `unknown` (or `NaN` for n
 Also avoid names that later steps write to `obs`: the QC metrics (`n_genes_by_counts`,
 `total_counts`, `pct_counts_mt`, ...), `doublet_score` / `predicted_doublet`,
 `celltypist:<model>` and `leiden_<resolution>`. Those steps would replace your column without a
-warning. Only `-entry qc_clustering` reads `--metadata`.
+warning. Only `--stage qc_clustering` reads `--metadata`.
 
 ### Choosing the number of PCs
 
@@ -308,7 +309,7 @@ the variance explained per PC, with a line at the number of PCs the graph used. 
 with the new value and `-resume`:
 
 ```bash
-nextflow run UKDRI/scdownstream -r dev_ukdri -entry qc_clustering -resume \
+nextflow run UKDRI/scdownstream -r dev_ukdri --stage qc_clustering -resume \
    <same options as before> \
    --neighbors_n_pcs 20
 ```
@@ -349,7 +350,7 @@ should still separate.
 Stage 2: marker genes per cluster, gene set enrichment, and LIANA+ cell–cell communication.
 
 ```bash
-nextflow run UKDRI/scdownstream -r dev_ukdri -entry downstream \
+nextflow run UKDRI/scdownstream -r dev_ukdri --stage downstream \
    -profile apptainer \
    --base_adata results/qc_clustering/my_study_qc_clustering.h5ad \
    --name my_study \
@@ -391,7 +392,7 @@ Stage 3: pseudobulk aggregation with decoupler, then PyDESeq2 differential expre
 combination of group label and contrast.
 
 ```bash
-nextflow run UKDRI/scdownstream -r dev_ukdri -entry differential_genes \
+nextflow run UKDRI/scdownstream -r dev_ukdri --stage differential_genes \
    -profile apptainer \
    --base_adata results/downstream/my_study_downstream.h5ad \
    --diffgenes_contrasts contrasts.tsv \
@@ -522,7 +523,7 @@ curl -o hcop/human_mouse_hcop_fifteen_column.txt.gz \
 
 and pass the directory with `--ortholog_hcop_directory hcop`. LIANA+ reads
 `<directory>/human_<species>_hcop_fifteen_column.txt.gz`, so keep the original file name.
-`--ortholog_hcop_directory` has no default. `-entry downstream` stops with an error if it is
+`--ortholog_hcop_directory` has no default. `--stage downstream` stops with an error if it is
 missing for a non-human species, and human data does not need it.
 
 **CellTypist models** are downloaded at runtime unless `--celltypist_model` is given a local `.pkl`
@@ -573,7 +574,7 @@ corrected upstream (e.g. plain CellRanger output), select a method with `--ambie
 `decontx`, `cellbender`, `soupx` or `scar`.
 
 ```bash
-nextflow run UKDRI/scdownstream -r dev_ukdri -entry qc_clustering \
+nextflow run UKDRI/scdownstream -r dev_ukdri --stage qc_clustering \
    --ambient_correction cellbender --input samplesheet.csv --outdir results
 ```
 
@@ -668,8 +669,8 @@ The first part (`--no-mount tmp --writable-tmpfs --nv`) is already set by the `g
 
 ### `-entry`
 
-Selects the stage to run: `qc_clustering`, `downstream` or `differential_genes`. Always required —
-see [Choosing an entry point](#choosing-an-entry-point).
+No longer used. The stage is selected with the `--stage` pipeline parameter; see
+[Choosing a stage](#choosing-a-stage).
 
 ### `-profile`
 

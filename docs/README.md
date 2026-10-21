@@ -3,7 +3,7 @@
 The documentation is split into the following pages:
 
 - [Usage](usage.md)
-  - How the pipeline works, how to run each of its three entry points, the samplesheet and contrasts
+  - How the pipeline works, how to run each of its three stages, the samplesheet and contrasts
     file formats, and a description of every parameter group.
 - [Output](output.md)
   - The results each stage produces and how to interpret them.
