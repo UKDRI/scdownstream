@@ -106,6 +106,28 @@ workflow DIFFERENTIAL_GENES {
         }
         .collectFile(name: 'de_markers_manifest.tsv', newLine: true, sort: true)
 
+    // The contrast definitions, so the report can state what each contrast compares. Same
+    // columns as the contrasts file, one row per contrast, deterministically sorted below
+    // the header. Blocking variables and excluded values stay comma-separated as given.
+    ch_contrasts_table = ch_contrasts
+        .map { contrast ->
+            [
+                contrast.contrast_name,
+                contrast.variable,
+                contrast.reference_group,
+                contrast.target_group,
+                contrast.list_of_blocked_variables,
+                contrast.exclude_samples_col,
+                contrast.exclude_samples_values,
+            ].collect { value -> value ?: '' }.join('\t')
+        }
+        .collectFile(
+            name: 'contrasts.tsv',
+            seed: "id\tvariable\treference\ttarget\tblocking\texclude_samples_col\texclude_samples_values",
+            newLine: true,
+            sort: true,
+        )
+
     // Versions of the modules that produced the results above, collated into a single file
     // so the report can list them. The report's own versions are mixed into ch_versions
     // only afterwards - feeding them back in here would close a cycle.
@@ -119,6 +141,7 @@ workflow DIFFERENTIAL_GENES {
         FILTER_PSEUDOBULK.out.h5ad,
         ch_de_tsvs,
         ch_de_manifest,
+        ch_contrasts_table,
         "${projectDir}/modules/local/pydeseq2/report/templates/scdownstream_differential_genes_report.qmd",
         sample_col,
         ch_group_cols,
