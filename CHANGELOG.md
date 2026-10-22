@@ -63,6 +63,12 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Changed`
 
+- **Behaviour change:** with `--automatic_cell_filtering`, `--min_genes` (default 200) and
+  `--min_counts` are now lower floors for the N-MAD thresholds, so automatic filtering can remove
+  more cells than before. Lower `--min_genes` to accept smaller cells. The raw N-MAD values, the
+  floors and the applied thresholds are stored in `uns["n_mads_obs_thresholds"]` and shown in
+  MultiQC. Cells left with no counts after gene filtering are removed even with
+  `--filtering_keep_outliers`.
 - The published `<name>_qc_clustering.h5ad` and `<name>_downstream.h5ad` always store `X`, every
   layer and `raw.X` as sparse CSR matrices, as well as being gzip-compressed. `ADATA_PUBLISH`
   converts dense or CSC matrices before writing and logs each conversion. Intermediate h5ads
@@ -97,6 +103,12 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Fixed`
 
+- Cell filtering no longer passes empty barcodes on. With `--automatic_cell_filtering`, the N-MAD
+  lower bound for genes and counts often clamps to 0 on skewed samples (GSM5223974: 0 genes,
+  0 counts), so near-empty barcodes passed; a cell whose only gene was then removed by gene
+  filtering ended up with no counts and crashed later steps. Cells with no counts after gene
+  filtering are now always removed, and the number is reported in MultiQC and
+  `uns["cell_filtering"]["n_empty_after_gene_filtering"]`.
 - `--duplicate_var_resolution max` no longer crashes on samples with duplicated gene symbols, and
   duplicate genes are aggregated with sparse matrix operations instead of a per-gene loop that
   assigned into the CSR matrix, which was slow for `sum` and `mean`. Results for `sum` and `mean`

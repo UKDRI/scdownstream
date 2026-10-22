@@ -88,8 +88,9 @@ differential_genes/    ── decoupler pseudobulk → PyDESeq2 per group × con
       [CellBender](https://cellbender.readthedocs.io/en/latest/) or
       [scAR](https://docs.scvi-tools.org/en/stable/user_guide/models/scar.html) via `--ambient_correction`
    4. Cell filtering — fixed thresholds, or automatic N-MAD outlier thresholds via
-      `--automatic_cell_filtering`; with `--filtering_keep_outliers` the outliers are kept and
-      marked in `obs["outlier"]` instead of removed
+      `--automatic_cell_filtering` (with `--min_genes` / `--min_counts` as lower floors); with
+      `--filtering_keep_outliers` the outliers are kept and marked in `obs["outlier"]` instead of
+      removed. Cells left with no counts after gene filtering are always removed
 3. Cell type annotation — [CellTypist](https://www.celltypist.org/)
 4. Harmonise gene symbol, batch and cell type columns across samples, resolving duplicate gene
    symbols
