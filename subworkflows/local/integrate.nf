@@ -57,8 +57,7 @@ workflow INTEGRATE {
             false,
             0,
             100,
-            false,
-            []
+            false
         )
         ch_h5ad_hvg = SCANPY_FILTER.out.h5ad
         ch_versions = ch_versions.mix(SCANPY_FILTER.out.versions)

@@ -312,8 +312,8 @@ Several of them silently affect results, so please read before interpreting outp
 8. **`--unify_gene_symbols` is no longer supported.** HUGO-based gene symbol unification only
     applies to human data and is not reliable enough to recommend. Gene symbols are still harmonised
     across samples without it.
-9. Several other inherited parameters are also not currently supported: `--skip_enrichment`,
-    `--skip_liana`, `--skip_rankgenesgroups`, `--pseudobulk*`, `--cluster_per_label`,
+9. Several other inherited parameters are also not currently supported: `--skip_liana`,
+    `--skip_rankgenesgroups`, `--pseudobulk*`, `--cluster_per_label`,
     `--cluster_global`.
 10. MultiQC coverage is partial — the Quarto reports are the more complete view of a run.
 

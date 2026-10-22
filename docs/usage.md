@@ -182,7 +182,6 @@ under `report/`, and a MultiQC report.
 | `--umap_color_by_embeddings`      | `X_umap_pca,X_umap_scvi`| UMAPs those columns are plotted on: before (PCA) and after (scVI) integration. |
 | `--name`                          | `qc_clustering`  | Identifier used in output file names.                                                                                                                                  |
 | `--species`                       | `human`          | `human` or `mouse`. Set explicitly for mouse data.                                                                                                                     |
-| `--mito_genes`                    | `null`           | File or pattern identifying mitochondrial genes, used for the mitochondrial percentage metric.                                                                         |
 | `--ambient_correction`            | `none`           | `none`, `decontx`, `cellbender`, `soupx` or `scar`. Off by default, because the expected input is already CellBender-corrected. See [Ambient RNA correction](#ambient-rna-correction). |
 | `--ambient_corrected_integration` | `false`          | Use ambient-corrected counts for integration rather than storing them as extra layers.                                                                                 |
 | `--doublet_detection`             | `scrublet`       | Doublet detection method, or `none` to skip. See [Supported tool choices](#supported-tool-choices).                                                                    |
@@ -529,7 +528,7 @@ Two consequences of the current tool set are worth knowing before you interpret 
   in `--integration_methods`; if it is omitted, the post-merge steps produce no output and no error.
 
 **Inactive parameters.** The following are accepted but currently have no effect:
-`--skip_enrichment`, `--skip_liana`, `--skip_rankgenesgroups`,
+`--skip_liana`, `--skip_rankgenesgroups`,
 `--pseudobulk`, `--pseudobulk_groupby_labels`, `--pseudobulk_min_num_cells`, `--cluster_per_label`,
 `--cluster_global`, `--base_embeddings`, `--base_label_col`. `--unify_gene_symbols` is no longer
 supported and should be left at its default —
