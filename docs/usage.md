@@ -467,10 +467,32 @@ provided at [`assets/contrasts.tsv`](../assets/contrasts.tsv).
 | `reference`              | yes      | Value of `variable` treated as the reference (baseline) group.                                                                  |
 | `target`                 | yes      | Value of `variable` treated as the target group. Log fold changes are target vs reference.                                      |
 | `blocking`               | no       | Additional `obs` columns to include in the design as covariates. **Comma-separated**, because the file itself is tab-separated. |
-| `exclude_samples_col`    | no       | Accepted but **currently inactive**.                                                                                            |
-| `exclude_samples_values` | no       | Accepted but **currently inactive**.                                                                                            |
+| `exclude_samples_col`    | no       | Sample-level `obs` column used to drop samples from **this contrast only**, e.g. `donor_id`. See [Excluding samples](#excluding-samples-from-a-contrast). |
+| `exclude_samples_values` | no       | Values of `exclude_samples_col` whose samples are dropped. **Comma-separated.**                                                 |
 
 The design formula is `~ variable [+ blocking…]`, fitted with `refit_cooks=True`.
+
+#### Excluding samples from a contrast
+
+Set `exclude_samples_col` and `exclude_samples_values` to leave samples out of one contrast, for
+example outlier donors, while the other contrasts still use them. Every pseudobulk sample whose
+value in `exclude_samples_col` is one of the `exclude_samples_values` is dropped before the model
+is fitted and before the `--diffgenes_min_samples` check:
+
+```tsv title="contrasts.tsv"
+id	variable	reference	target	blocking	exclude_samples_col	exclude_samples_values
+AD_vs_ctrl	condition	ctrl	AD		donor_id	D07,D12
+```
+
+- The column must be **sample-level** metadata, i.e. constant within each sample (donor, batch,
+  sex, …). Pseudobulk aggregation keeps only columns that are constant within each profile, so a
+  column that varies between cells of a sample is not available and the run stops with an error
+  naming the column. Columns added with `--metadata` are sample-level and work.
+- The task log reports how many samples were excluded and kept. Values that match no sample are
+  reported as a warning (check for typos), as is a column without values or values without a
+  column; in those cases nothing is excluded.
+- If the exclusion leaves fewer than `--diffgenes_min_samples` samples on either side, the
+  contrast is skipped for that group label, and the skip message says that samples were excluded.
 
 > [!WARNING]
 > A contrast is **silently skipped** for a given group label if either side has fewer than

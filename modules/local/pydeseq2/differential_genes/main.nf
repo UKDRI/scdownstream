@@ -58,6 +58,8 @@ process DIFFERENTIAL_GENES_PER_CONTRAST {
     target_group = contrast.target_group
     reference_group = contrast.reference_group
     blocked_variables = contrast.list_of_blocked_variables ?: ''
+    exclude_samples_col = contrast.exclude_samples_col ?: ''
+    exclude_samples_values = contrast.exclude_samples_values ?: ''
     template('deseq2_diffgenes_per_contrast.py')
 
     stub:
