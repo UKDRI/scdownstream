@@ -72,6 +72,13 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Changed`
 
+- The differential_genes report is easier to read: a **Contrasts** table at the top (target vs
+  reference, the direction of the log2 fold change in words, blocking variables, excluded samples), a
+  **Significant genes overview** (up / down per group label × contrast, skipped contrasts marked),
+  section headings that name the group column (`<column> = <value>` instead of `Group: <value>`), a
+  per-group table of significant up / down / tested genes before the volcano plots, and volcano plots
+  without significant genes collapsed. `PYDESEQ2_GENERATE_REPORT` takes the contrasts table as a new
+  input, written by the workflow from the validated contrasts.
 - **Behaviour change:** with `--automatic_cell_filtering`, `--min_genes` (default 200) and
   `--min_counts` are now lower floors for the N-MAD thresholds, so automatic filtering can remove
   more cells than before. Lower `--min_genes` to accept smaller cells. The raw N-MAD values, the

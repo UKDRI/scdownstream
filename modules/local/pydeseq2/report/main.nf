@@ -10,6 +10,7 @@ process PYDESEQ2_GENERATE_REPORT {
     tuple val(meta), path(h5ad)
     path(tsvs)
     path(manifest)
+    path(contrasts)
     path(qmd_template)
     val(sample_col)
     val(group_cols)
@@ -36,6 +37,7 @@ process PYDESEQ2_GENERATE_REPORT {
         --output ${prefix}.html \\
         -P PSEUDOBULK_FILE:${h5ad} \\
         -P MANIFEST:${manifest} \\
+        -P CONTRASTS_FILE:${contrasts} \\
         -P SAMPLE_COLUMN:"${sample_col}" \\
         -P GROUP_COLUMNS:"${group_cols}" \\
         -P NTOP:${ntop} \\
@@ -58,6 +60,16 @@ process PYDESEQ2_GENERATE_REPORT {
     prefix = task.ext.prefix ?: "${meta.id}"
     """
     touch "${prefix}.html"
-    touch "versions.yml"
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        quarto: \$(quarto --version)
+        python: \$(python3 -c 'import platform; print(platform.python_version())')
+        anndata: \$(python3 -c 'import anndata; print(anndata.__version__)')
+        matplotlib: \$(python3 -c 'import matplotlib; print(matplotlib.__version__)')
+        numpy: \$(python3 -c 'import numpy; print(numpy.__version__)')
+        pandas: \$(python3 -c 'import pandas; print(pandas.__version__)')
+        ipython: \$(python3 -c 'import IPython; print(IPython.__version__)')
+    END_VERSIONS
     """
 }

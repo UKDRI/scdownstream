@@ -18,6 +18,8 @@ format:
 
 PSEUDOBULK_FILE = "pseudobulk.h5ad"
 MANIFEST = "de_manifest.tsv"
+# The contrasts file of the run (--diffgenes_contrasts): TSV with a header row.
+CONTRASTS_FILE = "contrasts.tsv"
 # .obs column identifying the biological sample.
 SAMPLE_COLUMN = ""
 # Comma-separated: the group label column followed by the variable and the blocking
@@ -42,6 +44,7 @@ import io
 import itertools
 import os
 import re
+from html import escape as escape_html
 
 import anndata as ad
 import matplotlib
@@ -56,6 +59,7 @@ from IPython.display import display, HTML
 ```{python}
 path_pseudobulk = PSEUDOBULK_FILE
 path_manifest = MANIFEST
+path_contrasts = str(CONTRASTS_FILE).strip()
 sample_column = str(SAMPLE_COLUMN).strip()
 group_columns = [column.strip() for column in str(GROUP_COLUMNS).split(',') if column.strip()]
 padj_threshold = float(PADJ_THRESHOLD)
@@ -64,219 +68,31 @@ n_label_genes = int(N_LABEL_GENES)
 max_categories = int(MAX_CATEGORIES)
 ntop = int(NTOP)
 
+# The first entry of GROUP_COLUMNS is the group label column the pseudobulk was split by;
+# every contrast is tested separately within each of its values.
+group_column = group_columns[0] if group_columns else ''
+group_label = group_column if group_column else 'group'
+
 # padj is floored before the log so that padj == 0 does not produce an infinite y value.
 MIN_PADJ = 1e-300
 
 # Columns expected in a pydeseq2 results_df export.
 RESULT_COLUMNS = ['feature', 'baseMean', 'log2FoldChange', 'lfcSE', 'stat', 'pvalue', 'padj']
-```
 
----
-
-## <font color='green'>Pseudobulk summary</font>
-
-Counts were aggregated per sample and per group label before testing for differential
-expression with pydeseq2. The pseudobulk object below is the input to those tests. The
-profiles are broken down by the columns this analysis is defined by: the sample column, the
-group label column, and the variable and blocking variables of the contrasts.
-
-```{python}
-adata = ad.read_h5ad(path_pseudobulk)
-
-display(HTML(
-    "<p>The pseudobulk data set contains " + str(adata.n_obs) + " pseudobulk profiles and "
-    + str(adata.n_vars) + " genes or transcripts.</p>"
-))
-```
-
-```{python}
-def summarise_column(obs: pd.DataFrame, column: str) -> pd.DataFrame:
-    """Value counts for one .obs column, returned as a two column table."""
-    return (
-        obs.value_counts(column)
-        .rename_axis(column)
-        .reset_index(name='number of pseudobulk profiles')
-    )
+# Columns of the contrasts file; the first four are required by assets/schema_contrasts.json.
+CONTRAST_COLUMNS = [
+    'id', 'variable', 'reference', 'target', 'blocking',
+    'exclude_samples_col', 'exclude_samples_values',
+]
+REQUIRED_CONTRAST_COLUMNS = ['id', 'variable', 'reference', 'target']
 
 
-def requested_columns(sample_column: str, group_columns: list) -> list:
-    """
-    The .obs columns this analysis is defined by, in the order they are reported.
-
-    That is the sample column, then the group label column, then the variable and the
-    blocking variables of every contrast - the columns the pipeline aggregated the
-    pseudobulk over. Nothing else in .obs is tabulated. The order is the order they were
-    passed in, and a column named twice (a contrast variable that is also the group label,
-    say) is kept only at its first position.
-    """
-    seen = set()
-    columns = []
-    for column in ([sample_column] if sample_column else []) + list(group_columns):
-        if column and column not in seen:
-            seen.add(column)
-            columns.append(column)
-    return columns
-```
-
-```{python}
-obs = adata.obs.copy()
-
-requested = requested_columns(sample_column, group_columns)
-columns_to_show = [column for column in requested if column in obs.columns]
-missing_columns = [column for column in requested if column not in obs.columns]
-
-if not requested:
-    display(HTML(
-        "<p>No sample or group column was passed to the report, so no breakdown of the "
-        "pseudobulk profiles is shown.</p>"
-    ))
-
-# The requested columns come from the pipeline parameters, so a column may be absent from a
-# pseudobulk object that was built with different settings. That is reported rather than
-# raised on, so the rest of the report is still produced.
-if missing_columns:
-    display(HTML(
-        "<p>The following column(s) of this analysis are not present in <code>.obs</code> of "
-        "the pseudobulk object and are therefore not broken down below: <code>"
-        + ", ".join(missing_columns) + "</code>.</p>"
-    ))
-
-for column in columns_to_show:
-    header = "<h3><font color='green'>Pseudobulk profiles per " + str(column) + "</font></h3>"
-    n_levels = obs[column].astype(str).nunique(dropna=False)
-
-    # A column such as the sample one can have thousands of levels; the table would be as
-    # long as the object itself and tells the reader nothing, so only its size is reported.
-    if n_levels > max_categories:
-        display(HTML(
-            header + "<p>Column <code>" + str(column) + "</code> has " + str(n_levels)
-            + " distinct values, more than the " + str(max_categories)
-            + " tabulated here, so no table is shown for it.</p>"
-        ))
-        continue
-
-    table = summarise_column(obs, column)
-    html = header
-    html += '<font color="black"><details><summary>Click to expand table</summary>'
-    html += '<div style="overflow-y: scroll; overflow-x: scroll; max-height: 400px">'
-    html += table.to_html(index=False) + '</div></details></font>'
-    display(HTML(html))
-```
-
----
-
-## <font color='green'>Volcano plots</font>
-
-```{python}
-display(HTML(
-    "<p>Genes are called differentially expressed when <code>padj</code> &lt; "
-    + str(padj_threshold) + " and |log2FoldChange| &gt; " + str(lfc_threshold)
-    + ". Up- and down-regulated genes are coloured red and blue, respectively; the "
-    + str(n_label_genes) + " most significant of them are labelled. Genes with a missing "
-    + "<code>padj</code> (filtered out by pydeseq2) are excluded from the plot.</p>"
-    + "<p>Each plot is followed by two searchable tables of the genes behind it, one for "
-    + "the up- and one for the down-regulated genes. Each of the two tables is limited to "
-    + "the top " + str(ntop) + " genes, is searchable, and can be sorted by clicking on a "
-    + "column header.</p>"
-))
-```
-
-```{python}
-def read_manifest(path: str) -> pd.DataFrame:
-    """
-    Read the headerless three column manifest: filename, group label instance, contrast.
-
-    Grouping comes from the manifest rather than from the file names, because ids may
-    themselves contain underscores and would be ambiguous to parse.
-    """
-    columns = ['filename', 'group', 'contrast']
-
-    if not os.path.exists(path) or os.path.getsize(path) == 0:
-        return pd.DataFrame(columns=columns)
-
-    try:
-        manifest = pd.read_csv(path, sep="\t", header=None, names=columns, dtype=str)
-    except (pd.errors.EmptyDataError, pd.errors.ParserError):
-        return pd.DataFrame(columns=columns)
-
-    manifest = manifest.dropna(subset=['filename'])
-    manifest['group'] = manifest['group'].fillna('NA')
-    manifest['contrast'] = manifest['contrast'].fillna('NA')
-
-    return manifest
+def code(text) -> str:
+    """Text as escaped inline code, for naming columns and files in prose."""
+    return "<code>" + escape_html(str(text)) + "</code>"
 
 
-def read_results(path: str):
-    """
-    Read one pydeseq2 result table.
-
-    Returns (dataframe, message). Exactly one of the two is None: a missing, empty or
-    malformed file yields a message that is reported in place of the plot.
-    """
-    if not os.path.exists(path):
-        return None, f"Result file <code>{path}</code> is missing."
-    if os.path.getsize(path) == 0:
-        return None, f"Result file <code>{path}</code> is empty."
-
-    try:
-        results = pd.read_csv(path, sep="\t")
-    except (pd.errors.EmptyDataError, pd.errors.ParserError):
-        return None, f"Result file <code>{path}</code> could not be parsed."
-
-    if results.empty:
-        return None, f"Result file <code>{path}</code> contains no rows."
-
-    missing = [column for column in RESULT_COLUMNS if column not in results.columns]
-    if missing:
-        return None, f"Result file <code>{path}</code> is missing the column(s): {', '.join(missing)}."
-
-    return results, None
-```
-
-```{python}
-def volcano_png(results: pd.DataFrame, title: str) -> str:
-    """Draw one volcano plot and return it as a base64 encoded PNG."""
-    fig, ax = plt.subplots(figsize=(6, 5))
-
-    padj = results['padj'].clip(lower=MIN_PADJ)
-    neg_log_padj = -np.log10(padj)
-    lfc = results['log2FoldChange']
-
-    significant = (results['padj'] < padj_threshold) & (lfc.abs() > lfc_threshold)
-    up = significant & (lfc > 0)
-    down = significant & (lfc < 0)
-    rest = ~significant
-
-    ax.scatter(lfc[rest], neg_log_padj[rest], s=6, c='lightgrey', label='not significant')
-    ax.scatter(lfc[down], neg_log_padj[down], s=6, c='tab:blue', label='down')
-    ax.scatter(lfc[up], neg_log_padj[up], s=6, c='tab:red', label='up')
-
-    ax.axhline(-np.log10(max(padj_threshold, MIN_PADJ)), color='grey', lw=0.6, ls='--')
-    ax.axvline(lfc_threshold, color='grey', lw=0.6, ls='--')
-    ax.axvline(-lfc_threshold, color='grey', lw=0.6, ls='--')
-
-    labelled = results.loc[significant].assign(_y=neg_log_padj[significant])
-    labelled = labelled.sort_values('_y', ascending=False).head(n_label_genes)
-    for _, row in labelled.iterrows():
-        ax.annotate(
-            str(row['feature']),
-            (row['log2FoldChange'], row['_y']),
-            fontsize=7,
-            xytext=(2, 2),
-            textcoords='offset points',
-        )
-
-    ax.set_xlabel('log2 fold change')
-    ax.set_ylabel('-log10 adjusted p-value')
-    ax.set_title(title, fontsize=10)
-    ax.legend(fontsize=7, frameon=False, loc='best')
-    fig.tight_layout()
-
-    buffer = io.BytesIO()
-    fig.savefig(buffer, format='png', dpi=150, bbox_inches='tight')
-    plt.close(fig)
-
-    return base64.b64encode(buffer.getvalue()).decode('utf-8')
+group_label_html = code(group_column) if group_column else "the group label"
 ```
 
 ```{python}
@@ -394,6 +210,499 @@ def create_search_table_html(df: pd.DataFrame, search_text: str,
     table_html += "<div id=" + table_name + " style='overflow-y: scroll; max-height: 400px'>" + table_body + "</div>"
 
     return table_html
+
+
+def inline_table_html(df: pd.DataFrame) -> str:
+    """
+    A small plain table on a single line, for printing from an `output: asis` cell.
+
+    The rendered table is printed as a raw HTML block of the markdown. to_html indents its
+    rows, and pandoc reads a run of 4+ spaces inside the block as an indented code block,
+    which ends the raw HTML after the first header cell. Removing only the newlines is not
+    enough, as the indentation then remains between the tags; every line is therefore
+    stripped before the lines are joined.
+    """
+    return ''.join(line.strip() for line in df.to_html(index=False).splitlines())
+```
+
+```{python}
+def split_list(value: str) -> list:
+    """Comma-separated contrasts file entry as a list, empty entries dropped."""
+    return [item.strip() for item in str(value).split(',') if item.strip()]
+
+
+def read_contrasts(path: str):
+    """
+    Read the contrasts file of the run.
+
+    Returns (dataframe, message). Exactly one of the two is None: a missing, empty or
+    malformed file yields a message that is reported in place of the table. Optional
+    columns absent from the file are added as empty strings, and the literal 'null' is read
+    as empty, as the differential expression template does.
+    """
+    if not path or not os.path.exists(path):
+        return None, f"The contrasts file {code(path)} is missing, so the contrasts cannot be listed."
+    if os.path.getsize(path) == 0:
+        return None, f"The contrasts file {code(path)} is empty, so the contrasts cannot be listed."
+
+    try:
+        contrasts = pd.read_csv(path, sep="\t", dtype=str, keep_default_na=False)
+    except (pd.errors.EmptyDataError, pd.errors.ParserError):
+        return None, f"The contrasts file {code(path)} could not be parsed, so the contrasts cannot be listed."
+
+    contrasts.columns = [str(column).strip() for column in contrasts.columns]
+    missing = [column for column in REQUIRED_CONTRAST_COLUMNS if column not in contrasts.columns]
+    if missing:
+        return None, (
+            f"The contrasts file {code(path)} is missing the column(s) "
+            f"{', '.join(code(column) for column in missing)}, so the contrasts cannot be listed."
+        )
+
+    contrasts = contrasts.reindex(columns=CONTRAST_COLUMNS, fill_value='')
+    for column in CONTRAST_COLUMNS:
+        contrasts[column] = contrasts[column].astype(str).str.strip().replace('null', '')
+    contrasts = contrasts[contrasts['id'] != '']
+
+    if contrasts.empty:
+        return None, f"The contrasts file {code(path)} contains no contrasts."
+
+    return contrasts.reset_index(drop=True), None
+
+
+def describe_exclusion(column: str, values: list) -> str:
+    """The samples a contrast leaves out, in words."""
+    if column and values:
+        return f"{column} in {', '.join(values)}"
+    if column or values:
+        # The differential expression template only excludes when both are set.
+        return "— (exclude_samples_col and exclude_samples_values must both be set; none excluded)"
+    return "—"
+
+
+def describe_contrasts(contrasts: pd.DataFrame) -> pd.DataFrame:
+    """One readable row per contrast, with the direction of the fold change spelled out."""
+    rows = []
+    for _, contrast in contrasts.iterrows():
+        blocking = split_list(contrast['blocking'])
+        rows.append({
+            'contrast': contrast['id'],
+            'variable': contrast['variable'],
+            'target': contrast['target'],
+            'reference': contrast['reference'],
+            'log2 fold change': (
+                f"> 0: higher in {contrast['target']} than in {contrast['reference']}"
+            ),
+            'blocking': ', '.join(blocking) if blocking else '—',
+            'excluded samples': describe_exclusion(
+                contrast['exclude_samples_col'], split_list(contrast['exclude_samples_values'])
+            ),
+        })
+    return pd.DataFrame(rows)
+
+
+def read_manifest(path: str) -> pd.DataFrame:
+    """
+    Read the headerless three column manifest: filename, group label instance, contrast.
+
+    Grouping comes from the manifest rather than from the file names, because ids may
+    themselves contain underscores and would be ambiguous to parse.
+    """
+    columns = ['filename', 'group', 'contrast']
+
+    if not os.path.exists(path) or os.path.getsize(path) == 0:
+        return pd.DataFrame(columns=columns)
+
+    try:
+        manifest = pd.read_csv(path, sep="\t", header=None, names=columns, dtype=str)
+    except (pd.errors.EmptyDataError, pd.errors.ParserError):
+        return pd.DataFrame(columns=columns)
+
+    manifest = manifest.dropna(subset=['filename'])
+    manifest['group'] = manifest['group'].fillna('NA')
+    manifest['contrast'] = manifest['contrast'].fillna('NA')
+
+    return manifest
+
+
+def read_results(path: str):
+    """
+    Read one pydeseq2 result table.
+
+    Returns (dataframe, message). Exactly one of the two is None: a missing, empty or
+    malformed file yields a message that is reported in place of the plot.
+    """
+    if not os.path.exists(path):
+        return None, f"Result file <code>{path}</code> is missing."
+    if os.path.getsize(path) == 0:
+        return None, f"Result file <code>{path}</code> is empty."
+
+    try:
+        results = pd.read_csv(path, sep="\t")
+    except (pd.errors.EmptyDataError, pd.errors.ParserError):
+        return None, f"Result file <code>{path}</code> could not be parsed."
+
+    if results.empty:
+        return None, f"Result file <code>{path}</code> contains no rows."
+
+    missing = [column for column in RESULT_COLUMNS if column not in results.columns]
+    if missing:
+        return None, f"Result file <code>{path}</code> is missing the column(s): {', '.join(missing)}."
+
+    return results, None
+
+
+def tested_results(path: str):
+    """
+    Read one result table and keep the genes that can be placed on a volcano plot.
+
+    pydeseq2 writes NaN padj for independently filtered genes; those cannot be placed on a
+    -log10 axis and are dropped. Returns (dataframe, n_total, message), where n_total is
+    the number of genes in the file. The dataframe is None, and the message says why, when
+    there is nothing left to plot.
+    """
+    results, message = read_results(path)
+    if results is None:
+        return None, 0, message
+
+    n_total = len(results)
+    results = results.dropna(subset=['padj', 'log2FoldChange'])
+
+    if results.empty:
+        return None, n_total, (
+            f"All {n_total} gene(s) in <code>{path}</code> have a missing adjusted p-value."
+        )
+
+    return results, n_total, None
+
+
+def significant_genes(results: pd.DataFrame) -> pd.Series:
+    """
+    The significance rule of this report: padj below and |log2FoldChange| above threshold.
+
+    The volcano plots, the gene tables and the up/down counts all use this one mask.
+    """
+    return (results['padj'] < padj_threshold) & (results['log2FoldChange'].abs() > lfc_threshold)
+
+
+def count_significant(results: pd.DataFrame) -> tuple:
+    """Number of significant up- and down-regulated genes."""
+    significant = significant_genes(results)
+    lfc = results['log2FoldChange']
+    return int((significant & (lfc > 0)).sum()), int((significant & (lfc < 0)).sum())
+
+
+def order_by_contrast(table: pd.DataFrame, contrast_ids: list) -> pd.DataFrame:
+    """
+    Rows ordered by the position of their contrast in the contrasts file.
+
+    Contrasts that are not in the file (or when there is no file) follow, alphabetically.
+    """
+    position = {contrast: index for index, contrast in enumerate(contrast_ids)}
+    key = table['contrast'].map(position).fillna(len(position))
+    return (
+        table.assign(_order=key)
+        .sort_values(['_order', 'contrast'], kind='stable')
+        .drop(columns='_order')
+    )
+
+
+SKIPPED_NOTE = "skipped by the minimum sample guard (no result table)"
+NO_RESULTS_NOTE = "no usable results (see the contrast below)"
+
+
+def summarise_results(manifest: pd.DataFrame, contrast_ids: list) -> pd.DataFrame:
+    """
+    One row per group label instance and contrast, with significant up/down and tested genes.
+
+    The group label instances are those of the manifest. A contrast of the contrasts file
+    that has no result for an instance was skipped for it by the minimum sample guard of the
+    differential expression step, and gets a row saying so. Counts are display strings,
+    with "—" where there is nothing to count.
+    """
+    rows = []
+    for group, group_rows in manifest.groupby('group', sort=True):
+        produced = set(group_rows['contrast'])
+
+        for _, row in group_rows.iterrows():
+            results, _n_total, _message = tested_results(row['filename'])
+            if results is None:
+                rows.append({
+                    'group': group, 'contrast': row['contrast'],
+                    'significant up': '—', 'significant down': '—', 'tested genes': '—',
+                    'note': NO_RESULTS_NOTE, 'overview': 'no results',
+                })
+                continue
+
+            n_up, n_down = count_significant(results)
+            rows.append({
+                'group': group, 'contrast': row['contrast'],
+                'significant up': str(n_up), 'significant down': str(n_down),
+                'tested genes': str(len(results)),
+                'note': '', 'overview': f"{n_up} up / {n_down} down",
+            })
+
+        for contrast in contrast_ids:
+            if contrast not in produced:
+                rows.append({
+                    'group': group, 'contrast': contrast,
+                    'significant up': '—', 'significant down': '—', 'tested genes': '—',
+                    'note': SKIPPED_NOTE, 'overview': 'skipped',
+                })
+
+    columns = ['group', 'contrast', 'significant up', 'significant down', 'tested genes',
+               'note', 'overview']
+    if not rows:
+        return pd.DataFrame(columns=columns)
+
+    summary = pd.DataFrame(rows, columns=columns)
+    return pd.concat(
+        [order_by_contrast(table, contrast_ids) for _, table in summary.groupby('group', sort=True)]
+    ).reset_index(drop=True)
+```
+
+```{python}
+contrasts, contrasts_message = read_contrasts(path_contrasts)
+contrast_ids = [] if contrasts is None else list(dict.fromkeys(contrasts['id']))
+
+manifest = read_manifest(path_manifest)
+de_summary = summarise_results(manifest, contrast_ids)
+```
+
+---
+
+## <font color='green'>Contrasts</font>
+
+```{python}
+display(HTML(
+    "<p>Groups are the values of " + group_label_html + "; each contrast is tested "
+    "separately within each group. A contrast compares the <i>target</i> with the "
+    "<i>reference</i> level of its variable, so its log2 fold change is "
+    "log2(target / reference): a positive value means higher expression in the target. "
+    "Blocking variables are added to the design to account for them, and excluded samples "
+    "are left out of that contrast only.</p>"
+))
+
+if contrasts is None:
+    display(HTML("<p>" + contrasts_message + "</p>"))
+else:
+    contrasts_table = describe_contrasts(contrasts)
+    display(HTML(create_search_table_html(
+        contrasts_table,
+        "Search contrast...",
+        "sboxContrasts",
+        "tableContrasts",
+        max(len(contrasts_table), 1),
+    )))
+```
+
+---
+
+## <font color='green'>Significant genes overview</font>
+
+```{python}
+if de_summary.empty:
+    display(HTML(
+        "<p>No differential expression results were produced, so there is nothing to "
+        "summarise here.</p>"
+    ))
+else:
+    display(HTML(
+        "<p>Number of significant up- and down-regulated genes per value of "
+        + group_label_html + " (rows) and contrast (columns): <code>padj</code> &lt; "
+        + str(padj_threshold) + " and |log2FoldChange| &gt; " + str(lfc_threshold)
+        + ", the same rule the volcano plots use. <i>skipped</i> marks a contrast the "
+        "minimum sample guard skipped for that group, <i>no results</i> one whose result "
+        "table could not be used.</p>"
+    ))
+
+    # A contrast listed twice for one group in the manifest would make pivot raise; the
+    # first entry is kept, as in the group section below.
+    overview_columns = list(dict.fromkeys(de_summary['contrast']))
+    overview = (
+        de_summary.drop_duplicates(['group', 'contrast'])
+        .pivot(index='group', columns='contrast', values='overview')
+        .reindex(columns=overview_columns)
+        .fillna('—')
+        .reset_index()
+        .rename(columns={'group': group_label})
+    )
+    overview.columns.name = None
+
+    display(HTML(create_search_table_html(
+        overview,
+        "Search " + escape_html(group_label, quote=True) + "...",
+        "sboxOverview",
+        "tableOverview",
+        max(len(overview), 1),
+    )))
+```
+
+---
+
+## <font color='green'>Pseudobulk summary</font>
+
+```{python}
+sample_column_html = code(sample_column) if sample_column else "the sample column"
+
+display(HTML(
+    "<p>Counts were aggregated per sample (" + sample_column_html + ") and per group ("
+    + group_label_html + ") before testing for differential expression with pydeseq2. The "
+    "pseudobulk object below is the input to those tests. The profiles are broken down by "
+    "the columns this analysis is defined by: the sample column, the group column, and the "
+    "variable and blocking variables of the contrasts.</p>"
+))
+```
+
+```{python}
+adata = ad.read_h5ad(path_pseudobulk)
+
+display(HTML(
+    "<p>The pseudobulk data set contains " + str(adata.n_obs) + " pseudobulk profiles and "
+    + str(adata.n_vars) + " genes or transcripts.</p>"
+))
+```
+
+```{python}
+def summarise_column(obs: pd.DataFrame, column: str) -> pd.DataFrame:
+    """Value counts for one .obs column, returned as a two column table."""
+    return (
+        obs.value_counts(column)
+        .rename_axis(column)
+        .reset_index(name='number of pseudobulk profiles')
+    )
+
+
+def requested_columns(sample_column: str, group_columns: list) -> list:
+    """
+    The .obs columns this analysis is defined by, in the order they are reported.
+
+    That is the sample column, then the group label column, then the variable and the
+    blocking variables of every contrast - the columns the pipeline aggregated the
+    pseudobulk over. Nothing else in .obs is tabulated. The order is the order they were
+    passed in, and a column named twice (a contrast variable that is also the group label,
+    say) is kept only at its first position.
+    """
+    seen = set()
+    columns = []
+    for column in ([sample_column] if sample_column else []) + list(group_columns):
+        if column and column not in seen:
+            seen.add(column)
+            columns.append(column)
+    return columns
+```
+
+```{python}
+obs = adata.obs.copy()
+
+requested = requested_columns(sample_column, group_columns)
+columns_to_show = [column for column in requested if column in obs.columns]
+missing_columns = [column for column in requested if column not in obs.columns]
+
+if not requested:
+    display(HTML(
+        "<p>No sample or group column was passed to the report, so no breakdown of the "
+        "pseudobulk profiles is shown.</p>"
+    ))
+
+# The requested columns come from the pipeline parameters, so a column may be absent from a
+# pseudobulk object that was built with different settings. That is reported rather than
+# raised on, so the rest of the report is still produced.
+if missing_columns:
+    display(HTML(
+        "<p>The following column(s) of this analysis are not present in <code>.obs</code> of "
+        "the pseudobulk object and are therefore not broken down below: <code>"
+        + ", ".join(missing_columns) + "</code>.</p>"
+    ))
+
+for column in columns_to_show:
+    header = "<h3><font color='green'>Pseudobulk profiles per " + str(column) + "</font></h3>"
+    n_levels = obs[column].astype(str).nunique(dropna=False)
+
+    # A column such as the sample one can have thousands of levels; the table would be as
+    # long as the object itself and tells the reader nothing, so only its size is reported.
+    if n_levels > max_categories:
+        display(HTML(
+            header + "<p>Column <code>" + str(column) + "</code> has " + str(n_levels)
+            + " distinct values, more than the " + str(max_categories)
+            + " tabulated here, so no table is shown for it.</p>"
+        ))
+        continue
+
+    table = summarise_column(obs, column)
+    html = header
+    html += '<font color="black"><details><summary>Click to expand table</summary>'
+    html += '<div style="overflow-y: scroll; overflow-x: scroll; max-height: 400px">'
+    html += table.to_html(index=False) + '</div></details></font>'
+    display(HTML(html))
+```
+
+---
+
+## <font color='green'>Volcano plots</font>
+
+```{python}
+display(HTML(
+    "<p>Groups are the values of " + group_label_html + "; each contrast is tested "
+    "separately within each group, and each group has its own section below. Each section "
+    "starts with a table of the significant up- and down-regulated genes per contrast and "
+    "the number of tested genes, i.e. genes with an adjusted p-value.</p>"
+    "<p>Genes are called differentially expressed when <code>padj</code> &lt; "
+    + str(padj_threshold) + " and |log2FoldChange| &gt; " + str(lfc_threshold)
+    + ". Up- and down-regulated genes are coloured red and blue, respectively; the "
+    + str(n_label_genes) + " most significant of them are labelled. Genes with a missing "
+    + "<code>padj</code> (filtered out by pydeseq2) are excluded from the plot. Volcano plots "
+    + "of contrasts without any significant gene are collapsed; click to show them.</p>"
+    + "<p>Each plot is followed by two searchable tables of the genes behind it, one for "
+    + "the up- and one for the down-regulated genes. Each of the two tables is limited to "
+    + "the top " + str(ntop) + " genes, is searchable, and can be sorted by clicking on a "
+    + "column header.</p>"
+))
+```
+
+```{python}
+def volcano_png(results: pd.DataFrame, title: str) -> str:
+    """Draw one volcano plot and return it as a base64 encoded PNG."""
+    fig, ax = plt.subplots(figsize=(6, 5))
+
+    padj = results['padj'].clip(lower=MIN_PADJ)
+    neg_log_padj = -np.log10(padj)
+    lfc = results['log2FoldChange']
+
+    significant = significant_genes(results)
+    up = significant & (lfc > 0)
+    down = significant & (lfc < 0)
+    rest = ~significant
+
+    ax.scatter(lfc[rest], neg_log_padj[rest], s=6, c='lightgrey', label='not significant')
+    ax.scatter(lfc[down], neg_log_padj[down], s=6, c='tab:blue', label='down')
+    ax.scatter(lfc[up], neg_log_padj[up], s=6, c='tab:red', label='up')
+
+    ax.axhline(-np.log10(max(padj_threshold, MIN_PADJ)), color='grey', lw=0.6, ls='--')
+    ax.axvline(lfc_threshold, color='grey', lw=0.6, ls='--')
+    ax.axvline(-lfc_threshold, color='grey', lw=0.6, ls='--')
+
+    labelled = results.loc[significant].assign(_y=neg_log_padj[significant])
+    labelled = labelled.sort_values('_y', ascending=False).head(n_label_genes)
+    for _, row in labelled.iterrows():
+        ax.annotate(
+            str(row['feature']),
+            (row['log2FoldChange'], row['_y']),
+            fontsize=7,
+            xytext=(2, 2),
+            textcoords='offset points',
+        )
+
+    ax.set_xlabel('log2 fold change')
+    ax.set_ylabel('-log10 adjusted p-value')
+    ax.set_title(title, fontsize=10)
+    ax.legend(fontsize=7, frameon=False, loc='best')
+    fig.tight_layout()
+
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format='png', dpi=150, bbox_inches='tight')
+    plt.close(fig)
+
+    return base64.b64encode(buffer.getvalue()).decode('utf-8')
 ```
 
 ```{python}
@@ -408,6 +717,26 @@ def table_ids(index: int, group: str, contrast: str, direction: str) -> tuple:
     """
     stem = re.sub(r'[^0-9A-Za-z]+', '_', f"{group}_{contrast}").strip('_')
     return f"sboxDiff{index}{direction}_{stem}", f"tableDiff{index}{direction}_{stem}"
+
+
+def group_anchor(index: int, group: str) -> str:
+    """
+    Explicit id of a group section heading.
+
+    The heading text holds the column name, which may contain characters such as ':', so
+    the id is not left to pandoc's automatic identifiers. Only letters, digits, '_' and '-'
+    are kept, and the running index keeps it unique.
+    """
+    stem = re.sub(r'[^0-9A-Za-z_]+', '-', str(group)).strip('-')
+    return f"group-{index}-{stem}" if stem else f"group-{index}"
+
+
+def group_counts_table(summary: pd.DataFrame) -> pd.DataFrame:
+    """The up/down table at the start of one group section; the note only when needed."""
+    table = summary[['contrast', 'significant up', 'significant down', 'tested genes', 'note']]
+    if (table['note'] == '').all():
+        table = table.drop(columns='note')
+    return table
 
 
 def top_genes_table(results: pd.DataFrame, ntop: int, direction: str) -> pd.DataFrame:
@@ -428,7 +757,7 @@ def top_genes_table(results: pd.DataFrame, ntop: int, direction: str) -> pd.Data
     else:
         table = table[table['log2FoldChange'] < 0]
 
-    significant = (table['padj'] < padj_threshold) & (table['log2FoldChange'].abs() > lfc_threshold)
+    significant = significant_genes(table)
 
     table = (
         table.assign(_not_significant=(~significant).astype(int))
@@ -448,61 +777,66 @@ def top_genes_table(results: pd.DataFrame, ntop: int, direction: str) -> pd.Data
 ```{python}
 #| output: asis
 
-manifest = read_manifest(path_manifest)
-
 if manifest.empty:
     print(
-        "No differential expression results were produced. Every group was either skipped "
-        "by the minimum sample guard or yielded no result table, so there is nothing to "
-        "plot here.\n"
+        "No differential expression results were produced. Every group (value of "
+        f"{group_label_html}) was either skipped by the minimum sample guard or yielded no "
+        "result table, so there is nothing to plot here.\n"
     )
 else:
     # Counter over all (group label instance x contrast) pairs. Together with the
     # direction it keeps the ids of the searchable tables unique across the document.
     table_index = 0
 
-    for group, rows in manifest.groupby('group', sort=True):
-        print(f"\n### <font color='green'>Group: {group}</font>\n")
+    for group_index, (group, rows) in enumerate(manifest.groupby('group', sort=True)):
+        print(
+            f"\n### <font color='green'>{escape_html(group_label)} = {escape_html(str(group))}"
+            f"</font> {{#{group_anchor(group_index, group)}}}\n"
+        )
 
-        for _, row in rows.iterrows():
+        # Up/down counts first, so the outcome of every contrast of this group, skipped
+        # ones included, is visible before the plots.
+        group_summary = de_summary[de_summary['group'] == group]
+        print(
+            f"\n<p>Significant genes per contrast (<code>padj</code> &lt; {padj_threshold} "
+            f"and |log2FoldChange| &gt; {lfc_threshold}):</p>\n"
+        )
+        print(f"\n{inline_table_html(group_counts_table(group_summary))}\n")
+
+        for _, row in order_by_contrast(rows, contrast_ids).iterrows():
             contrast = row['contrast']
             print(f"\n**Contrast: {contrast}**\n")
 
-            results, message = read_results(row['filename'])
+            results, n_total, message = tested_results(row['filename'])
             if results is None:
                 print(f"\n{message} No volcano plot is shown for this contrast.\n")
                 continue
 
-            # pydeseq2 writes NaN padj for independently filtered genes; those points
-            # cannot be placed on a -log10 axis and are dropped before plotting.
-            n_total = len(results)
-            results = results.dropna(subset=['padj', 'log2FoldChange'])
             n_dropped = n_total - len(results)
-
-            if results.empty:
-                print(
-                    f"\nAll {n_total} gene(s) in <code>{row['filename']}</code> have a missing "
-                    "adjusted p-value, so no volcano plot is shown for this contrast.\n"
-                )
-                continue
-
-            n_significant = int(
-                (
-                    (results['padj'] < padj_threshold)
-                    & (results['log2FoldChange'].abs() > lfc_threshold)
-                ).sum()
-            )
+            n_up, n_down = count_significant(results)
+            n_significant = n_up + n_down
 
             image_string = volcano_png(results, f"{group} - {contrast}")
 
-            print(
-                f'\n<figure><img alt="volcano plot {group} {contrast}" '
+            figure = (
+                f'<figure><img alt="volcano plot {group} {contrast}" '
                 f'src="data:image/png;base64,{image_string}" />'
                 f'<figcaption>{n_significant} of {len(results)} tested gene(s) pass '
-                f'padj &lt; {padj_threshold} and |log2FoldChange| &gt; {lfc_threshold}. '
+                f'padj &lt; {padj_threshold} and |log2FoldChange| &gt; {lfc_threshold} '
+                f'({n_up} up, {n_down} down). '
                 f'{n_dropped} gene(s) with a missing adjusted p-value were excluded.'
-                f'</figcaption></figure>\n'
+                f'</figcaption></figure>'
             )
+
+            # A plot without a single significant gene says no more than its caption, so it
+            # is collapsed; plots with hits stay open.
+            if n_significant == 0:
+                figure = (
+                    "<details><summary><font color='green'>Volcano plot — no significant "
+                    "genes (click to show)</font></summary>" + figure + "</details>"
+                )
+
+            print(f"\n{figure}\n")
 
             # Searchable tables of the very genes plotted above, directly below the plot,
             # split by the sign of the log2 fold change. One <details> per direction

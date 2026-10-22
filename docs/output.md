@@ -234,7 +234,21 @@ directories (or given different `--name` values) to avoid overwriting each other
       contrast — one row per gene, with columns `feature`, `baseMean`, `log2FoldChange`, `lfcSE`,
       `stat`, `pvalue`, `padj`. Log fold changes are **target vs reference**.
 - `report/<name>_differential_genes_report.html`: a Quarto report summarising every contrast across
-  every group label — pseudobulk composition, per-contrast result tables and summary counts.
+  every group label. In order:
+  - **Contrasts**: one row per contrast with the variable, target and reference, the direction of
+    the log2 fold change in words (e.g. "> 0: higher in AD than in ctrl"), blocking variables and
+    excluded samples.
+  - **Significant genes overview**: group label × contrast, with the number of significant up- and
+    down-regulated genes, or "skipped" where the contrast was not tested.
+  - **Pseudobulk summary**: the profiles per sample, group label and contrast variable.
+  - **Volcano plots**: one section per group label, headed `<group column> = <value>` (e.g.
+    `celltypist:majority_voting = Microglia`). Each starts with a table of significant up / down /
+    tested genes per contrast, including skipped contrasts, followed by each contrast's volcano plot
+    and its up- and down-regulated gene tables. A volcano plot with no significant genes is
+    collapsed; click to show it.
+
+  "Significant" means `padj` < 0.05 and |log2FoldChange| > 1, the same rule for the counts, the
+  volcano plots and the gene tables.
 - `<name>_differential_genes.json.gz`: the top differential genes per group label and
   contrast, in the same compact JSON form as `<name>_downstream_markers.json.gz`. Each group label ×
   contrast gives two sets: `genes--<contrast>--<group_label>--up` (higher in the target group,
@@ -256,10 +270,9 @@ marker JSON and the report are always published.
 
 > [!WARNING]
 > A (group label, contrast) combination with fewer than `--diffgenes_min_samples` pseudobulk samples
-> on either side is **skipped silently** and produces no `.tsv`. The report is driven by a
-> `de_manifest.tsv` mapping each result file to its group label and contrast, so the set of tables in
-> the report is the authoritative record of what was actually tested. Compare it against the contrasts
-> you supplied.
+> on either side is **skipped** and produces no `.tsv`; the run does not fail. The report lists every
+> contrast of the contrasts file for every group label and marks such combinations as "skipped" in the
+> overview and in the group's table, so you can see what was not tested.
 
 ## Pipeline information
 
