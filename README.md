@@ -88,7 +88,8 @@ differential_genes/    ── decoupler pseudobulk → PyDESeq2 per group × con
       [CellBender](https://cellbender.readthedocs.io/en/latest/) or
       [scAR](https://docs.scvi-tools.org/en/stable/user_guide/models/scar.html) via `--ambient_correction`
    4. Cell filtering — fixed thresholds, or automatic N-MAD outlier thresholds via
-      `--automatic_cell_filtering` (with `--min_genes` / `--min_counts` as lower floors); with
+      `--automatic_cell_filtering` (with `--min_genes` / `--min_counts` as lower floors); every
+      threshold can also be set per sample in the samplesheet; with
       `--filtering_keep_outliers` the outliers are kept and marked in `obs["outlier"]` instead of
       removed. Cells left with no counts after gene filtering are always removed
 3. Cell type annotation — [CellTypist](https://www.celltypist.org/)
@@ -210,6 +211,11 @@ sample3,relative/path/to/sample3.rds
 sample4,/absolute/path/to/sample4.csv
 ```
 
+Gene symbols are taken from the matrix row names by default. If a sample's symbols are in another
+column, or it only has gene IDs, set that sample's `symbol_col` (and `geneid_col`) in the
+samplesheet; there is no global parameter for it. See
+[Gene symbols](docs/usage.md#gene-symbols).
+
 Each entry is an h5ad, 10x h5, RDS or CSV file. RDS files may contain any object convertible to a
 SingleCellExperiment via [Seurat's `as.SingleCellExperiment`](https://satijalab.org/seurat/reference/as.singlecellexperiment).
 CSV files should hold a matrix with genes as columns and cells as rows, the first column being cell
@@ -297,25 +303,21 @@ Several of them silently affect results, so please read before interpreting outp
    `--doublet_detection_threshold` methods having to agree (default 1).
 2. **Keep `scvi` in `--integration_methods`.** Everything after the merge is built on the scVI latent
    space; a selection that omits `scvi` produces no output and no error.
-3. **Per-sample QC overrides in the samplesheet are ignored.** The per-sample `min_genes`,
-   `max_mito_percentage`, `automatic_cell_filtering` and related columns are read into the sample
-   metadata but the global `--min_*` / `--max_*` parameters are what actually reach the filtering
-   step. Set filters globally.
-4. **`--prep_cellxgene` and `--qc_only` have been removed.** The published h5ad can be opened in
+3. **`--prep_cellxgene` and `--qc_only` have been removed.** The published h5ad can be opened in
    cellxgene directly, and stage 1 always merges, integrates and clusters.
-5. **`-profile test_offline` is no longer supported.** Use `-profile test` instead.
-6. **Set `--species` explicitly.** It defaults to `human`, and mouse data analysed under the human
+4. **`-profile test_offline` is no longer supported.** Use `-profile test` instead.
+5. **Set `--species` explicitly.** It defaults to `human`, and mouse data analysed under the human
    default produces wrong enrichment and cell–cell communication results without any error. See
    [Running the pipeline on non-human species](#running-the-pipeline-on-non-human-species).
-7. **The upstream single-pass workflow has been removed.** Always pass `--stage`; `-entry` is
+6. **The upstream single-pass workflow has been removed.** Always pass `--stage`; `-entry` is
    no longer used (see the note above).
-8. **`--unify_gene_symbols` is no longer supported.** HUGO-based gene symbol unification only
+7. **`--unify_gene_symbols` is no longer supported.** HUGO-based gene symbol unification only
     applies to human data and is not reliable enough to recommend. Gene symbols are still harmonised
     across samples without it.
-9. Several other inherited parameters are also not currently supported: `--skip_liana`,
+8. Several other inherited parameters are also not currently supported: `--skip_liana`,
     `--skip_rankgenesgroups`, `--pseudobulk*`, `--cluster_per_label`,
     `--cluster_global`.
-10. MultiQC coverage is partial — the Quarto reports are the more complete view of a run.
+9. MultiQC coverage is partial — the Quarto reports are the more complete view of a run.
 
 ## Documentation
 

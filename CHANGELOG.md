@@ -12,6 +12,11 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Added`
 
+- Per-sample QC thresholds: the samplesheet columns `min_genes`, `max_genes` (new),
+  `min_counts_cell`, `max_counts` (new), `max_mito_percentage`, `min_cells`, `min_counts_gene` and
+  `automatic_cell_filtering` now override the matching global parameter for that sample; an empty
+  cell falls back to the global value. Before, the columns were read and then ignored. Their schema
+  defaults were removed so that an empty cell can be told apart from an explicit `0` / `false`.
 - The contrasts-file columns `exclude_samples_col` / `exclude_samples_values` now work: they drop
   samples from one contrast only (e.g. outlier donors) before the model is fitted and before the
   `--diffgenes_min_samples` check. The column must be sample-level metadata. Before, both columns
@@ -136,6 +141,9 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 - `--mito_genes`. It was accepted and passed to cell filtering but never used: mitochondrial genes
   are always identified by the `mt-` prefix of the gene symbols. Moved to the backlog for
   re-assessment.
+- `--symbol_col`. Nothing read it; gene symbols are set per sample with the samplesheet column
+  `symbol_col` (default `index`), which is what UNIFY, CellTypist and QC use. The docs had described
+  it as the default for samples without their own value, which it never was.
 - `--skip_enrichment`. It was in `nextflow.config` but not in the schema, and nothing read it:
   gene set enrichment always runs in `--stage downstream`. Moved to the backlog for re-assessment.
 - `--prep_cellxgene` and the `ADATA_PREPCELLXGENE` module. The option never ran (its wiring used the

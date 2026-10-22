@@ -81,8 +81,8 @@ metadata is available in a CSV.
 | `filtered`                      | Path to an `h5ad`, `h5`, `rds` or `csv` file. `rds` files may hold any object convertible to a `SingleCellExperiment` via [Seurat `as.SingleCellExperiment`](https://satijalab.org/seurat/reference/as.singlecellexperiment). `csv` files should hold a matrix with genes as columns and cells as rows. |
 | `unfiltered`                    | As `filtered`, but for the unfiltered CellRanger or nf-core/scrnaseq output. If not provided, only `decontX` can be used for ambient RNA removal.                                                                                                                                                       |
 | `batch_col`                     | Column in the input file holding batch information. If absent, the whole object is treated as one batch. Renamed to `batch` during execution.                                                                                                                                                           |
-| `symbol_col`                    | Column holding gene symbols. Defaults to `index`. Two special values: `index` uses the matrix row names; `none` triggers gene symbol conversion via MyGene.info based on `geneid_col`. The values become the object index.                                                                              |
-| `geneid_col`                    | Column holding gene identifiers. Defaults to `index`. Only used when `symbol_col` is `none`.                                                                                                                                                                                                            |
+| `symbol_col`                    | Where this sample's gene symbols are. **Set per sample; there is no global `--symbol_col` parameter.** Empty or absent: `index` (the matrix row names / var index are the symbols). `none`: convert the gene IDs in `geneid_col` to symbols via MyGene.info. Any other value: the name of a var column holding the symbols. See [Gene symbols](#gene-symbols). |
+| `geneid_col`                    | Var column holding gene IDs (e.g. Ensembl). Only used when `symbol_col` is `none`. Empty or absent: `index`.                                                                                                                                                                                         |
 | `label_col`                     | Column holding cell type information. Defaults to `label`. If absent, the pipeline creates it and fills it with `unknown`. Renamed to `label` during execution.                                                                                                                                         |
 | `unknown_label`                 | Value in `label_col` to treat as unknown. Defaults to `unknown`. Renamed to `unknown` during execution.                                                                                                                                                                                                 |
 | `counts_layer`                  | Layer holding the raw counts matrix. Defaults to `X`.                                                                                                                                                                                                                                                   |
@@ -91,12 +91,82 @@ metadata is available in a CSV.
 | `ambient_corrected_integration` | Whether to use ambient-corrected counts for integration for this sample, overriding the global `--ambient_corrected_integration`.                                                                                                                                                                       |
 | `n_hvgs`                        | Number of highly variable genes for this sample. Defaults to `3000`.                                                                                                                                                                                                                                    |
 
+### Gene symbols
+
+The pipeline needs gene **symbols** (e.g. `CD3E`, `MT-CO1`), not only gene IDs: CellTypist models,
+LIANA+ ligand–receptor resources and gene set enrichment all match on symbols. Where a sample's
+symbols are is set **per sample** with the samplesheet column `symbol_col`. There is **no global
+parameter** for it (`--symbol_col` was removed); a sample that leaves the column empty, or a
+samplesheet without the column, uses `index`.
+
+| Input                                                                  | `symbol_col`                | `geneid_col`  |
+| ---------------------------------------------------------------------- | --------------------------- | ------------- |
+| Symbols are the matrix row names / var index (e.g. CellRanger `.h5`)    | empty or `index`            | —             |
+| Symbols are in a var column, e.g. `gene_symbols`                       | `gene_symbols`              | —             |
+| Only gene IDs, e.g. Ensembl IDs in the index                           | `none`                      | empty or `index` |
+| Only gene IDs, in a var column, e.g. `gene_ids`                        | `none`                      | `gene_ids`    |
+
+```csv title="samplesheet.csv"
+sample,filtered,symbol_col,geneid_col
+sample1,/path/to/sample1_cellranger.h5,,
+sample2,/path/to/sample2.h5ad,gene_symbols,
+sample3,/path/to/sample3_ensembl_only.h5ad,none,gene_ids
+```
+
 > [!WARNING]
-> **Per-sample QC filter columns are currently ignored.** The samplesheet accepts `min_genes`,
-> `min_cells`, `min_counts_cell`, `min_counts_gene`, `max_mito_percentage` and
-> `automatic_cell_filtering`, and they are read into the sample metadata, but the **global**
-> `--min_*` / `--max_*` / `--automatic_cell_filtering` parameters are what actually reach the
-> filtering step. Set your filters globally until this is fixed.
+> `symbol_col = none` has three limits:
+> - it looks the symbols up online at MyGene.info, so the compute nodes need internet access;
+> - the lookup is for **human** genes only;
+> - the conversion runs when the samples are unified, after per-sample QC and CellTypist. CellTypist
+>   therefore cannot use it: with `--celltypist_model` set, a `none` sample stops with
+>   "Symbol column none not found".
+>
+> For non-human data, or with CellTypist, provide input that already has a symbol column.
+
+> [!IMPORTANT]
+> Mitochondrial QC does **not** use `symbol_col`: it flags `MT-`/`mt-` genes in the var index, or
+> in a var column named `gene_name`, `gene_names`, `gene_symbol` or `gene_symbols` if one exists.
+> For input with Ensembl IDs in the index and none of these columns, the mitochondrial percentage is
+> 0 for every cell and `max_mito_percentage` removes nothing.
+
+### Per-sample QC thresholds
+
+The cell and gene filtering thresholds can be set per sample. Each column overrides one global
+parameter for that sample:
+
+| Column                     | Overrides                    | Meaning                                                    |
+| -------------------------- | ---------------------------- | ---------------------------------------------------------- |
+| `min_genes`                | `--min_genes`                | Minimum genes per cell                                     |
+| `max_genes`                | `--max_genes`                | Maximum genes per cell                                     |
+| `min_counts_cell`          | `--min_counts`               | Minimum counts per cell                                    |
+| `max_counts`               | `--max_counts`               | Maximum counts per cell                                    |
+| `max_mito_percentage`      | `--max_mito_percentage`      | Maximum percentage of mitochondrial counts per cell        |
+| `min_cells`                | `--min_cells`                | Minimum cells per gene (gene filtering)                    |
+| `min_counts_gene`          | `--min_counts_gene`          | Minimum counts per gene (gene filtering)                   |
+| `automatic_cell_filtering` | `--automatic_cell_filtering` | `true` / `false`: use N-MAD thresholds for this sample     |
+
+How the threshold for a sample is chosen:
+
+1. **A value in the samplesheet wins**, including `0` and `false`.
+2. **An empty cell (or a missing column) falls back to the global parameter.** A samplesheet
+   without these columns behaves exactly as before.
+3. **With automatic filtering on** (per sample or globally), the N-MAD thresholds replace the fixed
+   ones (`max_genes`, `max_counts`, `max_mito_percentage`), but `min_genes` and `min_counts_cell`
+   (or `--min_genes` / `--min_counts`) still apply as lower floors. See
+   [Automatic thresholds](#automatic-thresholds).
+4. **Gene filtering** (`min_cells`, `min_counts_gene`) applies in both modes.
+
+For example, to filter one low-quality sample more strictly and let another use automatic
+thresholds while everything else uses the global settings:
+
+```csv title="samplesheet.csv"
+sample,filtered,min_genes,max_mito_percentage,automatic_cell_filtering
+sample1,/path/to/sample1.h5ad,500,10,
+sample2,/path/to/sample2.h5ad,,,true
+sample3,/path/to/sample3.h5ad,,,
+```
+
+The thresholds applied to each sample are reported in its MultiQC section.
 
 An [example samplesheet](../assets/samplesheet.csv) is provided with the pipeline.
 
@@ -187,16 +257,15 @@ under `report/`, and a MultiQC report.
 | `--doublet_detection`             | `scrublet`       | Doublet detection method, or `none` to skip. See [Supported tool choices](#supported-tool-choices).                                                                    |
 | `--doublet_removal`               | `false`          | Remove cells called doublets by at least `--doublet_detection_threshold` methods, right after doublet detection. Off: doublets are only annotated. See [Doublets and QC outliers](#doublets-and-qc-outliers). |
 | `--doublet_detection_threshold`   | `1`              | With `--doublet_removal`: number of `--doublet_detection` methods that must call a cell a doublet. |
-| `--automatic_cell_filtering`      | `false`          | Derive per-sample thresholds from N-MAD outlier detection instead of the fixed thresholds below. `--min_genes` / `--min_counts` still apply as lower floors; consider setting them very low in this mode. See [Automatic thresholds](#automatic-thresholds). |
+| `--automatic_cell_filtering`      | `false`          | Derive per-sample thresholds from N-MAD outlier detection instead of the fixed thresholds below. `--min_genes` / `--min_counts` still apply as lower floors; consider setting them very low in this mode. See [Automatic thresholds](#automatic-thresholds). Can be set per sample in the samplesheet. |
 | `--filtering_keep_outliers`       | `false`          | Keep cells that fail the QC thresholds and mark them in `obs["outlier"]` instead of removing them. Cells left with no counts after gene filtering are removed regardless. See [Doublets and QC outliers](#doublets-and-qc-outliers). |
-| `--min_genes`                     | `200`            | Minimum genes per cell. Also the floor for the automatic lower bound with `--automatic_cell_filtering`.                                                                |
-| `--max_genes`                     | `false`          | Maximum genes per cell (`false` disables).                                                                                                                             |
-| `--min_cells`                     | `5`              | Minimum cells per gene.                                                                                                                                                |
-| `--min_counts`                    | `0`              | Minimum counts per cell. Also the floor for the automatic lower bound with `--automatic_cell_filtering`.                                                               |
-| `--max_counts`                    | `false`          | Maximum counts per cell (`false` disables).                                                                                                                            |
-| `--min_counts_gene`               | `0`              | Minimum counts per gene.                                                                                                                                               |
-| `--max_mito_percentage`           | `25`             | Maximum percentage of mitochondrial counts per cell.                                                                                                                   |
-| `--symbol_col`                    | `index`          | Default gene symbol column for samples that do not set their own.                                                                                                      |
+| `--min_genes`                     | `200`            | Minimum genes per cell. Also the floor for the automatic lower bound with `--automatic_cell_filtering`. Can be set per sample in the samplesheet. |
+| `--max_genes`                     | `false`          | Maximum genes per cell (`false` disables). Can be set per sample in the samplesheet. |
+| `--min_cells`                     | `5`              | Minimum cells per gene. Can be set per sample in the samplesheet. |
+| `--min_counts`                    | `0`              | Minimum counts per cell. Also the floor for the automatic lower bound with `--automatic_cell_filtering`. Can be set per sample in the samplesheet. |
+| `--max_counts`                    | `false`          | Maximum counts per cell (`false` disables). Can be set per sample in the samplesheet. |
+| `--min_counts_gene`               | `0`              | Minimum counts per gene. Can be set per sample in the samplesheet. |
+| `--max_mito_percentage`           | `25`             | Maximum percentage of mitochondrial counts per cell. Can be set per sample in the samplesheet. |
 | `--duplicate_var_resolution`      | `sum`            | How to resolve duplicate gene symbols: `mean`, `sum`, `max` or `make_unique`.                                                                                          |
 | `--aggregate_isoforms`            | `false`          | Aggregate isoform-level features.                                                                                                                                      |
 | `--n_hvgs`                        | `3000`           | Highly variable genes used for the PCA/UMAP embedding.                                                                                                                 |
@@ -255,7 +324,10 @@ absolute deviation (MAD) of its QC metrics:
 | counts per cell (`total_counts`)     | median − 2.5 × MAD, but at least `--min_counts` | median + 5 × MAD |
 | mitochondrial % (`pct_counts_mt`)    | none                                            | median + 5 × MAD |
 
-`--min_genes` and `--min_counts` are **floors**: the automatic lower bound never goes below them. On
+`--min_genes` and `--min_counts` (or a sample's `min_genes` / `min_counts_cell` column) are
+**floors**: the automatic lower bound never goes below them. Automatic filtering can also be
+switched on or off per sample with the `automatic_cell_filtering` column; see
+[Per-sample QC thresholds](#per-sample-qc-thresholds). On
 samples with a wide or skewed distribution, median − 2.5 × MAD is often below zero, and without a
 floor no cell would be removed at the low end, near-empty barcodes included. With the defaults, cells
 need at least 200 genes in automatic mode too. The fixed `--max_genes`, `--max_counts` and

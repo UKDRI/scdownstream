@@ -205,12 +205,6 @@
                     "maximum": 100,
                     "description": "Maximum number of mitochindrial genes.",
                     "help_text": "Cells that have a higher percentage will be removed."
-                },
-                "symbol_col": {
-                    "type": "string",
-                    "default": "index",
-                    "description": "Gene symbol column used for filtering.",
-                    "help_text": "This is usually the 'index' of the anndata object."
                 }
             }
         },

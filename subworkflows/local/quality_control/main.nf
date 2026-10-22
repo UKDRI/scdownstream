@@ -9,6 +9,7 @@ include { SCANPY_FILTER                                                         
 include { DOUBLET_DETECTION                                                          } from '../doublet_detection'
 include { SCANPY_PLOTQC as QC_FILTERED                                               } from '../../../modules/local/scanpy/plotqc'
 include { CUSTOM_COLLECTSIZES as COLLECT_SIZES                                       } from '../../../modules/local/custom/collectsizes'
+include { sampleOrGlobal                                                             } from '../utils_nfcore_scdownstream_pipeline'
 
 workflow QUALITY_CONTROL {
     take:
@@ -82,29 +83,31 @@ workflow QUALITY_CONTROL {
     ch_h5ad = AMBIENT_CORRECTION.out.h5ad
     ch_versions = ch_versions.mix(AMBIENT_CORRECTION.out.versions)
 
+    // Per-sample thresholds: the samplesheet value if set, otherwise the global parameter
     ch_filtering = ch_h5ad.multiMap { meta, h5ad ->
         h5ad: [meta, h5ad]
-        symbol_col: meta.symbol_col ?: "index"
-        min_cells: meta.min_cells ?: 0
-        min_genes: meta.min_genes ?: 0
-        max_genes: meta.max_genes ?: false
-        min_counts: meta.min_counts ?: 0
-        max_counts: meta.max_counts ?: false
-        min_counts_gene: meta.min_counts_gene ?: 0
-        max_mito_percentage: meta.max_mito_percentage ?: 100
-	    automatic_cell_filtering: meta.automatic_cell_filtering
+        symbol_col: meta.symbol_col ?: 'index'
+        min_cells: sampleOrGlobal(meta, 'min_cells', params.min_cells)
+        min_genes: sampleOrGlobal(meta, 'min_genes', params.min_genes)
+        max_genes: sampleOrGlobal(meta, 'max_genes', params.max_genes)
+        min_counts: sampleOrGlobal(meta, 'min_counts_cell', params.min_counts)
+        max_counts: sampleOrGlobal(meta, 'max_counts', params.max_counts)
+        min_counts_gene: sampleOrGlobal(meta, 'min_counts_gene', params.min_counts_gene)
+        max_mito_percentage: sampleOrGlobal(meta, 'max_mito_percentage', params.max_mito_percentage)
+        automatic_cell_filtering: sampleOrGlobal(meta, 'automatic_cell_filtering', params.automatic_cell_filtering)
     }
 
-    SCANPY_FILTER(ch_filtering.h5ad, 
-        params.symbol_col ?: "index",
-        params.min_cells, 
-        params.min_genes, 
-        params.max_genes,
-        params.min_counts,
-        params.max_counts,
-        params.min_counts_gene,
-        params.max_mito_percentage,
-        params.automatic_cell_filtering
+    SCANPY_FILTER(
+        ch_filtering.h5ad,
+        ch_filtering.symbol_col,
+        ch_filtering.min_cells,
+        ch_filtering.min_genes,
+        ch_filtering.max_genes,
+        ch_filtering.min_counts,
+        ch_filtering.max_counts,
+        ch_filtering.min_counts_gene,
+        ch_filtering.max_mito_percentage,
+        ch_filtering.automatic_cell_filtering,
     )
 
     ch_h5ad = SCANPY_FILTER.out.h5ad
