@@ -43,6 +43,7 @@
                 "type": "string",
                 "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$",
                 "default": "index",
+                "description": "Column of the input file's var table holding gene symbols, set per sample (there is no global parameter). Defaults to `index` (the var index / matrix row names are the symbols). `none` converts gene IDs from `geneid_col` to symbols via MyGene.info. Any other value names a var column whose values become the index.",
                 "errorMessage": "Symbol column needs to start with a letter and can contain letters, numbers, underlines and dashes.",
                 "meta": ["symbol_col"]
             },
@@ -50,6 +51,7 @@
                 "type": "string",
                 "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$",
                 "default": "index",
+                "description": "Column of the var table holding gene IDs (e.g. Ensembl), only used when `symbol_col` is `none`. Defaults to `index`.",
                 "errorMessage": "Gene ID column needs to start with a letter and can contain letters, numbers, underlines and dashes.",
                 "meta": ["geneid_col"]
             },

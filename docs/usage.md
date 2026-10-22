@@ -81,8 +81,8 @@ metadata is available in a CSV.
 | `filtered`                      | Path to an `h5ad`, `h5`, `rds` or `csv` file. `rds` files may hold any object convertible to a `SingleCellExperiment` via [Seurat `as.SingleCellExperiment`](https://satijalab.org/seurat/reference/as.singlecellexperiment). `csv` files should hold a matrix with genes as columns and cells as rows. |
 | `unfiltered`                    | As `filtered`, but for the unfiltered CellRanger or nf-core/scrnaseq output. If not provided, only `decontX` can be used for ambient RNA removal.                                                                                                                                                       |
 | `batch_col`                     | Column in the input file holding batch information. If absent, the whole object is treated as one batch. Renamed to `batch` during execution.                                                                                                                                                           |
-| `symbol_col`                    | Column holding gene symbols. Defaults to `index`. Two special values: `index` uses the matrix row names; `none` triggers gene symbol conversion via MyGene.info based on `geneid_col`. The values become the object index.                                                                              |
-| `geneid_col`                    | Column holding gene identifiers. Defaults to `index`. Only used when `symbol_col` is `none`.                                                                                                                                                                                                            |
+| `symbol_col`                    | Where this sample's gene symbols are. **Set per sample; there is no global `--symbol_col` parameter.** Empty or absent: `index` (the matrix row names / var index are the symbols). `none`: convert the gene IDs in `geneid_col` to symbols via MyGene.info. Any other value: the name of a var column holding the symbols. See [Gene symbols](#gene-symbols). |
+| `geneid_col`                    | Var column holding gene IDs (e.g. Ensembl). Only used when `symbol_col` is `none`. Empty or absent: `index`.                                                                                                                                                                                         |
 | `label_col`                     | Column holding cell type information. Defaults to `label`. If absent, the pipeline creates it and fills it with `unknown`. Renamed to `label` during execution.                                                                                                                                         |
 | `unknown_label`                 | Value in `label_col` to treat as unknown. Defaults to `unknown`. Renamed to `unknown` during execution.                                                                                                                                                                                                 |
 | `counts_layer`                  | Layer holding the raw counts matrix. Defaults to `X`.                                                                                                                                                                                                                                                   |
@@ -90,6 +90,44 @@ metadata is available in a CSV.
 | `ambient_correction`            | Whether to run ambient RNA correction for this sample (`true` uses the globally configured method). Defaults to `true`.                                                                                                                                                                                 |
 | `ambient_corrected_integration` | Whether to use ambient-corrected counts for integration for this sample, overriding the global `--ambient_corrected_integration`.                                                                                                                                                                       |
 | `n_hvgs`                        | Number of highly variable genes for this sample. Defaults to `3000`.                                                                                                                                                                                                                                    |
+
+### Gene symbols
+
+The pipeline needs gene **symbols** (e.g. `CD3E`, `MT-CO1`), not only gene IDs: CellTypist models,
+LIANA+ ligand–receptor resources and gene set enrichment all match on symbols. Where a sample's
+symbols are is set **per sample** with the samplesheet column `symbol_col`. There is **no global
+parameter** for it (`--symbol_col` was removed); a sample that leaves the column empty, or a
+samplesheet without the column, uses `index`.
+
+| Input                                                                  | `symbol_col`                | `geneid_col`  |
+| ---------------------------------------------------------------------- | --------------------------- | ------------- |
+| Symbols are the matrix row names / var index (e.g. CellRanger `.h5`)    | empty or `index`            | —             |
+| Symbols are in a var column, e.g. `gene_symbols`                       | `gene_symbols`              | —             |
+| Only gene IDs, e.g. Ensembl IDs in the index                           | `none`                      | empty or `index` |
+| Only gene IDs, in a var column, e.g. `gene_ids`                        | `none`                      | `gene_ids`    |
+
+```csv title="samplesheet.csv"
+sample,filtered,symbol_col,geneid_col
+sample1,/path/to/sample1_cellranger.h5,,
+sample2,/path/to/sample2.h5ad,gene_symbols,
+sample3,/path/to/sample3_ensembl_only.h5ad,none,gene_ids
+```
+
+> [!WARNING]
+> `symbol_col = none` has three limits:
+> - it looks the symbols up online at MyGene.info, so the compute nodes need internet access;
+> - the lookup is for **human** genes only;
+> - the conversion runs when the samples are unified, after per-sample QC and CellTypist. CellTypist
+>   therefore cannot use it: with `--celltypist_model` set, a `none` sample stops with
+>   "Symbol column none not found".
+>
+> For non-human data, or with CellTypist, provide input that already has a symbol column.
+
+> [!IMPORTANT]
+> Mitochondrial QC does **not** use `symbol_col`: it flags `MT-`/`mt-` genes in the var index, or
+> in a var column named `gene_name`, `gene_names`, `gene_symbol` or `gene_symbols` if one exists.
+> For input with Ensembl IDs in the index and none of these columns, the mitochondrial percentage is
+> 0 for every cell and `max_mito_percentage` removes nothing.
 
 ### Per-sample QC thresholds
 
@@ -228,7 +266,6 @@ under `report/`, and a MultiQC report.
 | `--max_counts`                    | `false`          | Maximum counts per cell (`false` disables). Can be set per sample in the samplesheet. |
 | `--min_counts_gene`               | `0`              | Minimum counts per gene. Can be set per sample in the samplesheet. |
 | `--max_mito_percentage`           | `25`             | Maximum percentage of mitochondrial counts per cell. Can be set per sample in the samplesheet. |
-| `--symbol_col`                    | `index`          | Default gene symbol column for samples that do not set their own.                                                                                                      |
 | `--duplicate_var_resolution`      | `sum`            | How to resolve duplicate gene symbols: `mean`, `sum`, `max` or `make_unique`.                                                                                          |
 | `--aggregate_isoforms`            | `false`          | Aggregate isoform-level features.                                                                                                                                      |
 | `--n_hvgs`                        | `3000`           | Highly variable genes used for the PCA/UMAP embedding.                                                                                                                 |

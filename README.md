@@ -211,6 +211,11 @@ sample3,relative/path/to/sample3.rds
 sample4,/absolute/path/to/sample4.csv
 ```
 
+Gene symbols are taken from the matrix row names by default. If a sample's symbols are in another
+column, or it only has gene IDs, set that sample's `symbol_col` (and `geneid_col`) in the
+samplesheet; there is no global parameter for it. See
+[Gene symbols](docs/usage.md#gene-symbols).
+
 Each entry is an h5ad, 10x h5, RDS or CSV file. RDS files may contain any object convertible to a
 SingleCellExperiment via [Seurat's `as.SingleCellExperiment`](https://satijalab.org/seurat/reference/as.singlecellexperiment).
 CSV files should hold a matrix with genes as columns and cells as rows, the first column being cell

@@ -141,6 +141,9 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 - `--mito_genes`. It was accepted and passed to cell filtering but never used: mitochondrial genes
   are always identified by the `mt-` prefix of the gene symbols. Moved to the backlog for
   re-assessment.
+- `--symbol_col`. Nothing read it; gene symbols are set per sample with the samplesheet column
+  `symbol_col` (default `index`), which is what UNIFY, CellTypist and QC use. The docs had described
+  it as the default for samples without their own value, which it never was.
 - `--skip_enrichment`. It was in `nextflow.config` but not in the schema, and nothing read it:
   gene set enrichment always runs in `--stage downstream`. Moved to the backlog for re-assessment.
 - `--prep_cellxgene` and the `ADATA_PREPCELLXGENE` module. The option never ran (its wiring used the
