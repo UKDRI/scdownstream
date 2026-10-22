@@ -101,8 +101,6 @@ differential_genes/    ── decoupler pseudobulk → PyDESeq2 per group × con
 7. Reports — a [Quarto](https://quarto.org/) QC/clustering report and a
    [`MultiQC`](http://multiqc.info/) report
 
-`--qc_only` stops after step 3, producing per-sample QC objects without merging or integration.
-
 ### Stage 2 — `downstream`
 
 1. Marker genes per cluster — `scanpy.tl.rank_genes_groups` (Wilcoxon) on the clustering named by
@@ -302,7 +300,8 @@ Several of them silently affect results, so please read before interpreting outp
    `max_mito_percentage`, `automatic_cell_filtering` and related columns are read into the sample
    metadata but the global `--min_*` / `--max_*` parameters are what actually reach the filtering
    step. Set filters globally.
-4. **`--prep_cellxgene` is no longer supported.** Leave it at its default.
+4. **`--prep_cellxgene` and `--qc_only` have been removed.** The published h5ad can be opened in
+   cellxgene directly, and stage 1 always merges, integrates and clusters.
 5. **`-profile test_offline` is no longer supported.** Use `-profile test` instead.
 6. **Set `--species` explicitly.** It defaults to `human`, and mouse data analysed under the human
    default produces wrong enrichment and cell–cell communication results without any error. See

@@ -141,10 +141,6 @@ def validateInputParameters() {
         throw new Exception("Either an input samplesheet or (base_adata && base_embeddings && base_label_col) must be provided")
     }
 
-    if (params.qc_only && !params.input) {
-        throw new Exception("If qc_only is set to true, an input samplesheet must be provided")
-    }
-
     def integration_methods = params.integration_methods.split(',').collect { it.trim().toLowerCase() }
     if (params.input && params.base_adata && (integration_methods - ['scvi', 'scanvi', 'scimilarity']).size() > 0) {
         throw new Exception("Only scvi, scanvi and scimilarity integration methods are supported if base_adata is provided")

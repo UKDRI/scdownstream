@@ -32,7 +32,6 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
   `docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4` and `docker.io/nhecker/pydeseq2:0.1`, built from Dockerfiles in
   the repository.
 - `--memory_scale`, which scales every memory request in `conf/base.config`.
-- `--qc_only`, to stop after per-sample QC and cell type annotation.
 - Per-sample `n_hvgs` and `automatic_cell_filtering` columns in the samplesheet schema.
 - `--metadata` / `--metadata_sample_col` for `--stage qc_clustering`: per-sample metadata from a TSV,
   added to `obs` before QC by the new `ADATA_ADDMETADATA` module. It stops on a missing sample,
@@ -94,6 +93,10 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Fixed`
 
+- `--duplicate_var_resolution max` no longer crashes on samples with duplicated gene symbols, and
+  duplicate genes are aggregated with sparse matrix operations instead of a per-gene loop that
+  assigned into the CSR matrix, which was slow for `sum` and `mean`. Results for `sum` and `mean`
+  are unchanged.
 - The pipeline now parses under Nextflow 26.04's strict syntax parser (the default since 26.04),
   without the `NXF_SYNTAX_PARSER=v1` fallback, and `nextflow lint` reports no errors. The
   `test_offline` profile, whose config file was never committed, is removed. The `validation`
@@ -110,6 +113,13 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Removed`
 
+- `--prep_cellxgene` and the `ADATA_PREPCELLXGENE` module. The option never ran (its wiring used the
+  output of a step that was not called), and its template would have log-transformed the already
+  log-normalised `X` a second time. The published h5ad can be opened in cellxgene directly.
+- `--qc_only`, and its `main_pipeline_qc` pipeline test. It published every per-sample object under
+  the same `<name>_qc_clustering` name, so they overwrote each other. Stage 1 always merges,
+  integrates and clusters.
+- The unused `FINALIZE` subworkflow.
 - SingleR / celldex cell type annotation: `--celldex_reference`, the `CELLDEX_FETCHREFERENCE` and
   `CELLTYPES_SINGLER` modules, the `SINGLER` subworkflow and `assets/schema_singler.json`. No UK DRI
   run used it; cell type annotation is CellTypist only, and scANVI-based annotation is planned
