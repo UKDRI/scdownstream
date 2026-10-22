@@ -51,7 +51,6 @@ sc.settings.n_jobs = int("${task.cpus}")
 adata = sc.read_h5ad("${h5ad}")
 prefix = "${prefix}"
 symbol_col = "${symbol_col}"
-mito_genes = "${mito_genes}"
 automatic_filtering = "${automatic_cell_filtering}" == "true"
 keep_outliers = "${task.ext.keep_outliers ?: false}" == "true"
 
@@ -65,26 +64,6 @@ namds_metric = {
 }
 
 dpi_plots = 120
-
-#  TODO: move custom mito genes to QC metric step
-#
-#symbols = adata.var_names if symbol_col == "index" else adata.var[symbol_col]
-#
-#
-# if mito_genes:
-#     with open(mito_genes, "r") as f:
-#         mito_genes = {
-#             line.strip().lower()
-#             for line in f
-#             if line.strip() and not line.startswith("#")
-#         }
-#     adata.var["mt"] = symbols.str.lower().isin(mito_genes)
-# else:
-#     adata.var["mt"] = symbols.str.lower().str.startswith("mt-")
-
-# sc.pp.calculate_qc_metrics(
-#     adata, qc_vars=["mt"], percent_top=None, log1p=False, inplace=True
-# )
 
 
 # thresholds cells

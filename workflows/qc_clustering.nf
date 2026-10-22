@@ -106,7 +106,6 @@ workflow QC_CLUSTER {
         params.ambient_correction,
         !params.doublet_detection || params.doublet_detection == 'none' ? [] : params.doublet_detection.split(',').collect { it -> it.trim().toLowerCase() },
         params.doublet_detection_threshold,
-        params.mito_genes,
     )
     ch_versions = ch_versions.mix(QUALITY_CONTROL.out.versions)
     ch_multiqc_files = ch_multiqc_files.mix(QUALITY_CONTROL.out.multiqc_files)

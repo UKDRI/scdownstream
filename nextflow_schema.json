@@ -110,12 +110,6 @@
             "fa_icon": "fas fa-check-circle",
             "description": "Options for quality control of the input data.",
             "properties": {
-                "mito_genes": {
-                    "type": "string",
-                    "format": "file-path",
-                    "description": "Optional file containing a list of mitochondrial gene symbols (one per line). If provided, it overrides the default 'mt-' prefix heuristic.",
-                    "exists": true
-                },
                 "ambient_correction": {
                     "type": "string",
                     "default": "none",

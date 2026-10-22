@@ -16,7 +16,6 @@ workflow QUALITY_CONTROL {
     ambient_correction_method   // value: string
     doublet_detection_methods   // value: list of strings
     doublet_detection_threshold // value: integer
-    mito_genes                  // value: string (path) or null
 
     main:
     ch_versions = Channel.empty()
@@ -105,8 +104,7 @@ workflow QUALITY_CONTROL {
         params.max_counts,
         params.min_counts_gene,
         params.max_mito_percentage,
-        params.automatic_cell_filtering,
-        mito_genes ?: []
+        params.automatic_cell_filtering
     )
 
     ch_h5ad = SCANPY_FILTER.out.h5ad

@@ -133,6 +133,11 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Removed`
 
+- `--mito_genes`. It was accepted and passed to cell filtering but never used: mitochondrial genes
+  are always identified by the `mt-` prefix of the gene symbols. Moved to the backlog for
+  re-assessment.
+- `--skip_enrichment`. It was in `nextflow.config` but not in the schema, and nothing read it:
+  gene set enrichment always runs in `--stage downstream`. Moved to the backlog for re-assessment.
 - `--prep_cellxgene` and the `ADATA_PREPCELLXGENE` module. The option never ran (its wiring used the
   output of a step that was not called), and its template would have log-transformed the already
   log-normalised `X` a second time. The published h5ad can be opened in cellxgene directly.

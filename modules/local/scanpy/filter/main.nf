@@ -18,7 +18,6 @@ process SCANPY_FILTER {
     val min_counts_gene
     val max_mito_percentage
     val automatic_cell_filtering
-    path mito_genes
 
     output:
     tuple val(meta), path("${prefix}.h5ad"), emit: h5ad
