@@ -128,56 +128,48 @@ workflow QC_CLUSTER {
     ch_h5ad = FINALIZE_QC_ANNDATAS.out.h5ad
     ch_versions = ch_versions.mix(FINALIZE_QC_ANNDATAS.out.versions)
 
-    if (!params.qc_only) {
-        //
-        // Unify samples to make them compatible for integration
-        //
-        UNIFY(ch_h5ad)
-        ch_versions = ch_versions.mix(UNIFY.out.versions)
-        ch_multiqc_files = ch_multiqc_files.mix(UNIFY.out.multiqc_files)
-        ch_h5ad = UNIFY.out.h5ad
+    //
+    // Unify samples to make them compatible for integration
+    //
+    UNIFY(ch_h5ad)
+    ch_versions = ch_versions.mix(UNIFY.out.versions)
+    ch_multiqc_files = ch_multiqc_files.mix(UNIFY.out.multiqc_files)
+    ch_h5ad = UNIFY.out.h5ad
 
-        //
-        // Combine samples and perform integration
-        //
-        COMBINE(ch_h5ad, ch_base)
-        ch_versions = ch_versions.mix(COMBINE.out.versions)
-        ch_obs = ch_obs.mix(COMBINE.out.obs)
-        ch_var = ch_var.mix(COMBINE.out.var)
-        ch_obsm = ch_obsm.mix(COMBINE.out.obsm)
-        ch_integrations = ch_integrations.mix(COMBINE.out.integrations)
-        //ch_finalization_base = COMBINE.out.h5ad
-        ch_h5ad = COMBINE.out.h5ad
+    //
+    // Combine samples and perform integration
+    //
+    COMBINE(ch_h5ad, ch_base)
+    ch_versions = ch_versions.mix(COMBINE.out.versions)
+    ch_obs = ch_obs.mix(COMBINE.out.obs)
+    ch_var = ch_var.mix(COMBINE.out.var)
+    ch_obsm = ch_obsm.mix(COMBINE.out.obsm)
+    ch_integrations = ch_integrations.mix(COMBINE.out.integrations)
+    //ch_finalization_base = COMBINE.out.h5ad
+    ch_h5ad = COMBINE.out.h5ad
 
-        ch_label_grouping = COMBINE.out.h5ad_inner
-        grouping_col = "label"
-    }
+    ch_label_grouping = COMBINE.out.h5ad_inner
+    grouping_col = "label"
 
     //
     // Compute embeddings
     //
-    if (!params.qc_only) {
-
-        SCANPY_LOG_NORMALIZE(ch_h5ad)
-        ch_h5ad = SCANPY_LOG_NORMALIZE.out.h5ad
-        SCANPY_HVGS(ch_h5ad, params.n_hvgs, false)
-        ch_h5ad = SCANPY_HVGS.out.h5ad
-        SCANPY_PCA(ch_h5ad)
-        ch_h5ad = SCANPY_PCA.out.h5ad
-        SCANPY_NEIGHBORS(ch_h5ad, 'X_pca', 'neighbors_pca' )
-        ch_h5ad = SCANPY_NEIGHBORS.out.h5ad
-        SCANPY_UMAP(ch_h5ad, 'neighbors_pca', 'X_umap_pca')
-        ch_h5ad = SCANPY_UMAP.out.h5ad
-
-    }
+    SCANPY_LOG_NORMALIZE(ch_h5ad)
+    ch_h5ad = SCANPY_LOG_NORMALIZE.out.h5ad
+    SCANPY_HVGS(ch_h5ad, params.n_hvgs, false)
+    ch_h5ad = SCANPY_HVGS.out.h5ad
+    SCANPY_PCA(ch_h5ad)
+    ch_h5ad = SCANPY_PCA.out.h5ad
+    SCANPY_NEIGHBORS(ch_h5ad, 'X_pca', 'neighbors_pca' )
+    ch_h5ad = SCANPY_NEIGHBORS.out.h5ad
+    SCANPY_UMAP(ch_h5ad, 'neighbors_pca', 'X_umap_pca')
+    ch_h5ad = SCANPY_UMAP.out.h5ad
 
     //
     // Perform clustering and related analysis
     //
-    if (!params.qc_only) {
-        SCANPY_LEIDEN(ch_h5ad, params.clustering_resolutions, "leiden", params.cluster_neighbors, false)
-        ch_h5ad = SCANPY_LEIDEN.out.h5ad
-    }
+    SCANPY_LEIDEN(ch_h5ad, params.clustering_resolutions, "leiden", params.cluster_neighbors, false)
+    ch_h5ad = SCANPY_LEIDEN.out.h5ad
 
     // create output final output files
     FINALIZE_H5AD_SIMPLE(ch_h5ad)
@@ -185,9 +177,7 @@ workflow QC_CLUSTER {
     //
     // Summary report
     //
-    if (!params.qc_only) {
-        SCANPY_GENERATE_REPORT_QC(ch_h5ad, "${projectDir}/modules/local/scanpy/report/templates/scdownstream_qc_clustering_report.qmd", params.umap_for_plots, params.umap_color_by ?: '', params.umap_color_by_embeddings ?: '')
-    }
+    SCANPY_GENERATE_REPORT_QC(ch_h5ad, "${projectDir}/modules/local/scanpy/report/templates/scdownstream_qc_clustering_report.qmd", params.umap_for_plots, params.umap_color_by ?: '', params.umap_color_by_embeddings ?: '')
 
     //
     // Collate and save software versions

@@ -182,7 +182,6 @@ under `report/`, and a MultiQC report.
 | `--umap_color_by_embeddings`      | `X_umap_pca,X_umap_scvi`| UMAPs those columns are plotted on: before (PCA) and after (scVI) integration. |
 | `--name`                          | `qc_clustering`  | Identifier used in output file names.                                                                                                                                  |
 | `--species`                       | `human`          | `human` or `mouse`. Set explicitly for mouse data.                                                                                                                     |
-| `--qc_only`                       | `false`          | Stop after per-sample QC and cell type annotation; skip merging, integration, embeddings, clustering and the Quarto report.                                            |
 | `--mito_genes`                    | `null`           | File or pattern identifying mitochondrial genes, used for the mitochondrial percentage metric.                                                                         |
 | `--ambient_correction`            | `none`           | `none`, `decontx`, `cellbender`, `soupx` or `scar`. Off by default, because the expected input is already CellBender-corrected. See [Ambient RNA correction](#ambient-rna-correction). |
 | `--ambient_corrected_integration` | `false`          | Use ambient-corrected counts for integration rather than storing them as extra layers.                                                                                 |
@@ -281,7 +280,7 @@ The pipeline stops with an error when:
   creates these itself, so rename them, e.g. `batch` to `seq_batch`.
 
 The columns are added before QC, so they are in every object from then on: the per-sample QC
-objects (also with `--qc_only`), the merged and integrated object, and the stage outputs used by
+objects, the merged and integrated object, and the stage outputs used by
 `downstream` and `differential_genes`. That means you can use them as scVI covariates
 (`--scvi_categorical_covariates`, `--scvi_continuous_covariates`), and as `variable` or `blocking`
 in the [contrasts file](#the-contrasts-file). With `--base_adata`, the metadata columns are kept
@@ -476,8 +475,8 @@ Two consequences of the current tool set are worth knowing before you interpret 
 **Inactive parameters.** The following are accepted but currently have no effect:
 `--skip_enrichment`, `--skip_liana`, `--skip_rankgenesgroups`,
 `--pseudobulk`, `--pseudobulk_groupby_labels`, `--pseudobulk_min_num_cells`, `--cluster_per_label`,
-`--cluster_global`, `--base_embeddings`, `--base_label_col`. `--prep_cellxgene` and
-`--unify_gene_symbols` are no longer supported and should be left at their defaults —
+`--cluster_global`, `--base_embeddings`, `--base_label_col`. `--unify_gene_symbols` is no longer
+supported and should be left at its default —
 HUGO-based gene symbol unification only applies to human data and is not reliable enough to
 recommend.
 

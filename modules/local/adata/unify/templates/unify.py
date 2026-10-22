@@ -11,20 +11,76 @@ from scipy.sparse import csr_matrix
 import platform
 import yaml
 
-# Function borrowed from https://github.com/icbi-lab/luca/blob/5ffb0a4671e9c288b10e73de18d447ee176bef1d/lib/scanpy_helper_submodule/scanpy_helpers/util.py#L122C1-L135C21
-def aggregate_duplicate_var(adata, aggr_fun=np.mean):
-    retain_var = ~adata.var_names.duplicated(keep="first")
-    duplicated_var = adata.var_names[adata.var_names.duplicated()].unique()
-    if len(duplicated_var):
-        for var in duplicated_var:
-            mask = adata.var_names == var
-            var_aggr = aggr_fun(adata.X[:, mask], axis=1)[:, np.newaxis]
-            adata.X[:, mask] = np.repeat(var_aggr, np.sum(mask), axis=1)
+def aggregate_duplicate_var(adata: ad.AnnData, method: str = "mean") -> ad.AnnData:
+    """Collapse columns that share a var name into one column per unique name.
 
-        adata_dedup = adata[:, retain_var].copy()
-        return adata_dedup
-    else:
+    Columns come out in first-occurrence order and keep the var row of the first
+    occurrence. "sum" adds the duplicate columns, "mean" averages them (implicit zeros
+    included) and "max" takes their element-wise maximum. X stays a CSR matrix of the
+    same dtype and is never densified.
+    """
+    is_first = ~adata.var_names.duplicated(keep="first")
+    if is_first.all():
         return adata
+
+    X = csr_matrix(adata.X)
+    dtype = X.dtype
+    n_obs, n_var = X.shape
+    first_idx = np.flatnonzero(is_first)
+    n_unique = len(first_idx)
+
+    # Column of each var in the deduplicated matrix. get_indexer matches NaN to NaN,
+    # consistent with duplicated() above.
+    codes = adata.var_names[first_idx].get_indexer(adata.var_names)
+    assert (codes >= 0).all(), "Could not map every var name to its first occurrence"
+    group_size = np.bincount(codes, minlength=n_unique)
+
+    if method in ("sum", "mean"):
+        # Indicator matrix: entry (j, k) is 1 if var j belongs to unique var k
+        indicator = csr_matrix(
+            (np.ones(n_var, dtype=dtype), (np.arange(n_var), codes)),
+            shape=(n_var, n_unique),
+        )
+        X_new = (X @ indicator).tocsr()
+        if method == "mean":
+            X_new.data = (X_new.data / group_size[X_new.indices]).astype(dtype)
+    elif method == "max":
+        # Columns of unique vars are already correct in the first-occurrence slice;
+        # only the duplicated groups need their maximum computed.
+        is_dup_group = group_size > 1
+        dup_cols = np.flatnonzero(is_dup_group[codes])
+        dup = X[:, dup_cols].tocoo()
+        rows, cols, vals = dup.row, codes[dup_cols][dup.col], dup.data
+
+        # Sort stored entries by (row, group) and reduce each run to its maximum
+        order = np.lexsort((cols, rows))
+        rows, cols, vals = rows[order], cols[order], vals[order]
+        if vals.size:
+            starts = np.flatnonzero(np.r_[True, (rows[1:] != rows[:-1]) | (cols[1:] != cols[:-1])])
+            group_max = np.maximum.reduceat(vals, starts)
+            n_stored = np.diff(np.r_[starts, vals.size])
+            # A run with fewer stored entries than its group has columns also covers
+            # implicit zeros, which take part in the maximum
+            has_implicit_zero = n_stored < group_size[cols[starts]]
+            group_max = np.where(has_implicit_zero, np.maximum(group_max, 0), group_max)
+            rows, cols = rows[starts], cols[starts]
+        else:
+            group_max = vals
+        dup_max = csr_matrix((group_max, (rows, cols)), shape=(n_obs, n_unique), dtype=dtype)
+
+        # Clear the duplicated groups' columns in the first-occurrence slice, then add the maxima
+        X_first = X[:, first_idx]
+        X_first.data[is_dup_group[X_first.indices]] = 0
+        X_new = (X_first + dup_max).tocsr()
+    else:
+        raise ValueError(f"Invalid aggregation method: {method}")
+
+    X_new = X_new.astype(dtype, copy=False)
+    X_new.eliminate_zeros()
+
+    adata_dedup = adata[:, is_first].copy()
+    adata_dedup.X = X_new
+    return adata_dedup
 
 def to_Florent_case(s: str):
     corrected = s.lower().strip()
@@ -81,7 +137,7 @@ if "${aggregate_isoforms}" == "true":
 # Deal with duplicate genes
 method = "${duplicate_var_resolution}"
 if method in ["mean", "sum", "max"]:
-    adata = aggregate_duplicate_var(adata, aggr_fun=getattr(np, method))
+    adata = aggregate_duplicate_var(adata, method=method)
 elif method == "make_unique":
     adata.var_names_make_unique()
 else:

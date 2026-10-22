@@ -523,10 +523,6 @@
             "type": "object",
             "description": "Options for selecting which tools should be used for certain tasks",
             "properties": {
-                "qc_only": {
-                    "type": "boolean",
-                    "description": "Only run the preprocessing steps, skip the integration and clustering steps"
-                },
                 "skip_liana": {
                     "type": "boolean",
                     "description": "Skip the LIANA step. For large datasets, the pipeline might fail due to high memory usage in this step. Use this option to skip it."
@@ -538,11 +534,6 @@
                 "pseudobulk": {
                     "type": "boolean",
                     "description": "Perform pseudobulking"
-                },
-                "prep_cellxgene": {
-                    "type": "boolean",
-                    "description": "Prepare the output for visualisation in cellxgene",
-                    "fa_icon": "fas fa-chart-line"
                 }
             }
         },
