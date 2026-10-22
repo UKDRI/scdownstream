@@ -12,6 +12,11 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Added`
 
+- Per-sample QC thresholds: the samplesheet columns `min_genes`, `max_genes` (new),
+  `min_counts_cell`, `max_counts` (new), `max_mito_percentage`, `min_cells`, `min_counts_gene` and
+  `automatic_cell_filtering` now override the matching global parameter for that sample; an empty
+  cell falls back to the global value. Before, the columns were read and then ignored. Their schema
+  defaults were removed so that an empty cell can be told apart from an explicit `0` / `false`.
 - The contrasts-file columns `exclude_samples_col` / `exclude_samples_values` now work: they drop
   samples from one contrast only (e.g. outlier donors) before the model is fitted and before the
   `--diffgenes_min_samples` check. The column must be sample-level metadata. Before, both columns

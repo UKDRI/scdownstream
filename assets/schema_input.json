@@ -73,45 +73,51 @@
                 "errorMessage": "Counts layer needs to start with a letter and can contain letters, numbers, underlines and dashes.",
                 "meta": ["counts_layer"]
             },
-	        "automatic_cell_filtering": {
+            "automatic_cell_filtering": {
                 "type": "boolean",
-                "default": true,
                 "errorMessage": "'automatic_cell_filtering' must be a boolean.",
                 "meta": ["automatic_cell_filtering"]
-	        },
+            },
             "min_genes": {
                 "type": "integer",
                 "minimum": 0,
-                "default": 0,
-                "errorMessage": "Minimum number of genes must be an integer greater than 0.",
+                "errorMessage": "Minimum number of genes must be an integer of 0 or more.",
                 "meta": ["min_genes"]
+            },
+            "max_genes": {
+                "type": "integer",
+                "minimum": 1,
+                "errorMessage": "Maximum number of genes must be an integer of 1 or more.",
+                "meta": ["max_genes"]
             },
             "min_cells": {
                 "type": "integer",
                 "minimum": 0,
-                "default": 0,
-                "errorMessage": "Minimum number of cells must be an integer greater than 0.",
+                "errorMessage": "Minimum number of cells must be an integer of 0 or more.",
                 "meta": ["min_cells"]
             },
             "min_counts_cell": {
                 "type": "integer",
                 "minimum": 0,
-                "default": 0,
-                "errorMessage": "Minimum number of counts per cell must be an integer greater than 0.",
+                "errorMessage": "Minimum number of counts per cell must be an integer of 0 or more.",
                 "meta": ["min_counts_cell"]
+            },
+            "max_counts": {
+                "type": "integer",
+                "minimum": 1,
+                "errorMessage": "Maximum number of counts per cell must be an integer of 1 or more.",
+                "meta": ["max_counts"]
             },
             "min_counts_gene": {
                 "type": "integer",
                 "minimum": 0,
-                "default": 0,
-                "errorMessage": "Minimum number of counts per gene must be an integer greater than 0.",
+                "errorMessage": "Minimum number of counts per gene must be an integer of 0 or more.",
                 "meta": ["min_counts_gene"]
             },
             "max_mito_percentage": {
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 100,
-                "default": 100,
                 "errorMessage": "Max mitochondrial percentage must be an integer between 0 and 100.",
                 "meta": ["max_mito_percentage"]
             },

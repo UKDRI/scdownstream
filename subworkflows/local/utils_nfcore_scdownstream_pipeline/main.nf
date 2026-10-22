@@ -181,6 +181,18 @@ def validateInputSamplesheet(input) {
 }
 
 //
+// Return the per-sample value meta[key] from the samplesheet, or `global` when the
+// samplesheet cell was left empty (null, '' or []). Explicit 0 and false are kept.
+//
+def sampleOrGlobal(meta, key, global) {
+    def value = meta[key]
+    if (value == null || value == '' || value == []) {
+        return global
+    }
+    return value
+}
+
+//
 // Generate methods description for MultiQC
 //
 def toolCitationText() {
