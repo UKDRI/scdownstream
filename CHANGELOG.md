@@ -12,6 +12,10 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Added`
 
+- The contrasts-file columns `exclude_samples_col` / `exclude_samples_values` now work: they drop
+  samples from one contrast only (e.g. outlier donors) before the model is fitted and before the
+  `--diffgenes_min_samples` check. The column must be sample-level metadata. Before, both columns
+  were validated and then ignored.
 - Three sequential stages, selected with `--stage`, replacing the single-pass workflow: `--stage qc_clustering`,
   `--stage downstream` and `--stage differential_genes`, chained by passing each stage's
   `<name>_qc_clustering.h5ad` / `<name>_downstream.h5ad` to the next as `--base_adata`.
