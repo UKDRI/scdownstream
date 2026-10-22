@@ -64,8 +64,11 @@ later object, including `<name>_qc_clustering.h5ad` and `<name>_downstream.h5ad`
     scores and predictions, and a `*_mqc.json` carrying the score distribution plot for MultiQC.
   - `ambient_rna_removal/`: ambient RNA correction results (decontX, SoupX, CellBender or scAR
     depending on `--ambient_correction`).
-  - `custom_thresholds/`: the result of cell and gene filtering, plus QC plots. When
-    `--automatic_cell_filtering` is set, the N-MAD-derived thresholds used are reported here.
+  - `custom_thresholds/`: the result of cell and gene filtering, plus QC plots. The thresholds
+    applied are reported here and in MultiQC; with `--automatic_cell_filtering` these are the N-MAD
+    thresholds after the `--min_genes` / `--min_counts` floors, and the report says when a floor
+    was used. The number of cells removed because they had no counts left after gene filtering is
+    reported too.
   - `qc_filtered/`: QC metrics and plots after filtering, also fed into MultiQC.
   - `finalized/`: the per-sample objects with cell type predictions merged back in.
 

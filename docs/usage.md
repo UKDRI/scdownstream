@@ -188,12 +188,12 @@ under `report/`, and a MultiQC report.
 | `--doublet_detection`             | `scrublet`       | Doublet detection method, or `none` to skip. See [Supported tool choices](#supported-tool-choices).                                                                    |
 | `--doublet_removal`               | `false`          | Remove cells called doublets by at least `--doublet_detection_threshold` methods, right after doublet detection. Off: doublets are only annotated. See [Doublets and QC outliers](#doublets-and-qc-outliers). |
 | `--doublet_detection_threshold`   | `1`              | With `--doublet_removal`: number of `--doublet_detection` methods that must call a cell a doublet. |
-| `--automatic_cell_filtering`      | `false`          | Derive filtering thresholds automatically from N-MAD outlier detection instead of using the fixed thresholds below.                                                    |
-| `--filtering_keep_outliers`       | `false`          | Keep cells that fail the QC thresholds and mark them in `obs["outlier"]` instead of removing them. See [Doublets and QC outliers](#doublets-and-qc-outliers). |
-| `--min_genes`                     | `200`            | Minimum genes per cell.                                                                                                                                                |
+| `--automatic_cell_filtering`      | `false`          | Derive per-sample thresholds from N-MAD outlier detection instead of the fixed thresholds below. `--min_genes` / `--min_counts` still apply as lower floors; consider setting them very low in this mode. See [Automatic thresholds](#automatic-thresholds). |
+| `--filtering_keep_outliers`       | `false`          | Keep cells that fail the QC thresholds and mark them in `obs["outlier"]` instead of removing them. Cells left with no counts after gene filtering are removed regardless. See [Doublets and QC outliers](#doublets-and-qc-outliers). |
+| `--min_genes`                     | `200`            | Minimum genes per cell. Also the floor for the automatic lower bound with `--automatic_cell_filtering`.                                                                |
 | `--max_genes`                     | `false`          | Maximum genes per cell (`false` disables).                                                                                                                             |
 | `--min_cells`                     | `5`              | Minimum cells per gene.                                                                                                                                                |
-| `--min_counts`                    | `0`              | Minimum counts per cell.                                                                                                                                               |
+| `--min_counts`                    | `0`              | Minimum counts per cell. Also the floor for the automatic lower bound with `--automatic_cell_filtering`.                                                               |
 | `--max_counts`                    | `false`          | Maximum counts per cell (`false` disables).                                                                                                                            |
 | `--min_counts_gene`               | `0`              | Minimum counts per gene.                                                                                                                                               |
 | `--max_mito_percentage`           | `25`             | Maximum percentage of mitochondrial counts per cell.                                                                                                                   |
@@ -237,13 +237,47 @@ filtering on the QC thresholds (fixed, or automatic N-MAD thresholds with
   QC/clustering report then shows a "QC outliers" section: a UMAP coloured by `outlier`, a table of
   outliers per sample and violin plots of the QC metrics. Gene filtering (`--min_cells`,
   `--min_counts_gene`) still applies, counted over all kept cells, outliers included.
+- **Empty cells**: gene filtering (`--min_cells`, `--min_counts_gene`) runs after cell filtering, so a
+  cell whose only genes are removed is left with no counts. Such cells are **always removed**, also
+  with `--filtering_keep_outliers`: an empty barcode cannot be normalised or integrated and makes
+  later steps fail. The number removed is in the MultiQC caption of each sample and in
+  `uns["cell_filtering"]["n_empty_after_gene_filtering"]`.
 
 The two options are independent: you can, for example, remove doublets and keep QC outliers.
 
+#### Automatic thresholds
+
+With `--automatic_cell_filtering`, each sample gets its own thresholds from the median and the median
+absolute deviation (MAD) of its QC metrics:
+
+| Metric                               | Lower bound                                     | Upper bound      |
+| ------------------------------------ | ----------------------------------------------- | ---------------- |
+| genes per cell (`n_genes_by_counts`) | median − 2.5 × MAD, but at least `--min_genes`  | median + 5 × MAD |
+| counts per cell (`total_counts`)     | median − 2.5 × MAD, but at least `--min_counts` | median + 5 × MAD |
+| mitochondrial % (`pct_counts_mt`)    | none                                            | median + 5 × MAD |
+
+`--min_genes` and `--min_counts` are **floors**: the automatic lower bound never goes below them. On
+samples with a wide or skewed distribution, median − 2.5 × MAD is often below zero, and without a
+floor no cell would be removed at the low end, near-empty barcodes included. With the defaults, cells
+need at least 200 genes in automatic mode too. The fixed `--max_genes`, `--max_counts` and
+`--max_mito_percentage` are not used in automatic mode.
+
+> [!TIP]
+> When you use `--automatic_cell_filtering`, consider setting `--min_genes` and `--min_counts` very
+> low (e.g. `--min_genes 10 --min_counts 20`). The N-MAD thresholds then decide where the lower
+> cut-off lies for each sample, and the floors only stop empty and near-empty barcodes from passing
+> when the N-MAD bound drops to zero. With the default `--min_genes 200`, the floor often overrides
+> the automatic bound, and samples with many small cells (e.g. nuclei with low RNA content) lose
+> more cells than the N-MAD rule alone would remove.
+
+The thresholds that were applied are in the per-sample MultiQC section (which also says when a floor
+replaced the N-MAD value) and in `uns["n_mads_obs_thresholds"]`: `thresholds` holds the applied
+values, `n_mads_thresholds` the raw N-MAD values and `floors` the floors.
+
 > [!NOTE]
-> Cells with no counts in the highly variable genes used for integration are still dropped before
-> scVI, also with `--filtering_keep_outliers`. This can remove a few near-empty outlier cells from
-> the merged object.
+> Cells with no counts in the highly variable genes used for integration are also dropped before
+> scVI, also with `--filtering_keep_outliers`, so a few cells with very few genes can be missing
+> from the merged object.
 
 To drop the marked outliers later, subset the object, e.g. `adata = adata[~adata.obs["outlier"]].copy()`.
 
