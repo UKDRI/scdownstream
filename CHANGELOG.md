@@ -64,6 +64,10 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Changed`
 
+- The published `<name>_qc_clustering.h5ad` and `<name>_downstream.h5ad` always store `X`, every
+  layer and `raw.X` as sparse CSR matrices, as well as being gzip-compressed. `ADATA_PUBLISH`
+  converts dense or CSC matrices before writing and logs each conversion. Intermediate h5ads
+  (published only with `--save_intermediates`) are still written uncompressed.
 - Stage outputs are named after `--name` and the stage: `<name>_qc_clustering.h5ad`/`.rds`,
   `<name>_downstream.h5ad`/`.rds`, `<name>_downstream_markers.json.gz`, and the reports
   `<name>_qc_clustering_report.html` / `<name>_downstream_report.html` (previously

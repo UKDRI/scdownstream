@@ -24,6 +24,13 @@ process ADATA_PUBLISH {
     prefix = task.ext.prefix ?: "${meta.id}"
     """
     touch ${prefix}.h5ad
-    touch versions.yml
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        python: \$(python3 -c 'import platform; print(platform.python_version())')
+        anndata: \$(python3 -c 'import anndata; print(anndata.__version__)')
+        h5py: \$(python3 -c 'import h5py; print(h5py.__version__)')
+        scipy: \$(python3 -c 'import scipy; print(scipy.__version__)')
+    END_VERSIONS
     """
 }

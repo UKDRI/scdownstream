@@ -12,7 +12,9 @@ are grouped by stage.
 > [!IMPORTANT]
 > Most intermediate objects are only published when `--save_intermediates` is set. Without it you get
 > the finalized objects, the HTML reports, MultiQC and `pipeline_info/` — which is usually what you
-> want.
+> want. Intermediate h5ad files are written uncompressed and may hold dense matrices; only the
+> finalized `<name>_qc_clustering.h5ad` and `<name>_downstream.h5ad` are guaranteed sparse and
+> gzip-compressed.
 
 ## Stage 1 — `qc_clustering`
 
@@ -21,8 +23,8 @@ Produces, at the top level of the results directory:
 <details markdown="1">
 <summary>Output files</summary>
 
-- `<name>_qc_clustering.h5ad`: the integrated, clustered AnnData object, gzip-compressed. **This is the input to
-  `--stage downstream`.**
+- `<name>_qc_clustering.h5ad`: the integrated, clustered AnnData object, gzip-compressed, with `X`,
+  every layer and `raw.X` stored as sparse CSR matrices. **This is the input to `--stage downstream`.**
 - `<name>_qc_clustering.rds`: a SingleCellExperiment version of the same object.
 
 </details>
@@ -193,8 +195,8 @@ a `qc_clustering` run.
 <details markdown="1">
 <summary>Output files</summary>
 
-- `<name>_downstream.h5ad` (gzip-compressed) / `<name>_downstream.rds`: the object with marker genes, enrichment results
-  and LIANA+ output added. **This is the input to `--stage differential_genes`.**
+- `<name>_downstream.h5ad` (gzip-compressed, sparse CSR `X`, layers and `raw.X`) / `<name>_downstream.rds`: the
+  object with marker genes, enrichment results and LIANA+ output added. **This is the input to `--stage differential_genes`.**
 - `<name>_downstream_markers.json.gz`: the marker genes per group (one set per cluster, id
   `genes--cluster--<cluster>`; the separator is `--markers_sep`), filtered by `--markers_thr_adj_pvalue`,
   `--markers_n_top`, `--markers_pct_nz` and `--markers_min_logfc`, in a compact JSON form for
