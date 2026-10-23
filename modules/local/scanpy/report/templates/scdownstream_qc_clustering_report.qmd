@@ -19,6 +19,7 @@ FILE = "scdownstream.h5ad"
 UMAP_FOR_PLOTS = "X_umap_scvi"
 UMAP_COLOR_BY = ""
 UMAP_COLOR_BY_EMBEDDINGS = "X_umap_pca,X_umap_scvi"
+MAX_CELLTYPE_LABELS = 50
 ```
 
 
@@ -359,9 +360,52 @@ else:
 Celltypist uses pre-trained logistic regression models for predicting labels such as cell types for each cell. Predicted labels of the selected model(s) and the confidence of the predictions are displayed in the UMAPs below. Counts for the predicted labels are summarised in the table(s).
 
 ```{python}
+# CellTypist models can predict hundreds of labels. Only the max_predicted_labels labels with the most
+# cells are coloured, the others are grouped into one grey "other" category. Grouped columns are plotted
+# from a small in-memory AnnData, so scanpy never writes to the backed report object.
+import anndata as ad
+import numpy as np
+import pandas as pd
+from IPython.display import display, HTML
+
+# set by --report_max_celltype_labels (default 50); keeps the legend and the count table readable
+max_predicted_labels = int(MAX_CELLTYPE_LABELS)
+
+def group_predicted_labels(values, max_labels):
+    # cells per label, most cells first; the labels after the first max_labels are grouped as "other"
+    counts = values.value_counts()
+    counts = counts[counts > 0]
+    top, rest = counts.iloc[:max_labels], counts.iloc[max_labels:]
+    return top, rest, f"other ({len(rest)} labels)"
+
+def grouped_labels_note(top, rest):
+    return (f"Showing the {len(top)} labels with the most cells out of {len(top) + len(rest)}; "
+            f"the other {len(rest)} labels ({rest.sum()} cells)")
+
 predicted_labels = [ colname for colname in adata.obs.columns if colname.startswith('celltypist:') ]
 for label in predicted_labels:
-    sc.pl.embedding(adata, basis=default_umap, color=label)
+    if label.endswith(':conf'):
+        sc.pl.embedding(adata, basis=default_umap, color=label)
+        continue
+
+    top, rest, other_name = group_predicted_labels(adata.obs[label], max_predicted_labels)
+    if rest.empty:
+        sc.pl.embedding(adata, basis=default_umap, color=label)
+        continue
+
+    values = adata.obs[label].astype(object)
+    grouped = values.where(values.isin(top.index) | values.isna(), other_name).to_numpy()
+    # "other" cells first, so they are drawn below the coloured cells
+    order = np.argsort(grouped != other_name, kind="stable")
+    label_obs = pd.DataFrame({label: pd.Categorical(grouped[order], categories=[*top.index, other_name])},
+                             index=adata.obs_names[order])
+    adata_label = ad.AnnData(obs=label_obs, obsm={default_umap: np.asarray(adata.obsm[default_umap])[order]})
+
+    # scanpy's default colours for this many categories (default_102), grey for "other"
+    label_palette = dict(zip(top.index, sc.pl.palettes.default_102))
+    label_palette[other_name] = "lightgrey"
+    sc.pl.embedding(adata_label, basis=default_umap, color=label, palette=label_palette)
+    display(HTML(f"<p><b>Note:</b> {grouped_labels_note(top, rest)} are shown in grey as 'other'.</p>"))
 ```
 
 ```{python}
@@ -371,7 +415,13 @@ import base64
 for label in predicted_labels:
     if not label.endswith(':conf'):
         html = f'<font color="black"><details><summary>Click to expand {label} table</summary>'
-        df = adata.obs.value_counts(label).rename_axis(label).reset_index(name='number of cells')
+        top, rest, other_name = group_predicted_labels(adata.obs[label], max_predicted_labels)
+        if rest.empty:
+            df = adata.obs.value_counts(label).rename_axis(label).reset_index(name='number of cells')
+        else:
+            # top labels, then one row with the cells of all other labels
+            df = pd.DataFrame({label: [*top.index, other_name], 'number of cells': [*top.to_numpy(), rest.sum()]})
+            html += f"<p><b>Note:</b> {grouped_labels_note(top, rest)} are summed in the last row.</p>"
         html += '<div style="overflow-y: scroll; overflow-x: scroll; max-height: 400px">' + df.to_html() + '</div></details></font>'
         display(HTML(html))
 ```

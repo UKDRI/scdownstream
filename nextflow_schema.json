@@ -360,6 +360,14 @@
                     "description": "Table row limit for downstream analysis report.",
                     "help_text": "The top N entries will be displayed in the report to avoid overly large or slow HTML files."
                 },
+                "report_max_celltype_labels": {
+                    "type": "integer",
+                    "default": 50,
+                    "minimum": 1,
+                    "fa_icon": "fas fa-tags",
+                    "description": "Maximum number of predicted cell type labels shown per CellTypist model in the reports.",
+                    "help_text": "Labels are ranked by the number of predicted cells. The UMAPs colour the top N labels and draw the rest in grey as 'other'; the count tables list the top N labels plus an 'other' row. Increase it to see more labels, at the cost of a less readable legend."
+                },
                 "umap_for_plots": {
                     "type": "string",
                     "default": "X_umap_scvi",
