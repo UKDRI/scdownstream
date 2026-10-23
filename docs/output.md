@@ -171,8 +171,11 @@ does not, and without checking this pipeline's steps you would not know what it 
   section shows where the marked outliers fall, how many there are per sample, and their QC
   metrics compared with the other cells. With `--umap_color_by`,
   a "Requested UMAP plots" section plots those `obs` columns on each UMAP in
-  `--umap_color_by_embeddings` (by default before and after integration). Tables are searchable
-  and capped at `--report_table_row_limit` rows.
+  `--umap_color_by_embeddings` (by default before and after integration). The "Predicted labels"
+  section shows, for each CellTypist model, a UMAP and a count table limited to the
+  `--report_max_celltype_labels` labels (default 50) with the most predicted cells; the other labels
+  are grouped as `other`, drawn in grey, and the report says how many were grouped. Tables are
+  searchable and capped at `--report_table_row_limit` rows.
 
 </details>
 
@@ -208,8 +211,9 @@ a `qc_clustering` run.
 - `per_group/<name>/liana/`: [LIANA+](https://liana-py.readthedocs.io/) rank-aggregate cell–cell
   communication results.
 - `report/<name>_downstream_report.html`: a Quarto report covering the marker genes per group, the
-  enrichment results and the cell–cell communication analysis. With `--umap_color_by`, it also
-  has the "Requested UMAP plots" section described for stage 1.
+  enrichment results and the cell–cell communication analysis. Its "Predicted labels" section is
+  limited to the top `--report_max_celltype_labels` CellTypist labels as described for stage 1.
+  With `--umap_color_by`, it also has the "Requested UMAP plots" section described for stage 1.
 
 </details>
 

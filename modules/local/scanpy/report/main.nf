@@ -14,6 +14,7 @@ process SCANPY_GENERATE_REPORT {
     val(umap_for_plots)
     val(umap_color_by)
     val(umap_color_by_embeddings)
+    val(max_celltype_labels)
 
     output:
     tuple val(meta), path("*.html"), emit: html
@@ -42,6 +43,7 @@ process SCANPY_GENERATE_REPORT {
         -P CLUSTERING_NAME:${clustering_name} \\
         -P NTOP:${ntop} \\
         -P "UMAP_FOR_PLOTS:${umap_for_plots}" \\
+        -P MAX_CELLTYPE_LABELS:${max_celltype_labels} \\
         ${color_by_args} \\
         --to html
 
@@ -59,7 +61,15 @@ process SCANPY_GENERATE_REPORT {
     prefix = task.ext.prefix ?: "${meta.id}"
     """
     touch "${prefix}.html"
-    touch "versions.yml"
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        quarto: \$(quarto --version)
+        python: \$(python3 -c 'import platform; print(platform.python_version())')
+        scanpy: \$(python3 -c 'import scanpy; print(scanpy.__version__)')
+        anndata: \$(python3 -c 'import anndata; print(anndata.__version__)')
+        liana: \$(python3 -c 'import liana; print(liana.__version__)')
+    END_VERSIONS
     """
 }
 
@@ -78,6 +88,7 @@ process SCANPY_GENERATE_REPORT_QC {
     val(umap_for_plots)
     val(umap_color_by)
     val(umap_color_by_embeddings)
+    val(max_celltype_labels)
 
     output:
     tuple val(meta), path("*.html"), emit: html
@@ -104,6 +115,7 @@ process SCANPY_GENERATE_REPORT_QC {
         --output ${prefix}.html \\
         -P FILE:${h5ad} \\
         -P "UMAP_FOR_PLOTS:${umap_for_plots}" \\
+        -P MAX_CELLTYPE_LABELS:${max_celltype_labels} \\
         ${color_by_args} \\
         --to html
 
@@ -120,6 +132,13 @@ process SCANPY_GENERATE_REPORT_QC {
     prefix = task.ext.prefix ?: "${meta.id}"
     """
     touch "${prefix}.html"
-    touch "versions.yml"
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        quarto: \$(quarto --version)
+        python: \$(python3 -c 'import platform; print(platform.python_version())')
+        scanpy: \$(python3 -c 'import scanpy; print(scanpy.__version__)')
+        anndata: \$(python3 -c 'import anndata; print(anndata.__version__)')
+    END_VERSIONS
     """
 }

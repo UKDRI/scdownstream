@@ -176,7 +176,7 @@ workflow QC_CLUSTER {
     //
     // Summary report
     //
-    SCANPY_GENERATE_REPORT_QC(ch_h5ad, "${projectDir}/modules/local/scanpy/report/templates/scdownstream_qc_clustering_report.qmd", params.umap_for_plots, params.umap_color_by ?: '', params.umap_color_by_embeddings ?: '')
+    SCANPY_GENERATE_REPORT_QC(ch_h5ad, "${projectDir}/modules/local/scanpy/report/templates/scdownstream_qc_clustering_report.qmd", params.umap_for_plots, params.umap_color_by ?: '', params.umap_color_by_embeddings ?: '', params.report_max_celltype_labels)
 
     //
     // Collate and save software versions

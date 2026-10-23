@@ -12,6 +12,10 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Added`
 
+- `--report_max_celltype_labels` (default 50): the "Predicted labels" UMAPs and count tables in the
+  QC/clustering and downstream reports show only the CellTypist labels with the most predicted
+  cells; the rest are grouped as `other` (grey in the UMAP, one row in the table), so models with
+  hundreds of labels stay readable.
 - Per-sample QC thresholds: the samplesheet columns `min_genes`, `max_genes` (new),
   `min_counts_cell`, `max_counts` (new), `max_mito_percentage`, `min_cells`, `min_counts_gene` and
   `automatic_cell_filtering` now override the matching global parameter for that sample; an empty
