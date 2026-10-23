@@ -119,6 +119,11 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Fixed`
 
+- The downstream analysis report no longer crashes in the LIANA+ dotplots when a cluster is a
+  target of some clusters but not of others (seen on SCR_HS_1, cluster 40). `li.pl.dotplot`
+  (liana 1.6.1) checks the requested targets among the rows of the chosen source only, so each
+  source cluster now asks only for its own targets. A dotplot that still fails becomes a note in the
+  report, with the cluster's interaction table still shown, instead of stopping the report.
 - Cell filtering no longer passes empty barcodes on. With `--automatic_cell_filtering`, the N-MAD
   lower bound for genes and counts often clamps to 0 on skewed samples (GSM5223974: 0 genes,
   0 counts), so near-empty barcodes passed; a cell whose only gene was then removed by gene

@@ -490,40 +490,51 @@ ntop_liana_dotplot = 20
 
 paths_images = {}
 clusters_without_interactions = []
+dotplot_failures = []
 
 if 'liana_res' in adata.uns:
-    # LIANA+ skips clusters with too few cells (min_cells=5), and li.pl.dotplot raises for
-    # any requested label that is missing from liana_res, so only plot the clusters it scored
-    liana_sources = set(adata.uns['liana_res']['source'].astype(str))
-    liana_targets = set(adata.uns['liana_res']['target'].astype(str))
-    target_labels = [c for c in list_clusters if c in liana_targets]
+    liana_res = adata.uns['liana_res']
 
     for clus in list_clusters:
-        if clus not in liana_sources or not target_labels:
+        # li.pl.dotplot filters by source first and then raises for any requested target
+        # that is missing from the remaining rows, so the targets must be taken per source.
+        # LIANA+ also skips clusters with too few cells (min_cells=5).
+        res_clus = liana_res[liana_res['source'].astype(str) == clus]
+        clus_targets = set(res_clus['target'].astype(str))
+        target_labels = [c for c in list_clusters if c in clus_targets]
+
+        if res_clus.empty or not target_labels:
             clusters_without_interactions.append(clus)
             continue
 
         path_img = f"./dotplot_test_clus{clus}.png"
+
+        try:
+            fig = li.pl.dotplot(adata = adata,
+                  colour='magnitude_rank',
+                  size='specificity_rank',
+                  inverse_size=True,
+                  inverse_colour=True,
+                  source_labels=[clus],
+                  target_labels=target_labels,
+                  top_n=ntop_liana_dotplot,
+                  orderby='magnitude_rank',
+                  orderby_ascending=True,
+                  return_fig=True)
+
+            fig.save(path_img, bbox_inches='tight')
+        except ValueError as err:
+            # one cluster must never stop the report; it is reported in the HTML output
+            dotplot_failures.append((clus, str(err)))
+            continue
+
         paths_images[clus] = path_img
-
-        fig = li.pl.dotplot(adata = adata,
-              colour='magnitude_rank',
-              size='specificity_rank',
-              inverse_size=True,
-              inverse_colour=True,
-              source_labels=[clus],
-              target_labels=target_labels,
-              top_n=ntop_liana_dotplot, 
-              orderby='magnitude_rank',
-              orderby_ascending=True,
-              return_fig=True)
-
-        fig.save(path_img, bbox_inches='tight')
 ```
 
 ```{python}
 # HTML output
 from IPython.display import display, HTML
+from html import escape
 import base64
 
 if 'liana_res' in adata.uns:
@@ -531,36 +542,47 @@ if 'liana_res' in adata.uns:
 
     if clusters_without_interactions:
         display(HTML(
-            f"<p>No LIANA+ interactions for cluster(s) {', '.join(clusters_without_interactions)}. "
-            "LIANA+ skips clusters with fewer than 5 cells.</p>"
+            f"<p>No LIANA+ interactions with cluster(s) {', '.join(clusters_without_interactions)} as source. "
+            "LIANA+ skips clusters with fewer than 5 cells, and a cluster can have no interactions that pass its filters.</p>"
         ))
 
+    failure_messages = dict(dotplot_failures)
+
     tableid = 0
-    
-    for clus, path in paths_images.items():
-        with open(path, "rb") as f_plot:
-            # dotplot
-            image_string = base64.b64encode(f_plot.read()).decode("utf-8")
-            image_html = f'<h3><font color="green">Interactions cluster {clus}</font></h3>'
+
+    for clus in list_clusters:
+        if clus not in paths_images and clus not in failure_messages:
+            continue
+
+        image_html = f'<h3><font color="green">Interactions cluster {clus}</font></h3>'
+
+        # dotplot
+        if clus in paths_images:
+            with open(paths_images[clus], "rb") as f_plot:
+                image_string = base64.b64encode(f_plot.read()).decode("utf-8")
             image_html += '<details><summary>Click to expand dotplot</summary>'
             image_html += f'<figure><img alt="liana image" src="data:image/png;base64,{image_string}" />'
             image_html += f'<figcaption>Shown are the top {ntop_liana_dotplot} interactions between cluster {clus} and the other clusters. '
             image_html += 'The color gradient and dot size indicate the -log10 <i>magnitude rank</i> and <i>specificity rank</i>, respectively. Higher values are better.</figcaption></figure></details>'
-            
-            # table
-            df_liana_clus = df_liana[ df_liana['source'] == clus]
-            
+        else:
+            image_html += f'<p>Dotplot for cluster {clus} could not be drawn: {escape(failure_messages[clus])}</p>'
+
+        # table
+        df_liana_clus = df_liana[ df_liana['source'].astype(str) == clus]
+
+        if not df_liana_clus.empty:
             box_name = 'sboxLiana' + str(tableid)
             table_name = 'tableLiana' + str(tableid)
             text = "Search gene..."
-            
+
             html = create_search_table_html(df_liana_clus, text, box_name, table_name, ntop)
             image_html += '<font color="black"><details><summary>Click to expand table</summary>'
             image_html += html
             image_html += f"<p>Results in tables are limited to the top {ntop} interactions.</p></details></font>"
-            display(HTML(image_html))
-            
+
             tableid += 1
+
+        display(HTML(image_html))
 ```
 
 ```{python}
