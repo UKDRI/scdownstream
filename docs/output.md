@@ -212,7 +212,9 @@ a `qc_clustering` run.
   communication results.
 - `report/<name>_downstream_report.html`: a Quarto report covering the marker genes per group, the
   enrichment results and the cell–cell communication analysis. Its "Predicted labels" section is
-  limited to the top `--report_max_celltype_labels` CellTypist labels as described for stage 1.
+  limited to the top `--report_max_celltype_labels` CellTypist labels as described for stage 1. The
+  per-cluster summary is not limited: for each cluster it lists up to 5 predicted labels that cover
+  at least 5 % of the cluster's cells, with their percentage, whatever their overall rank.
   With `--umap_color_by`, it also has the "Requested UMAP plots" section described for stage 1.
 
 </details>
