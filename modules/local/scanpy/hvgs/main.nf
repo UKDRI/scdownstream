@@ -23,7 +23,9 @@ process SCANPY_HVGS {
     script:
     prefix = task.ext.prefix ?: "${meta.id}"
     batch_key = task.ext.batch_key ?: ""
-    
+    // 'seurat' (log data), or 'pearson_residuals' / 'seurat_v3' (raw counts)
+    flavor = task.ext.flavor ?: 'seurat'
+
     template('hvgs.py')
 
     stub:

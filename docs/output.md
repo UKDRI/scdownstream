@@ -286,6 +286,39 @@ marker JSON and the report are always published.
 > contrast of the contrasts file for every group label and marks such combinations as "skipped" in the
 > overview and in the group's table, so you can see what was not tested.
 
+## Stage `train_models`
+
+Trains CellTypist and scANVI cell type models on an annotated reference (`--train_adata`). See
+[Training your own models](usage.md#training-your-own-models). `<name>` is `--train_name`
+(default: `--name`, then `reference`).
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `models/`
+  - `celltypist/<name>.pkl`: the CellTypist model, for `--celltypist_model`.
+  - `scanvi/<name>/model.pt`: the scANVI model, for `--scanvi_model` (with `scvi,scanvi` in
+    `--integration_methods`).
+  - `scvi/<name>/model.pt`: the scVI model the scANVI model was initialised from.
+  - `<name>_reference.h5ad`: the reference as used for training (raw counts, `label`, `batch`), with
+    the scANVI latent space (`obsm["X_scanvi"]`) and its predictions.
+  - `evaluation/`: with `--train_evaluate true` (default):
+    - `<name>_label_counts.tsv`: cells per label in total, training and test set, whether the label
+      was dropped (below `--train_min_cells_per_label`) and, with `--train_max_cells_per_label`,
+      the cells used after downsampling.
+    - `<method>/<method>_metrics.tsv`: accuracy, balanced accuracy, macro and weighted F1 on the
+      held-out test cells.
+    - `<method>/<method>_per_label.tsv`: precision, recall, F1 and support per label.
+    - `<method>/<method>_confusion.tsv`: confusion matrix (rows: true label, columns: predicted).
+  - `intermediates/`: with `--save_intermediates`, the split objects and the evaluation models.
+- `report/<name>_training_report.html`: the labels used, and per method the metrics, the per-label
+  table and a confusion matrix normalised per true label.
+
+</details>
+
+With `--train_final_on_all false`, the published models are the ones trained on the training split
+(the same models the evaluation describes) instead of a refit on all cells.
+
 ## Pipeline information
 
 <details markdown="1">

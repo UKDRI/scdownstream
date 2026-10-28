@@ -14,9 +14,9 @@
             "properties": {
                 "stage": {
                     "type": "string",
-                    "enum": ["qc_clustering", "downstream", "differential_genes"],
+                    "enum": ["qc_clustering", "downstream", "differential_genes", "train_models"],
                     "description": "Pipeline stage to run",
-                    "help_text": "The pipeline runs as three sequential stages: `qc_clustering` (QC, integration and clustering from `--input`), `downstream` (marker genes, enrichment and cell-cell communication on the `--base_adata` written by `qc_clustering`) and `differential_genes` (pseudobulk differential expression on the `--base_adata` written by `downstream`, with `--diffgenes_contrasts`). Each stage consumes the finalized h5ad of the previous one. This parameter replaces Nextflow's `-entry` option, which the strict syntax parser does not support.",
+                    "help_text": "The pipeline runs as three sequential stages: `qc_clustering` (QC, integration and clustering from `--input`), `downstream` (marker genes, enrichment and cell-cell communication on the `--base_adata` written by `qc_clustering`) and `differential_genes` (pseudobulk differential expression on the `--base_adata` written by `downstream`, with `--diffgenes_contrasts`). Each stage consumes the finalized h5ad of the previous one. A fourth, independent stage, `train_models`, trains CellTypist and scANVI reference models on an annotated h5ad (`--train_adata`, see the model training options), evaluates them on held-out cells and writes a training report; the models can then be used in `qc_clustering` with `--celltypist_model` and `--scanvi_model`. It needs no `--input`. This parameter replaces Nextflow's `-entry` option, which the strict syntax parser does not support.",
                     "fa_icon": "fas fa-stream"
                 },
                 "input": {
@@ -488,9 +488,9 @@
             "properties": {
                 "celltypist_model": {
                     "type": "string",
-                    "description": "Specify the models to use for the celltypist cell type annotation",
-                    "help_text": "If you want to use multiple models, separate them with a comma. Available models can be found [here](https://www.celltypist.org/models).",
-                    "pattern": "^([a-zA-Z0-9_]*(,[a-zA-Z0-9_]*)*)?$"
+                    "description": "Specify the models to use for the celltypist cell type annotation: built-in model names and/or local .pkl files.",
+                    "help_text": "Separate multiple models with a comma, without spaces. An entry is either the name of a built-in model, which is downloaded (available models are listed [here](https://www.celltypist.org/models)), or a local model file: any entry that ends in `.pkl` or contains a `/`, e.g. a model written by `--stage train_models`. Names and files can be mixed, e.g. `Adult_Human_PrefrontalCortex,models/celltypist/my_ref.pkl`. The predictions are written to the obs columns `celltypist:<model>` and `celltypist:<model>:conf`, where `<model>` is the model name or the file name without `.pkl`.",
+                    "pattern": "^(([a-zA-Z0-9_]+|[^,\\s]+\\.pkl|[^,\\s]*/[^,\\s]*)(,([a-zA-Z0-9_]+|[^,\\s]+\\.pkl|[^,\\s]*/[^,\\s]*))*)?$"
                 }
             }
         },
@@ -680,6 +680,133 @@
                 }
             }
         },
+        "model_training_options": {
+            "title": "Model training options",
+            "type": "object",
+            "fa_icon": "fas fa-graduation-cap",
+            "description": "Options for `--stage train_models`: train CellTypist and scANVI reference models on an annotated h5ad, evaluate them on held-out cells and refit them on all cells.",
+            "properties": {
+                "train_adata": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "pattern": "^\\S+\\.h5ad$",
+                    "description": "Annotated reference h5ad to train the models on. Required for `--stage train_models`.",
+                    "help_text": "Either an external annotated reference or an output of this pipeline after the labels have been curated. The object needs raw counts (see `--train_counts_layer`) and a label column (`--train_label_col`).",
+                    "fa_icon": "fas fa-file"
+                },
+                "train_label_col": {
+                    "type": "string",
+                    "description": "Obs column with the cell type labels to train on. Required for `--stage train_models`.",
+                    "help_text": "The labels are used exactly as given, without renaming, so distinct labels such as `CD4+ T cells` and `CD4- T cells` stay distinct classes. Only `--train_unknown_label` and missing values are treated as unlabelled."
+                },
+                "train_unknown_label": {
+                    "type": "string",
+                    "default": "unknown",
+                    "description": "Label value that marks a cell as unlabelled.",
+                    "help_text": "Cells with this label or with a missing label are never in the test set. CellTypist leaves them out of training; scANVI keeps them as unlabelled cells for its semi-supervised training."
+                },
+                "train_batch_col": {
+                    "type": "string",
+                    "default": "batch",
+                    "description": "Obs column with the batch, used by scVI/scANVI and the HVG selection.",
+                    "help_text": "The column is used as the scVI/scANVI batch key and for the per-batch HVG selection. If it does not exist, all cells are treated as one batch."
+                },
+                "train_counts_layer": {
+                    "type": "string",
+                    "default": "X",
+                    "description": "Layer with the raw counts, or `X` for the main matrix.",
+                    "help_text": "Both methods need raw counts: CellTypist normalises them itself, and scVI/scANVI model the counts directly. For the outputs of this pipeline, the raw counts are in the `counts` layer."
+                },
+                "train_symbol_col": {
+                    "type": "string",
+                    "default": "index",
+                    "description": "Var column with the gene symbols, or `index` for the var index.",
+                    "help_text": "The models are trained on these gene names, so they must match the gene names of the data the models are applied to later."
+                },
+                "train_methods": {
+                    "type": "string",
+                    "default": "celltypist,scanvi",
+                    "pattern": "^(celltypist|scanvi)(,(celltypist|scanvi))*$",
+                    "description": "Comma-separated models to train: celltypist, scanvi.",
+                    "help_text": "`scanvi` trains an scVI model first and initialises the scANVI model from it; both models are written. The scVI/scANVI architecture and epochs come from the scVI/scANVI options (`--scvi_*`)."
+                },
+                "train_name": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_\\-]+$",
+                    "description": "Name of the trained models. Default: `--name`, or `reference` if that is not set either.",
+                    "help_text": "Used in the names of the model files. When a model is applied in `--stage qc_clustering`, its predictions are written to `celltypist:<name>` and `scanvi:<name>`."
+                },
+                "train_min_cells_per_label": {
+                    "type": "integer",
+                    "default": 50,
+                    "minimum": 1,
+                    "description": "Labels with fewer cells are dropped before the split and the final fit.",
+                    "help_text": "Dropping small labels everywhere means the final model knows no class the evaluation did not test. The dropped labels are listed in the training report."
+                },
+                "train_max_cells_per_label": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Downsample the training data to at most this many cells per label (e.g. 2000), for large references.",
+                    "help_text": "Applies to both CellTypist and scANVI, to the training split and the final fit; the held-out test set is not downsampled. Not set by default: all cells are used."
+                },
+                "train_test_fraction": {
+                    "type": "number",
+                    "default": 0.25,
+                    "exclusiveMinimum": 0,
+                    "exclusiveMaximum": 1,
+                    "description": "Share of the cells of each label held out for testing.",
+                    "help_text": "The split is stratified by label and uses a fixed seed. With `--train_test_split_by`, whole groups are held out instead and this is the target share. Only used with `--train_evaluate`."
+                },
+                "train_test_split_by": {
+                    "type": "string",
+                    "description": "Obs column (e.g. the donor) whose groups are held out as a whole for testing.",
+                    "help_text": "By default, single cells are held out, so the test cells share donors and samples with the training cells, and the metrics are optimistic for new donors. With a column such as the donor, whole groups are held out instead (stratified group k-fold), and labels that end up with no test cells are reported with a warning."
+                },
+                "train_evaluate": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Hold out a test set, train each method on the rest and evaluate it on the test set.",
+                    "help_text": "CellTypist predicts the test cells with the training-split model. For scANVI, the test cells are mapped onto the training-split reference as a query with their labels hidden, the way the model is used later. Accuracy, balanced accuracy, macro F1, per-label scores and a confusion matrix go into the training report. Set to false to skip the evaluation, e.g. for large atlases; the models are then trained on all cells only."
+                },
+                "train_final_on_all": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Refit the final models on all cells after the evaluation.",
+                    "help_text": "The final models are trained on all cells with the same settings, so the test metrics describe the training procedure and are slightly pessimistic for the final models. Set to false to keep the training-split models as the final models, which saves training every model twice. Ignored with `--train_evaluate false`, where the models are always trained on all cells."
+                },
+                "train_hvgs": {
+                    "type": "integer",
+                    "default": 5000,
+                    "minimum": 1,
+                    "description": "Number of highly variable genes for the scVI/scANVI reference model.",
+                    "help_text": "Selected with the `seurat_v3` flavour on the raw counts, per batch. The reference model is trained on these genes, and every query mapped onto it is reduced to them. A number larger than the number of genes keeps all genes."
+                },
+                "train_celltypist_feature_selection": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Use CellTypist's two-pass feature selection.",
+                    "help_text": "CellTypist first trains on all genes, keeps the most informative genes per label and trains again on them only. Set to false to train on all genes."
+                },
+                "train_celltypist_use_sgd": {
+                    "type": "boolean",
+                    "description": "Train CellTypist with stochastic gradient descent (SGD), for large references.",
+                    "help_text": "The default logistic regression becomes slow for references with hundreds of thousands of cells; SGD scales to them, in particular together with `--train_celltypist_mini_batch`. Note that the non-SGD (logistic regression) path of CellTypist 1.6.3 needs scikit-learn < 1.8."
+                },
+                "train_celltypist_mini_batch": {
+                    "type": "boolean",
+                    "description": "Train CellTypist with mini-batch SGD (chunks of `--train_celltypist_batch_size` cells); requires `--train_celltypist_use_sgd`.",
+                    "help_text": "Mini-batch training keeps the memory use and run time of large references in check."
+                },
+                "train_celltypist_batch_size": {
+                    "type": "integer",
+                    "default": 1000,
+                    "minimum": 1,
+                    "description": "Cells per mini-batch with `--train_celltypist_mini_batch`.",
+                    "help_text": "Only used with `--train_celltypist_mini_batch`."
+                }
+            }
+        },
         "institutional_config_options": {
             "title": "Institutional config options",
             "type": "object",
@@ -865,6 +992,9 @@
         },
         {
             "$ref": "#/$defs/differential_genes_options"
+        },
+        {
+            "$ref": "#/$defs/model_training_options"
         },
         {
             "$ref": "#/$defs/institutional_config_options"

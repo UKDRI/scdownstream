@@ -2,6 +2,7 @@
 
 import os
 import platform
+from pathlib import Path
 
 os.environ["MPLCONFIGDIR"] = "./tmp/mpl"
 os.environ["NUMBA_CACHE_DIR"] = "./tmp/numba"
@@ -36,6 +37,25 @@ adata = sc.read_h5ad("${h5ad}")
 prefix = "${prefix}"
 
 models = "${models.join(' ')}".split()
+# Local model files, staged by the process into this folder (stageAs: 'celltypist_models/*')
+model_files = sorted(str(path) for path in Path("celltypist_models").glob("*") if path.is_file())
+
+if not models and not model_files:
+    raise ValueError("CELLTYPES_CELLTYPIST: no CellTypist model given (neither a model name nor a .pkl file).")
+
+# (column name, model to load): built-in models are downloaded, local files are loaded as they are
+model_specs = []
+for model in models:
+    model_file = f"{model}.pkl" if not model.endswith(".pkl") else model
+    ct_models.download_models(model=model_file)
+    model_specs.append((model_file[:-4], model_file))
+for model_file in model_files:
+    model_specs.append((Path(model_file).stem, model_file))
+
+model_names = [name for name, _ in model_specs]
+duplicated = sorted({name for name in model_names if model_names.count(name) > 1})
+if duplicated:
+    raise ValueError(f"CELLTYPES_CELLTYPIST: more than one model named {duplicated}; the prediction columns would clash.")
 
 adata_celltypist = adata.copy()  # make a copy of our adata
 sc.pp.normalize_per_cell(
@@ -51,10 +71,8 @@ if symbol_col != "index" and symbol_col:
 
 df_list = []
 
-for model in models:
-    model_file = f"{model}.pkl" if not model.endswith(".pkl") else model
-    model_name = model_file[:-4]
-    ct_models.download_models(model=model_file)
+for model_name, model_file in model_specs:
+    # A path with a '/' is opened as a file; a bare name is looked up in the downloaded models
     model_obj = ct_models.Model.load(model_file)
 
     predictions = celltypist.annotate(

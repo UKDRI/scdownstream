@@ -62,6 +62,9 @@ workflow PIPELINE_INITIALISATION {
     if (params.stage == 'qc_clustering') {
         validateInputParameters()
     }
+    if (params.stage == 'train_models') {
+        validateTrainParameters()
+    }
 
     //
     // Check config provided to the pipeline
@@ -173,6 +176,74 @@ def validateInputParameters() {
 
     if (params.input && params.base_adata && 'scimilarity' in integration_methods && !params.scimilarity_model) {
         throw new Exception("If base_adata is provided and scimilarity is used as integration method, scimilarity_model must be provided.")
+    }
+}
+
+//
+// Read a boolean parameter. With the Nextflow 26 strict parser and no typed params block,
+// parameters given on the command line stay strings: `--train_evaluate false` gives "false",
+// which Groovy treats as true. A -params-file (YAML/JSON) and nextflow.config keep the type.
+// Booleans are returned as they are, null is false, and strings are true only for
+// "true", "yes" or "1" (case-insensitive).
+//
+def paramAsBoolean(value) {
+    if (value instanceof Boolean) {
+        return value
+    }
+    if (value == null) {
+        return false
+    }
+    return value.toString().trim().toLowerCase() in ['true', 'yes', '1']
+}
+
+//
+// Check the parameters of --stage train_models. It reads --train_adata, not --input.
+//
+def validateTrainParameters() {
+    if (!params.train_adata) {
+        throw new Exception("--stage train_models requires --train_adata, the annotated reference h5ad.")
+    }
+
+    if (!params.train_label_col) {
+        throw new Exception("--stage train_models requires --train_label_col, the obs column with the cell type labels.")
+    }
+
+    def supported_methods = ['celltypist', 'scanvi']
+    def train_methods = params.train_methods
+        ? params.train_methods.toString().split(',').collect { it -> it.trim().toLowerCase() }.findAll { it -> it }
+        : []
+    if (!train_methods) {
+        throw new Exception("--train_methods must name at least one method (${supported_methods.join(', ')}).")
+    }
+    def unsupported_methods = train_methods - supported_methods
+    if (unsupported_methods) {
+        throw new Exception("--train_methods: unsupported method(s) ${unsupported_methods.join(', ')}. Supported: ${supported_methods.join(', ')}.")
+    }
+
+    // Numbers given on the command line arrive as strings (see paramAsBoolean), so convert
+    // them before comparing
+    def test_fraction = params.train_test_fraction as BigDecimal
+    if (!(test_fraction > 0 && test_fraction < 1)) {
+        throw new Exception("--train_test_fraction (${params.train_test_fraction}) must be larger than 0 and smaller than 1.")
+    }
+
+    def min_cells_per_label = params.train_min_cells_per_label as Integer
+    if (!(min_cells_per_label >= 1)) {
+        throw new Exception("--train_min_cells_per_label (${params.train_min_cells_per_label}) must be at least 1.")
+    }
+
+    if (params.train_max_cells_per_label != null && !((params.train_max_cells_per_label as Integer) >= 1)) {
+        throw new Exception("--train_max_cells_per_label (${params.train_max_cells_per_label}) must be at least 1.")
+    }
+
+    if (paramAsBoolean(params.train_celltypist_mini_batch) && !paramAsBoolean(params.train_celltypist_use_sgd)) {
+        throw new Exception("--train_celltypist_mini_batch requires --train_celltypist_use_sgd.")
+    }
+
+    // Without the evaluation there is no training-split model to keep, so the final models are
+    // always trained on all cells
+    if (!paramAsBoolean(params.train_evaluate) && !paramAsBoolean(params.train_final_on_all)) {
+        log.warn("--train_final_on_all false is ignored with --train_evaluate false: the final models are trained on all cells.")
     }
 }
 

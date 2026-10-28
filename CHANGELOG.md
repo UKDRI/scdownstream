@@ -12,6 +12,14 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Added`
 
+- `--stage train_models`: trains CellTypist and scANVI cell type models on an annotated reference
+  (`--train_adata`, `--train_label_col`, other `--train_*` options). Labels are kept exactly as
+  given; small labels are dropped; a stratified held-out split (optionally by donor,
+  `--train_test_split_by`) evaluates both methods the way they are used (scANVI by query mapping),
+  then the final models are refit on all cells. Outputs the models under `models/`, evaluation tables
+  and a training report.
+- `--celltypist_model` accepts local `.pkl` model files (e.g. from `train_models`), mixed with
+  built-in model names.
 - `--report_max_celltype_labels` (default 50): the "Predicted labels" UMAPs and count tables in the
   QC/clustering and downstream reports show only the CellTypist labels with the most predicted
   cells; the rest are grouped as `other` (grey in the UMAP, one row in the table), so models with

@@ -52,6 +52,11 @@ consumes the previous stage's finalized `.h5ad` via `--base_adata`.
 | 1     | `--stage qc_clustering`      | `--input samplesheet.csv`                                             | `<name>_qc_clustering.h5ad`, MultiQC report, QC/clustering HTML report |
 | 2     | `--stage downstream`         | `--base_adata <stage 1 h5ad>`                                         | `<name>_downstream.h5ad`, `<name>_downstream_markers.json.gz`, analysis HTML report |
 | 3     | `--stage differential_genes` | `--base_adata <stage 2 h5ad>` + `--diffgenes_contrasts contrasts.tsv` | per-contrast DE tables, pseudobulk h5ad, DE HTML report                 |
+| —     | `--stage train_models`       | `--train_adata reference.h5ad` + `--train_label_col <column>`         | CellTypist and scANVI models, held-out evaluation, training report      |
+
+`train_models` is independent of the other three: it trains your own CellTypist and scANVI cell
+type models from an annotated reference, which `qc_clustering` then uses via `--celltypist_model`
+and `--scanvi_model`. See [Training your own models](docs/usage.md#training-your-own-models).
 
 ```text
 samplesheet.csv
