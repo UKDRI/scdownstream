@@ -87,10 +87,10 @@ adata.obs.value_counts('sample').rename_axis('samples').reset_index(name='number
 
 ## <font color='green'>Predicted labels</font>
 
-Celltypist uses pre-trained logistic regression models for predicting labels such as cell types for each cell. Predicted labels of the selected model(s) and the confidence of the predictions are displayed in the UMAPs below. Counts for the predicted labels are summarised in the table(s).
+Labels such as cell types are predicted for each cell by CellTypist (pre-trained logistic regression models, columns `celltypist:<model>`) and/or by scANVI reference mapping (columns `scanvi:<model>`). Predicted labels of the selected model(s) and the confidence of the predictions (columns ending in `:conf`) are displayed in the UMAPs below. Counts for the predicted labels are summarised in the table(s).
 
 ```{python}
-# CellTypist models can predict hundreds of labels. Only the max_predicted_labels labels with the most
+# Reference models can predict hundreds of labels. Only the max_predicted_labels labels with the most
 # cells are coloured, the others are grouped into one grey "other" category. Grouped columns are plotted
 # from a small in-memory AnnData, so scanpy never writes to the report object.
 import anndata as ad
@@ -112,7 +112,9 @@ def grouped_labels_note(top, rest):
     return (f"Showing the {len(top)} labels with the most cells out of {len(top) + len(rest)}; "
             f"the other {len(rest)} labels ({rest.sum()} cells)")
 
-predicted_labels = [ colname for colname in adata.obs.columns if colname.startswith('celltypist:') ]
+# obs column prefixes of the label prediction tools; their ':conf' columns are plotted as continuous values
+prediction_prefixes = ('celltypist:', 'scanvi:')
+predicted_labels = [ colname for colname in adata.obs.columns if colname.startswith(prediction_prefixes) ]
 for label in predicted_labels:
     if label.endswith(':conf'):
         sc.pl.embedding(adata, basis=default_umap, color=label)
@@ -181,12 +183,14 @@ for key, title in comparison_umaps:
 ```
 
 ```{python}
-# define order of clusters numerically
+# define order of clusters: numerically when all names are integers (e.g. leiden), otherwise by name
 import numpy as np
 
-list_clusters = np.unique(adata.obs[selected_clustering])
-list_clusters = sorted([int(x) for x in list_clusters])
-list_clusters = [str(x) for x in list_clusters]
+list_clusters = [str(x) for x in np.unique(adata.obs[selected_clustering].astype(str))]
+try:
+    list_clusters = sorted(list_clusters, key=int)
+except ValueError:
+    list_clusters = sorted(list_clusters)
 ```
 
 ```{python}
@@ -220,10 +224,12 @@ def create_overlap_pct_label(adata: ann.AnnData, list_clusters: list, clustering
         Table listing the top N annotations per cluster including the percentage of cells
     """
     dict_clus_overlap = {}
+    # list_clusters holds the group names as strings
+    cluster_names = adata.obs[clustering].astype(str)
 
     for clus in list_clusters:
-        size = adata[ adata.obs[clustering] == clus ].shape[0]
-        list_topn = adata[ adata.obs[clustering] == clus ].obs.value_counts(annotation)[0:ntop]
+        size = adata[ cluster_names == clus ].shape[0]
+        list_topn = adata[ cluster_names == clus ].obs.value_counts(annotation)[0:ntop]
         
         ratios = list_topn / size
         ratios = ratios[ ratios >= min_overlap_ratio]

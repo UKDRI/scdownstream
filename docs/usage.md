@@ -277,6 +277,7 @@ under `report/`, and a MultiQC report.
 | `--cluster_neighbors`             | `neighbors_scvi` | Neighbour graph used for clustering. The default assumes scVI integration.                                                                                             |
 | `--celltypist_model`              | `null`           | Comma-separated [CellTypist](https://www.celltypist.org/models) model names, or a path to a custom `.pkl` model.                                                       |
 | `--scvi_model` / `--scanvi_model` | `null`           | Pre-trained model for reference mapping — see [Reference mapping](#reference-mapping).                                                                                 |
+| `--scvi_query_max_epochs`         | `100`            | Fine-tuning epochs when mapping new cells onto `--scvi_model` / `--scanvi_model`. See [Reference mapping](#reference-mapping). |
 | `--save_intermediates`            | `false`          | Publish intermediate objects as well as the final ones.                                                                                                                |
 
 scVI itself is tuned with `--scvi_n_latent` (30), `--scvi_n_hidden` (128), `--scvi_n_layers` (2),
@@ -701,20 +702,46 @@ instead, set `--ambient_corrected_integration true` globally, or the
 
 ## Reference mapping
 
-`qc_clustering` supports mapping new samples into the latent space of an existing scVI or scANVI
-model, via `--scvi_model` and `--scanvi_model`. With an scANVI model this also transfers cell type
-annotations to the new samples.
+`qc_clustering` can map new samples onto an existing scVI or scANVI model (scArches-style query
+mapping) instead of training a new model. With a scANVI model, the cell type labels the model was
+trained on are transferred to the new cells.
 
-- **Pre-trained scVI model** — pass its path to `--scvi_model` and keep `scvi` in
-  `--integration_methods`. Only the genes present in the reference model are used, rather than
-  intersecting highly variable genes.
-- **Adding samples to an existing object** — additionally pass the previous run's h5ad to
-  `--base_adata`; the new samples are aggregated onto it after integration.
+```bash
+--integration_methods scvi,scanvi \
+--scanvi_model /path/to/models/scanvi/my_reference/model.pt
+```
 
-> [!NOTE]
-> `--scanvi_model` exists for label transfer from a pre-trained scANVI model, but scANVI is not yet
-> part of the curated tool set (see [Supported tool choices](#supported-tool-choices)): it produces
-> embeddings without driving the rest of the workflow.
+- **`--scanvi_model`** maps the cells onto the scANVI model and predicts a label for every cell.
+  The predictions are written as `scanvi:<model>` (the most probable label) and
+  `scanvi:<model>:conf` (its probability, 0–1), where `<model>` is the name of the directory holding
+  `model.pt` (`my_reference` above). They appear in the reports' "Predicted labels" sections next to
+  any CellTypist columns, and can be used as `--selected_clustering` or `--diffgenes_group_col`.
+  The latent space is stored as `obsm["X_scanvi"]`.
+- **`--scvi_model`** maps the cells onto a scVI model; the rest of the workflow then uses that
+  latent space (`X_scvi`).
+- **What happens during mapping:**
+  - the query keeps all its genes; genes the model needs but the query lacks are set to 0, and
+    extra genes are ignored;
+  - the model is fine-tuned on the new cells for `--scvi_query_max_epochs` epochs (default 100) with
+    weight decay 0, so the reference part stays fixed;
+  - for scANVI, the samplesheet labels of the new cells are **hidden** during mapping, so they cannot
+    leak into the predictions; they are kept unchanged in `label` (copied to `label_input`).
+- **Requirements:**
+  - `scanvi` needs `scvi` in `--integration_methods`;
+  - `--scanvi_model` needs `scanvi`, and `--scvi_model` needs `scvi`, in `--integration_methods`;
+  - the model's batch and covariate columns must exist in the new data (the pipeline's `batch`
+    column always does);
+  - the model must be a scVI/scANVI model saved with scvi-tools 1.3 (the version in the pipeline's
+    containers), given as the path to its `model.pt`.
+- **Confidence:** a cell type missing from the reference is still assigned the closest reference
+  label, usually with a lower `:conf`. Check low-confidence cells before trusting their labels.
+- **Without `--scanvi_model`**, `scanvi` in `--integration_methods` trains a scANVI model on this
+  run's own samplesheet labels (`label_col`), starting from the scVI model; its predictions are
+  written as `scanvi:labels`.
+
+> [!WARNING]
+> Mapping onto an existing object with `--base_adata` is supported for scVI only; `--base_adata`
+> together with `scanvi` stops with "not supported yet".
 
 ## GPU acceleration
 

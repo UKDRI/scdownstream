@@ -11,6 +11,7 @@ include { SEURAT_INTEGRATION   } from '../../modules/local/seurat/integration'
 include { ADATA_READRDS        } from '../../modules/local/adata/readrds'
 include { SCIMILARITY          } from './scimilarity'
 include { ADATA_ADD_OBS_OBSM   } from '../../modules/local/adata/add_obs_obsm'
+include { ADATA_ADD_OBS_OBSM as ADD_SCANVI_RESULTS } from '../../modules/local/adata/add_obs_obsm'
 include { SCANPY_NEIGHBORS     } from '../../modules/local/scanpy/neighbors'
 include { SCANPY_UMAP          } from '../../modules/local/scanpy/umap'
 
@@ -72,12 +73,19 @@ workflow INTEGRATE {
         ch_integrations = ch_integrations.mix(SEURAT_INTEGRATION.out.h5ad)
     }
 
+    // Supplied models are reference models: the query cells are mapped onto them
+    ch_scvi_model = scvi_model
+        ? Channel.value([[id: 'scvi_model'], file(scvi_model, checkIfExists: true)])
+        : [[], []]
+    ch_scanvi_model = scanvi_model
+        ? Channel.value([[id: 'scanvi_model'], file(scanvi_model, checkIfExists: true)])
+        : [[], []]
+
     if (methods.contains('scvi')) {
         SCVITOOLS_SCVI(
             (scvi_model ? ch_h5ad : ch_h5ad_hvg).map { _meta, h5ad -> [[id: 'scvi'], h5ad] },
-            scvi_model
-                ? Channel.value([[id: 'scvi_model'], scvi_model])
-                : [[], []],
+            ch_scvi_model,
+            scvi_model ? 'query' : 'scratch',
             "batch",
             scvi_categorical_covariates,
             scvi_continuous_covariates,
@@ -99,23 +107,37 @@ workflow INTEGRATE {
         ch_h5ad_out = SCANPY_UMAP.out.h5ad
     }
 
+    // validateInputParameters() guarantees that scvi runs whenever scanvi does
     if (methods.contains('scanvi')) {
         SCVITOOLS_SCANVI(
-            (scvi_model ? ch_h5ad : ch_h5ad_hvg).map { _meta, h5ad -> [[id: 'scanvi'], h5ad] },
-            scanvi_model
-                ? Channel.value([[id: 'scanvi_model'], scanvi_model])
-                : methods.contains('scvi')
-                    ? SCVITOOLS_SCVI.out.model
-                    : [[], []],
+            // A query keeps all genes (with counts); otherwise scANVI gets the input scVI got
+            ((scanvi_model || scvi_model) ? ch_h5ad : ch_h5ad_hvg).map { _meta, h5ad -> [[id: 'scanvi'], h5ad] },
+            scanvi_model ? ch_scanvi_model : SCVITOOLS_SCVI.out.model,
+            scanvi_model ? 'query' : 'from_scvi',
             ["label", "unknown"],
             "batch",
             scvi_categorical_covariates,
             scvi_continuous_covariates,
+            scanvi_model ? file(scanvi_model).parent.name : 'labels',
         )
         ch_versions = ch_versions.mix(SCVITOOLS_SCANVI.out.versions)
         ch_integrations = ch_integrations.mix(SCVITOOLS_SCANVI.out.h5ad)
         ch_obs = ch_obs.mix(SCVITOOLS_SCANVI.out.obs)
         ch_obsm = ch_obsm.mix(SCVITOOLS_SCANVI.out.obsm)
+
+        // add the scANVI predictions (obs) and latent (obsm) to the scVI-based object.
+        // A fixed id that no input file uses keeps the output name from clashing with an input.
+        ADD_SCANVI_RESULTS(
+            ch_h5ad_out.map { _meta, h5ad -> [[id: 'integrated_scanvi'], h5ad] }
+                .join(
+                    SCVITOOLS_SCANVI.out.h5ad.map { _meta, h5ad -> [[id: 'integrated_scanvi'], h5ad] },
+                    failOnMismatch: true,
+                )
+        )
+        ch_versions = ch_versions.mix(ADD_SCANVI_RESULTS.out.versions)
+        // Restore the scVI id, so the stages after INTEGRATE publish to the same
+        // directories with and without scANVI
+        ch_h5ad_out = ADD_SCANVI_RESULTS.out.h5ad.map { _meta, h5ad -> [[id: 'integrated_scvi'], h5ad] }
     }
 
     if (methods.contains('harmony')) {

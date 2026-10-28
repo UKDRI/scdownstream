@@ -357,10 +357,10 @@ else:
 
 ## <font color='green'>Predicted labels</font>
 
-Celltypist uses pre-trained logistic regression models for predicting labels such as cell types for each cell. Predicted labels of the selected model(s) and the confidence of the predictions are displayed in the UMAPs below. Counts for the predicted labels are summarised in the table(s).
+Labels such as cell types are predicted for each cell by CellTypist (pre-trained logistic regression models, columns `celltypist:<model>`) and/or by scANVI reference mapping (columns `scanvi:<model>`). Predicted labels of the selected model(s) and the confidence of the predictions (columns ending in `:conf`) are displayed in the UMAPs below. Counts for the predicted labels are summarised in the table(s).
 
 ```{python}
-# CellTypist models can predict hundreds of labels. Only the max_predicted_labels labels with the most
+# Reference models can predict hundreds of labels. Only the max_predicted_labels labels with the most
 # cells are coloured, the others are grouped into one grey "other" category. Grouped columns are plotted
 # from a small in-memory AnnData, so scanpy never writes to the backed report object.
 import anndata as ad
@@ -382,7 +382,9 @@ def grouped_labels_note(top, rest):
     return (f"Showing the {len(top)} labels with the most cells out of {len(top) + len(rest)}; "
             f"the other {len(rest)} labels ({rest.sum()} cells)")
 
-predicted_labels = [ colname for colname in adata.obs.columns if colname.startswith('celltypist:') ]
+# obs column prefixes of the label prediction tools; their ':conf' columns are plotted as continuous values
+prediction_prefixes = ('celltypist:', 'scanvi:')
+predicted_labels = [ colname for colname in adata.obs.columns if colname.startswith(prediction_prefixes) ]
 for label in predicted_labels:
     if label.endswith(':conf'):
         sc.pl.embedding(adata, basis=default_umap, color=label)

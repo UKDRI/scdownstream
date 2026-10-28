@@ -21,9 +21,10 @@ nextflow_process {
                     ]
                 )
                 input[1] = [[], []]
-                input[2] = 'sample'
-                input[3] = ''
+                input[2] = 'scratch'
+                input[3] = 'sample'
                 input[4] = ''
+                input[5] = ''
                 """
             }
         }
@@ -60,9 +61,10 @@ nextflow_process {
                     ]
                 )
                 input[1] = [[], []]
-                input[2] = 'sample'
-                input[3] = ''
+                input[2] = 'scratch'
+                input[3] = 'sample'
                 input[4] = ''
+                input[5] = ''
                 """
             }
         }

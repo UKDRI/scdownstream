@@ -124,7 +124,13 @@ isoforms are optionally aggregated with `--aggregate_isoforms`.
   - `integrate/`
     - `input_hvg/`: the highly-variable-gene subset passed to the integration tools, as `h5ad` and
       `rds`.
-    - `scvi/`: the scVI-integrated object and `X_scvi.pkl`, the latent representation.
+    - `scvi/`: the scVI model (`scvi_model/model.pt`, always published) and, with
+      `--save_intermediates`, the scVI-integrated object and `X_scvi.pkl`.
+    - `scanvi/`: with `scanvi` in `--integration_methods`, the scANVI model
+      (`scanvi_model/model.pt`, always published) and, with `--save_intermediates`, the object with
+      the predictions and the latent space. The predictions (`scanvi:<model>`,
+      `scanvi:<model>:conf`) and `obsm["X_scanvi"]` are also in `<name>_qc_clustering.h5ad`. See
+      [Reference mapping](usage.md#reference-mapping).
 
 </details>
 

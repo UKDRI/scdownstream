@@ -123,6 +123,18 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Fixed`
 
+- Reference mapping onto a supplied scVI / scANVI model now works. Before, a supplied model was never
+  loaded (a new model was trained from scratch without a warning), scANVI was fitted to
+  log-normalised data, the query's own labels leaked into the predictions, only the query's HVGs
+  were used, and scANVI's results never reached the output. Now `--scvi_model` / `--scanvi_model`
+  map the cells onto the model (scArches fine-tuning, weight decay 0,
+  `--scvi_query_max_epochs`, default 100) on all genes and raw counts, with the input labels hidden.
+- `scanvi` in `--integration_methods` writes `scanvi:<model>` and `scanvi:<model>:conf` (most
+  probable label and its probability) and `obsm["X_scanvi"]` into `<name>_qc_clustering.h5ad`;
+  both reports treat `scanvi:` columns like CellTypist predictions.
+- The `qc_clustering` parameter checks were never run. They now are, and stop on `--scanvi_model`
+  without `scanvi`, `--scvi_model` without `scvi`, `scanvi` without `scvi`, and `--base_adata` with
+  `scanvi` (not supported yet).
 - The downstream analysis report no longer crashes in the LIANA+ dotplots when a cluster is a
   target of some clusters but not of others (seen on SCR_HS_1, cluster 40). `li.pl.dotplot`
   (liana 1.6.1) checks the requested targets among the rows of the chosen source only, so each

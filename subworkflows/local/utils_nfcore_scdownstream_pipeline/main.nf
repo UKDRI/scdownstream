@@ -59,6 +59,9 @@ workflow PIPELINE_INITIALISATION {
     // Check parameter combinations the schema cannot express
     //
     validatePcaParameters()
+    if (params.stage == 'qc_clustering') {
+        validateInputParameters()
+    }
 
     //
     // Check config provided to the pipeline
@@ -134,27 +137,41 @@ workflow PIPELINE_COMPLETION {
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 //
-// Check and validate pipeline parameters
+// Check the integration parameter combinations of --stage qc_clustering
 //
 def validateInputParameters() {
-    if (!params.input && !(params.base_adata && params.base_embeddings && params.base_label_col)) {
-        throw new Exception("Either an input samplesheet or (base_adata && base_embeddings && base_label_col) must be provided")
+    def integration_methods = params.integration_methods
+        ? params.integration_methods.split(',').collect { it -> it.trim().toLowerCase() }
+        : []
+
+    if (params.scvi_model && !('scvi' in integration_methods)) {
+        throw new Exception("--scvi_model requires scvi in --integration_methods.")
     }
 
-    def integration_methods = params.integration_methods.split(',').collect { it.trim().toLowerCase() }
+    if (params.scanvi_model && !('scanvi' in integration_methods)) {
+        throw new Exception("--scanvi_model requires scanvi in --integration_methods.")
+    }
+
+    // INTEGRATE builds its output object from scVI, so scANVI alone would produce nothing
+    if ('scanvi' in integration_methods && !('scvi' in integration_methods)) {
+        throw new Exception("scanvi in --integration_methods requires scvi as well.")
+    }
+
+    if (params.base_adata && 'scanvi' in integration_methods) {
+        throw new Exception("Reference mapping onto --base_adata with scANVI is not supported yet.")
+    }
+
+    // Extending --base_adata with the --input samples. Without --input, the base is processed
+    // on its own (tests/main_pipeline_sub.nf.test) and these extension checks do not apply.
     if (params.input && params.base_adata && (integration_methods - ['scvi', 'scanvi', 'scimilarity']).size() > 0) {
         throw new Exception("Only scvi, scanvi and scimilarity integration methods are supported if base_adata is provided")
     }
 
-    if (params.base_adata && 'scvi' in integration_methods && !params.scvi_model) {
+    if (params.input && params.base_adata && 'scvi' in integration_methods && !params.scvi_model) {
         throw new Exception("If base_adata is provided and scvi is used as integration method, scvi_model must be provided.")
     }
 
-    if (params.base_adata && 'scanvi' in integration_methods && !params.scanvi_model) {
-        throw new Exception("If base_adata is provided and scanvi is used as integration method, scanvi_model must be provided.")
-    }
-
-    if (params.base_adata && 'scimilarity' in integration_methods && !params.scimilarity_model) {
+    if (params.input && params.base_adata && 'scimilarity' in integration_methods && !params.scimilarity_model) {
         throw new Exception("If base_adata is provided and scimilarity is used as integration method, scimilarity_model must be provided.")
     }
 }

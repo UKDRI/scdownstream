@@ -230,16 +230,16 @@
                 "scvi_model": {
                     "type": "string",
                     "format": "file-path",
-                    "description": "Path to a pre-trained scVI model, only relevant if scVI is selected in `integration_methods`. If provided, the model will be used for integration. Otherwise, a new model will be trained.",
-                    "help_text": "The file should be in the .pt format.",
+                    "description": "Path to a pre-trained scVI model for reference mapping. Requires scvi in `integration_methods`.",
+                    "help_text": "If provided, the query cells are mapped onto this model (scArches fine-tuning for at most `--scvi_query_max_epochs` epochs) instead of training a new scVI model. The query keeps all genes; genes missing from the model are dropped and model genes missing from the query are zero-filled. The file should be in the .pt format.",
                     "pattern": "^\\S+\\.pt$",
                     "exists": true
                 },
                 "scanvi_model": {
                     "type": "string",
                     "format": "file-path",
-                    "description": "Path to a pre-trained scANVI model, only relevant if scANVI is selected in `integration_methods`. If provided, the model will be used for integration. Otherwise, a new model will be trained.",
-                    "help_text": "The file should be in the .pt format.",
+                    "description": "Path to a pre-trained scANVI model for reference mapping and label transfer. Requires scanvi and scvi in `integration_methods`.",
+                    "help_text": "If provided, the query cells are mapped onto this model (scArches fine-tuning for at most `--scvi_query_max_epochs` epochs) and their labels are predicted. The predictions are written to the obs columns `scanvi:<model>` and `scanvi:<model>:conf`, where `<model>` is the name of the directory containing the model file. Otherwise, a new scANVI model is trained from the scVI model. scANVI requires scvi in `integration_methods`, and cannot yet be combined with `--base_adata`. The file should be in the .pt format.",
                     "pattern": "^\\S+\\.pt$",
                     "exists": true
                 },
@@ -571,6 +571,12 @@
                 "scvi_max_epochs": {
                     "type": "integer",
                     "description": "Maximum number of epochs for training scVI/scANVI. If not set, a heuristic provided by scVI/scANVI will be used."
+                },
+                "scvi_query_max_epochs": {
+                    "type": "integer",
+                    "default": 100,
+                    "minimum": 1,
+                    "description": "Maximum number of epochs for mapping query data onto a supplied scVI/scANVI model (scArches fine-tuning)"
                 },
                 "scvi_categorical_covariates": {
                     "type": "string",
