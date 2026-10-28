@@ -270,8 +270,13 @@ nextflow run UKDRI/scdownstream -r dev_ukdri --stage differential_genes \
 ```
 
 > [!WARNING]
-> Provide pipeline parameters on the command line or via `-params-file`. Custom config files passed
-> with `-c` can supply any Nextflow configuration **except parameters**.
+> **Put analysis parameters in a YAML params file (`-params-file params.yml`)** and keep the command
+> line for `--stage` and input/output paths (`--input`, `--base_adata`, `--outdir`, model files).
+> Under Nextflow 26, values given on the command line reach the pipeline as text, so
+> `--some_option false` counts as *true* and numbers are not numbers; a params file keeps `true` /
+> `false` and numbers typed. See
+> [Passing parameters](docs/usage.md#passing-parameters-use-a-params-file).
+> Custom config files passed with `-c` can supply any Nextflow configuration **except parameters**.
 
 ## Container images
 

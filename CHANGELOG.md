@@ -84,6 +84,9 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Changed`
 
+- The docs now recommend passing analysis parameters in a YAML params file (`-params-file`) and
+  keeping the command line for `--stage` and input/output paths: under Nextflow 26 command-line
+  values reach the pipeline as text, so `--some_option false` counts as true.
 - The differential_genes report is easier to read: a **Contrasts** table at the top (target vs
   reference, the direction of the log2 fold change in words, blocking variables, excluded samples), a
   **Significant genes overview** (up / down per group label × contrast, skipped contrasts marked),

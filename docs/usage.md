@@ -206,18 +206,36 @@ work                # Nextflow working files
 # plus other hidden Nextflow files, e.g. run history and old logs
 ```
 
-For repeated runs, put the parameters in a YAML or JSON file and pass it with `-params-file`:
+### Passing parameters: use a params file
+
+**Put the analysis parameters in a YAML params file and pass it with `-params-file`.** Keep the
+command line for the stage and the input/output paths (`--stage`, `--input`, `--base_adata`,
+`--outdir`, model paths such as `--scanvi_model`), plus Nextflow options such as `-profile`.
 
 ```bash
-nextflow run UKDRI/scdownstream -r dev_ukdri --stage qc_clustering -profile apptainer -params-file params.yaml
+nextflow run UKDRI/scdownstream -r dev_ukdri --stage qc_clustering -profile apptainer \
+   --input ./samplesheet.csv --outdir ./results \
+   -params-file params_qc_clustering.yml
 ```
 
-```yaml title="params.yaml"
-input: "./samplesheet.csv"
-outdir: "./results/"
+```yaml title="params_qc_clustering.yml"
 name: "my_study"
 species: "human"
+automatic_cell_filtering: true
+min_genes: 10
+min_counts: 20
+doublet_removal: false
+integration_methods: "scvi,scanvi"
+clustering_resolutions: "0.5,1.0"
 ```
+
+> [!WARNING]
+> **Why:** Nextflow 26's strict syntax parser passes values given on the command line to the
+> pipeline as **text**. `--some_option false` arrives as the word `"false"`, which counts as *true*
+> where the pipeline decides what to run, so the option is silently ignored when its default is
+> `true`. Numbers given on the command line are text too. In a YAML params file, `true`/`false` and
+> numbers keep their types. Paths and other text values are not affected, which is why they can
+> stay on the command line.
 
 > [!WARNING]
 > Do not use `-c <file>` to specify parameters — this will result in errors. Config files given with
@@ -412,12 +430,15 @@ Two parameters control the PCA-based embedding, and they are different things:
 
 To pick a value, look at the elbow plot in the PCA section of the QC/clustering report. It shows
 the variance explained per PC, with a line at the number of PCs the graph used. Then rerun stage 1
-with the new value and `-resume`:
+with the new value in your params file and `-resume`:
+
+```yaml title="params_qc_clustering.yml"
+neighbors_n_pcs: 20
+```
 
 ```bash
 nextflow run UKDRI/scdownstream -r dev_ukdri --stage qc_clustering -resume \
-   <same options as before> \
-   --neighbors_n_pcs 20
+   <same options as before> -params-file params_qc_clustering.yml
 ```
 
 With `-resume`, QC and scVI integration come from the cache; only the steps from the PCA graph
@@ -735,7 +756,8 @@ Two methods are trained (`--train_methods celltypist,scanvi` by default):
 --scanvi_model results/models/scanvi/my_reference/model.pt
 ```
 
-**Large references.** Training time and memory grow with the number of cells; CellTypist's default
+**Large references.** (Set these in the params file, see
+[Passing parameters](#passing-parameters-use-a-params-file).) Training time and memory grow with the number of cells; CellTypist's default
 logistic regression in particular holds a dense, scaled copy of the data. For atlases with hundreds of
 thousands of cells:
 
