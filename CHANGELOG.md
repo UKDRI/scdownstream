@@ -123,6 +123,12 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Fixed`
 
+- The QC/clustering report no longer crashes with an `IndexError` on the "Clusters" UMAPs when
+  there are three or fewer Leiden clusterings, which includes the default
+  `--clustering_resolutions 0.5,1.0` (`leiden`, `leiden_0.5`, `leiden_1.0`). With a single row of
+  panels, `plt.subplots` returned a 1-D axes array that the cells indexed as 2-D; the panel grid now
+  always stays 2-D and has at most three columns. If there are no Leiden clusterings, the report
+  says so instead of drawing an empty figure.
 - The downstream analysis report no longer crashes in the LIANA+ dotplots when a cluster is a
   target of some clusters but not of others (seen on SCR_HS_1, cluster 40). `li.pl.dotplot`
   (liana 1.6.1) checks the requested targets among the rows of the chosen source only, so each
