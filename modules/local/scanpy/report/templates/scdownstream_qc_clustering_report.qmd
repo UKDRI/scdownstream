@@ -453,35 +453,31 @@ Clusterings on scvi-based UMAP
 ```{python}
 import matplotlib.pyplot as plt
 import math
-from matplotlib.pyplot import rc_context
 
 embedding = 'X_umap_scvi'
 title = "UMAP (scvi)"
-ncols = 3
-nrows = math.ceil(len(clustering_labels) / ncols)
 
-fig_width = ncols * 6
-fig_height = nrows * 5
+if embedding not in adata.obsm:
+    display(HTML(f"<p>No {title} was found.</p>"))
+elif not clustering_labels:
+    display(HTML("<p>No Leiden clusterings were found.</p>"))
+else:
+    ncols = min(3, len(clustering_labels))
+    nrows = math.ceil(len(clustering_labels) / ncols)
+    # squeeze=False keeps axs 2-D, so a single row of panels is indexed like any other grid
+    fig, axs = plt.subplots(nrows, ncols, figsize=(ncols * 6, nrows * 5), squeeze=False,
+                            layout="constrained")
+    panels = axs.ravel()
 
-with rc_context({'figure.figsize': (fig_width, fig_height)}):
-    if embedding in adata.obsm:
-        fig, axs = plt.subplots(nrows, ncols)
+    for ax, label in zip(panels, clustering_labels):
+        sc.pl.embedding(adata, basis=embedding, color=label, legend_loc='on data', show=False,
+                        title=f"{embedding} - {label}", ax=ax)
 
-        cur_col = 0
-        cur_row = 0
-    
-        for clustering_label in clustering_labels:
-    
-            if cur_col == ncols:
-                cur_col = 0
-                cur_row += 1
-    
-            sc.pl.embedding(adata, basis=embedding, color=clustering_label, legend_loc='on data', show=False,
-                            title=f"{embedding} - {clustering_label}", ax=axs[cur_row, cur_col])
-    
-            cur_col += 1
-    else:
-        display(HTML(f"<p>No {title} was found.</p>"))
+    for ax in panels[len(clustering_labels):]:
+        ax.set_axis_off()
+
+    plt.show()
+    plt.close(fig)
 ```
 
 Clusterings on PCA-based UMAP
@@ -489,35 +485,31 @@ Clusterings on PCA-based UMAP
 ```{python}
 import matplotlib.pyplot as plt
 import math
-from matplotlib.pyplot import rc_context
 
 embedding = 'X_umap_pca' if 'X_umap_pca' in adata.obsm else 'X_umap'
 title = "UMAP (PCA)"
-ncols = 3
-nrows = math.ceil(len(clustering_labels) / ncols)
 
-fig_width = ncols * 6
-fig_height = nrows * 5
+if embedding not in adata.obsm:
+    display(HTML(f"<p>No {title} was found.</p>"))
+elif not clustering_labels:
+    display(HTML("<p>No Leiden clusterings were found.</p>"))
+else:
+    ncols = min(3, len(clustering_labels))
+    nrows = math.ceil(len(clustering_labels) / ncols)
+    # squeeze=False keeps axs 2-D, so a single row of panels is indexed like any other grid
+    fig, axs = plt.subplots(nrows, ncols, figsize=(ncols * 6, nrows * 5), squeeze=False,
+                            layout="constrained")
+    panels = axs.ravel()
 
-with rc_context({'figure.figsize': (fig_width, fig_height)}):
-    if embedding in adata.obsm:
-        fig, axs = plt.subplots(nrows, ncols)
+    for ax, label in zip(panels, clustering_labels):
+        sc.pl.embedding(adata, basis=embedding, color=label, legend_loc='on data', show=False,
+                        title=f"{embedding} - {label}", ax=ax)
 
-        cur_col = 0
-        cur_row = 0
-    
-        for clustering_label in clustering_labels:
-    
-            if cur_col == ncols:
-                cur_col = 0
-                cur_row += 1
-    
-            sc.pl.embedding(adata, basis=embedding, color=clustering_label, legend_loc='on data', show=False,
-                            title=f"{embedding} - {clustering_label}", ax=axs[cur_row, cur_col])
-    
-            cur_col += 1
-    else:
-        display(HTML(f"<p>No {title} was found.</p>"))
+    for ax in panels[len(clustering_labels):]:
+        ax.set_axis_off()
+
+    plt.show()
+    plt.close(fig)
 ```
 
 ```{python}

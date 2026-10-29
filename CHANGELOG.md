@@ -134,6 +134,12 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Fixed`
 
+- The QC/clustering report no longer crashes with an `IndexError` on the "Clusters" UMAPs when
+  there are three or fewer Leiden clusterings, which includes the default
+  `--clustering_resolutions 0.5,1.0` (`leiden`, `leiden_0.5`, `leiden_1.0`). With a single row of
+  panels, `plt.subplots` returned a 1-D axes array that the cells indexed as 2-D; the panel grid now
+  always stays 2-D and has at most three columns. If there are no Leiden clusterings, the report
+  says so instead of drawing an empty figure.
 - Reference mapping onto a supplied scVI / scANVI model now works. Before, a supplied model was never
   loaded (a new model was trained from scratch without a warning), scANVI was fitted to
   log-normalised data, the query's own labels leaked into the predictions, only the query's HVGs
