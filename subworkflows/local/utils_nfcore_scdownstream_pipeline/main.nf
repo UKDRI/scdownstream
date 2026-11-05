@@ -65,6 +65,9 @@ workflow PIPELINE_INITIALISATION {
     if (params.stage == 'train_models') {
         validateTrainParameters()
     }
+    if (params.stage == 'annotate') {
+        validateAnnotateParameters()
+    }
 
     //
     // Check config provided to the pipeline
@@ -244,6 +247,57 @@ def validateTrainParameters() {
     // always trained on all cells
     if (!paramAsBoolean(params.train_evaluate) && !paramAsBoolean(params.train_final_on_all)) {
         log.warn("--train_final_on_all false is ignored with --train_evaluate false: the final models are trained on all cells.")
+    }
+}
+
+//
+// Split --celltypist_model into built-in model names and local model files. Entries ending in
+// .pkl or holding a path are local model files (e.g. from --stage train_models); everything
+// else is the name of a built-in model to download. Returns [names: [String], files: [Path]].
+//
+def splitCelltypistModels(value) {
+    def entries = value
+        ? value.toString().split(',').collect { entry -> entry.trim() }.findAll { entry -> entry }
+        : []
+    def names = entries.findAll { entry -> !(entry.endsWith('.pkl') || entry.contains('/')) }
+    def files = entries
+        .findAll { entry -> entry.endsWith('.pkl') || entry.contains('/') }
+        .collect { entry -> file(entry, checkIfExists: true) }
+    return [names: names, files: files]
+}
+
+//
+// Check the parameters of --stage annotate. It reads --base_adata, not --input.
+//
+def validateAnnotateParameters() {
+    if (!params.base_adata) {
+        throw new Exception("--stage annotate requires --base_adata, the processed h5ad to annotate (with raw counts in layers['counts']).")
+    }
+
+    def celltypist = splitCelltypistModels(params.celltypist_model)
+    if (!celltypist.names && !celltypist.files && !params.scanvi_model) {
+        throw new Exception("--stage annotate requires at least one model: --celltypist_model and/or --scanvi_model.")
+    }
+
+    if (params.scanvi_model) {
+        def scanvi_model = file(params.scanvi_model)
+        if (scanvi_model.name != 'model.pt') {
+            throw new Exception("--scanvi_model must be a file named model.pt, e.g. models/scanvi/<name>/model.pt from --stage train_models (got ${params.scanvi_model}). The prediction columns are named after its folder.")
+        }
+        if (!scanvi_model.exists() || scanvi_model.isDirectory()) {
+            throw new Exception("--scanvi_model ${params.scanvi_model} does not exist or is not a file.")
+        }
+    }
+
+    // The cell subset needs both the column and at least one value
+    def subset_values = params.annotate_subset_values != null
+        ? params.annotate_subset_values.toString().split(',').collect { value -> value.trim() }.findAll { value -> value }
+        : []
+    if (params.annotate_subset_col && !subset_values) {
+        throw new Exception("--annotate_subset_col requires --annotate_subset_values, the comma-separated values of the column whose cells are annotated.")
+    }
+    if (subset_values && !params.annotate_subset_col) {
+        throw new Exception("--annotate_subset_values requires --annotate_subset_col, the obs column to select the cells by.")
     }
 }
 

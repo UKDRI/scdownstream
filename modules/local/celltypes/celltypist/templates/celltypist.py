@@ -2,6 +2,7 @@
 
 import os
 import platform
+import sys
 from pathlib import Path
 
 os.environ["MPLCONFIGDIR"] = "./tmp/mpl"
@@ -35,6 +36,10 @@ def format_yaml_like(data: dict, indent: int = 0) -> str:
 
 adata = sc.read_h5ad("${h5ad}")
 prefix = "${prefix}"
+
+# Share of a model's genes the data should have; below it a warning (the missing genes count as not
+# expressed, which degrades the predictions)
+min_feature_overlap_warn = 0.5
 
 models = "${models.join(' ')}".split()
 # Local model files, staged by the process into this folder (stageAs: 'celltypist_models/*')
@@ -74,6 +79,19 @@ df_list = []
 for model_name, model_file in model_specs:
     # A path with a '/' is opened as a file; a bare name is looked up in the downloaded models
     model_obj = ct_models.Model.load(model_file)
+
+    model_features = pd.Index(model_obj.features)
+    n_found = int(model_features.isin(adata_celltypist.var_names).sum())
+    fraction = n_found / len(model_features) if len(model_features) else 0.0
+    print(f"CellTypist model {model_name}: {n_found} of {len(model_features)} model genes ({fraction:.1%}) are in the data.")
+    if fraction < min_feature_overlap_warn:
+        print(
+            f"WARNING: CELLTYPES_CELLTYPIST: only {fraction:.1%} of the genes of the model {model_name} are in the data. "
+            "Check that the var_names are the same kind of gene identifiers as the model (e.g. gene symbols, "
+            f"not Ensembl IDs; first data genes: {list(adata_celltypist.var_names[:5])}, first model genes: "
+            f"{list(model_features[:5])}).",
+            file=sys.stderr,
+        )
 
     predictions = celltypist.annotate(
         adata_celltypist, model=model_obj

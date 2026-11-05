@@ -2,6 +2,7 @@
 
 import os
 import platform
+import sys
 
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
@@ -27,6 +28,7 @@ categorical_covariates = "${categorical_covariates}"
 continuous_covariates = "${continuous_covariates}"
 max_epochs = "${max_epochs ?: ''}"
 query_max_epochs = int("${query_max_epochs}")
+latent_key = "${latent_key}"
 use_gpu = "${task.ext.use_gpu}" == "true"
 
 # Fixed seed so that training is reproducible between runs
@@ -41,6 +43,13 @@ query_weight_decay = 0.0
 query_early_stopping = False
 # Name of the obs column that keeps the query's own labels, which are hidden from the model
 label_input_col = "label_input"
+# The generic integration embedding X_emb is written only under the default latent key; with another
+# key (e.g. X_scanvi_<model> in --stage annotate) the output gets no X_emb
+default_latent_key = "X_scanvi"
+# Share of the reference model's genes a query must have: below the first a warning, below the second
+# an error. Missing genes are filled with zeros, which degrades the mapping without any other message.
+min_gene_overlap_warn = 0.8
+min_gene_overlap_error = 0.5
 
 torch.set_float32_matmul_precision(matmul_precision)
 torch.use_deterministic_algorithms(True)
@@ -80,6 +89,44 @@ def check_model_obs_columns(adata, setup_args, model_desc):
         raise ValueError(
             f"The {model_desc} needs the obs column(s) {missing}, which the input data does not have."
         )
+
+
+def check_gene_overlap(adata, model_cls, model_desc):
+    # Must run before prepare_query_anndata, which pads the missing reference genes with zeros
+    reference_genes = model_cls.prepare_query_anndata(
+        adata, reference_model_path, return_reference_var_names=True
+    )
+    n_found = int(reference_genes.isin(adata.var_names).sum())
+    fraction = n_found / len(reference_genes) if len(reference_genes) else 0.0
+    print(f"{n_found} of {len(reference_genes)} genes of the {model_desc} ({fraction:.1%}) are in the query data.")
+    if fraction < min_gene_overlap_warn:
+        message = (
+            f"only {fraction:.1%} of the genes of the {model_desc} are in the query data; the missing genes "
+            "are filled with zeros. Check that the query's var_names are the same kind of gene identifiers "
+            f"as the reference (e.g. gene symbols, not Ensembl IDs; first query genes: {list(adata.var_names[:5])}, "
+            f"first reference genes: {list(reference_genes[:5])}). Gene symbols in a var column are used "
+            "with --annotate_symbol_col in --stage annotate, or the symbol_col of the samplesheet."
+        )
+        if fraction < min_gene_overlap_error:
+            raise ValueError(f"SCVITOOLS_SCANVI: {message}")
+        print(f"WARNING: SCVITOOLS_SCANVI: {message}", file=sys.stderr)
+
+
+def report_new_categories(adata, registry):
+    # A query may have batches and categorical covariate values the reference has not seen; scArches
+    # adds them to the model (load_query_data extends the categories), so this only reports them
+    field_registries = registry.get("field_registries", {})
+    batch_key = registry["setup_args"].get("batch_key")
+    batch_mapping = field_registries.get("batch", {}).get("state_registry", {}).get("categorical_mapping")
+    known = {batch_key: batch_mapping} if batch_key and batch_mapping is not None else {}
+    known.update(field_registries.get("extra_categorical_covs", {}).get("state_registry", {}).get("mappings", {}))
+    for col, mapping in known.items():
+        if col not in adata.obs.columns:
+            continue
+        new = sorted(set(adata.obs[col].astype(str).unique()) - set(str(c) for c in mapping))
+        if new:
+            shown = ", ".join(new[:20]) + (f", ... ({len(new)} in total)" if len(new) > 20 else "")
+            print(f"'{col}': {len(new)} categories not in the reference model, added as new categories: {shown}")
 
 
 def put_counts_in_model_layer(adata, model_layer):
@@ -170,6 +217,8 @@ elif mode == "query":
         adata.obs[label_input_col] = adata.obs[model_labels_key].copy()
     adata.obs[model_labels_key] = model_unlabeled_category
 
+    check_gene_overlap(adata, SCANVI, "reference scANVI model")
+    report_new_categories(adata, registry)
     SCANVI.prepare_query_anndata(adata, reference_model_path)
     x_input, added_layer = put_counts_in_model_layer(adata, setup_args.get("layer"))
 
@@ -191,9 +240,10 @@ if use_gpu:
 model.train(**train_kwargs)
 
 latent = model.get_latent_representation()
-adata.obsm["X_scanvi"] = latent
-# kept for compatibility with consumers of the generic integration embedding
-adata.obsm["X_emb"] = latent
+adata.obsm[latent_key] = latent
+if latent_key == default_latent_key:
+    # kept for compatibility with consumers of the generic integration embedding
+    adata.obsm["X_emb"] = latent
 
 # Label probabilities, cells x labels: the most likely label and its probability
 probs = model.predict(soft=True)
@@ -213,7 +263,7 @@ adata.write_h5ad(f"{prefix}.h5ad")
 adata.obs[[pred_col, conf_col]].to_pickle(f"{prefix}.pkl")
 model.save(f"{prefix}_model")
 
-df = pd.DataFrame(adata.obsm["X_scanvi"], index=adata.obs_names)
+df = pd.DataFrame(adata.obsm[latent_key], index=adata.obs_names)
 df.to_pickle(f"X_{prefix}.pkl")
 
 # Versions

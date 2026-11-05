@@ -39,6 +39,8 @@ process SCVITOOLS_SCANVI {
     gene_likelihood = task.ext.gene_likelihood ?: 'zinb'
     max_epochs = task.ext.max_epochs ?: null
     query_max_epochs = task.ext.query_max_epochs ?: 100
+    // obsm key of the latent representation; only the default also writes the generic X_emb
+    latent_key = task.ext.latent_key ?: 'X_scanvi'
 
     if ("${h5ad}" == "${prefix}.h5ad") {
         error("Input and output names are the same, set prefix in module configuration to disambiguate!")

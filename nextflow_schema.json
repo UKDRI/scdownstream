@@ -14,9 +14,9 @@
             "properties": {
                 "stage": {
                     "type": "string",
-                    "enum": ["qc_clustering", "downstream", "differential_genes", "train_models"],
+                    "enum": ["qc_clustering", "downstream", "differential_genes", "train_models", "annotate"],
                     "description": "Pipeline stage to run",
-                    "help_text": "The pipeline runs as three sequential stages: `qc_clustering` (QC, integration and clustering from `--input`), `downstream` (marker genes, enrichment and cell-cell communication on the `--base_adata` written by `qc_clustering`) and `differential_genes` (pseudobulk differential expression on the `--base_adata` written by `downstream`, with `--diffgenes_contrasts`). Each stage consumes the finalized h5ad of the previous one. A fourth, independent stage, `train_models`, trains CellTypist and scANVI reference models on an annotated h5ad (`--train_adata`, see the model training options), evaluates them on held-out cells and writes a training report; the models can then be used in `qc_clustering` with `--celltypist_model` and `--scanvi_model`. It needs no `--input`. This parameter replaces Nextflow's `-entry` option, which the strict syntax parser does not support.",
+                    "help_text": "The pipeline runs as three sequential stages: `qc_clustering` (QC, integration and clustering from `--input`), `downstream` (marker genes, enrichment and cell-cell communication on the `--base_adata` written by `qc_clustering`) and `differential_genes` (pseudobulk differential expression on the `--base_adata` written by `downstream`, with `--diffgenes_contrasts`). Each stage consumes the finalized h5ad of the previous one. A fourth, independent stage, `train_models`, trains CellTypist and scANVI reference models on an annotated h5ad (`--train_adata`, see the model training options), evaluates them on held-out cells and writes a training report; the models can then be used in `qc_clustering` with `--celltypist_model` and `--scanvi_model`. It needs no `--input`. A fifth stage, `annotate`, adds cell type predictions from pre-trained models (`--celltypist_model` and/or `--scanvi_model`) to a processed h5ad (`--base_adata`, with raw counts in `layers['counts']`) without changing anything else in it, and writes a small report (see the cell type annotation options). It needs no `--input`, and its output can be passed on to `downstream`. This parameter replaces Nextflow's `-entry` option, which the strict syntax parser does not support.",
                     "fa_icon": "fas fa-stream"
                 },
                 "input": {
@@ -238,8 +238,8 @@
                 "scanvi_model": {
                     "type": "string",
                     "format": "file-path",
-                    "description": "Path to a pre-trained scANVI model for reference mapping and label transfer. Requires scanvi and scvi in `integration_methods`.",
-                    "help_text": "If provided, the query cells are mapped onto this model (scArches fine-tuning for at most `--scvi_query_max_epochs` epochs) and their labels are predicted. The predictions are written to the obs columns `scanvi:<model>` and `scanvi:<model>:conf`, where `<model>` is the name of the directory containing the model file. Otherwise, a new scANVI model is trained from the scVI model. scANVI requires scvi in `integration_methods`, and cannot yet be combined with `--base_adata`. The file should be in the .pt format.",
+                    "description": "Path to a pre-trained scANVI model for reference mapping and label transfer. In `--stage qc_clustering`, requires scanvi and scvi in `integration_methods`; in `--stage annotate`, the scANVI predictions run when it is set.",
+                    "help_text": "If provided, the query cells are mapped onto this model (scArches fine-tuning for at most `--scvi_query_max_epochs` epochs) and their labels are predicted. The predictions are written to the obs columns `scanvi:<model>` and `scanvi:<model>:conf`, where `<model>` is the name of the directory containing the model file. Otherwise, a new scANVI model is trained from the scVI model. In `--stage qc_clustering`, scANVI requires scvi in `integration_methods`, and cannot yet be combined with `--base_adata`. In `--stage annotate`, the cells of `--base_adata` are mapped onto the model, with the batches taken from `--annotate_batch_col`, and the file must be named `model.pt` (e.g. `models/scanvi/<name>/model.pt` from `--stage train_models`). The file should be in the .pt format.",
                     "pattern": "^\\S+\\.pt$",
                     "exists": true
                 },
@@ -286,8 +286,8 @@
                 "base_adata": {
                     "type": "string",
                     "format": "file-path",
-                    "description": "If you want to project new data onto an already integrated object, specify the path to the base AnnData object here",
-                    "help_text": "The file should be in the .h5ad format.",
+                    "description": "If you want to project new data onto an already integrated object, specify the path to the base AnnData object here. Also the input object of `--stage downstream`, `differential_genes` and `annotate`.",
+                    "help_text": "The file should be in the .h5ad format. In `--stage annotate`, this is the processed object the cell type predictions are added to; it must hold raw counts in `layers['counts']`, as the output of `--stage qc_clustering` does.",
                     "pattern": "^\\S+\\.h5ad$",
                     "exists": true
                 },
@@ -489,7 +489,7 @@
                 "celltypist_model": {
                     "type": "string",
                     "description": "Specify the models to use for the celltypist cell type annotation: built-in model names and/or local .pkl files.",
-                    "help_text": "Separate multiple models with a comma, without spaces. An entry is either the name of a built-in model, which is downloaded (available models are listed [here](https://www.celltypist.org/models)), or a local model file: any entry that ends in `.pkl` or contains a `/`, e.g. a model written by `--stage train_models`. Names and files can be mixed, e.g. `Adult_Human_PrefrontalCortex,models/celltypist/my_ref.pkl`. The predictions are written to the obs columns `celltypist:<model>` and `celltypist:<model>:conf`, where `<model>` is the model name or the file name without `.pkl`.",
+                    "help_text": "Separate multiple models with a comma, without spaces. An entry is either the name of a built-in model, which is downloaded (available models are listed [here](https://www.celltypist.org/models)), or a local model file: any entry that ends in `.pkl` or contains a `/`, e.g. a model written by `--stage train_models`. Names and files can be mixed, e.g. `Adult_Human_PrefrontalCortex,models/celltypist/my_ref.pkl`. The predictions are written to the obs columns `celltypist:<model>` and `celltypist:<model>:conf`, where `<model>` is the model name or the file name without `.pkl`. Used by `--stage qc_clustering` and `--stage annotate`; in `annotate`, CellTypist runs when this is set.",
                     "pattern": "^(([a-zA-Z0-9_]+|[^,\\s]+\\.pkl|[^,\\s]*/[^,\\s]*)(,([a-zA-Z0-9_]+|[^,\\s]+\\.pkl|[^,\\s]*/[^,\\s]*))*)?$"
                 }
             }
@@ -807,6 +807,40 @@
                 }
             }
         },
+        "cell_type_annotation_options": {
+            "title": "Cell type annotation options",
+            "type": "object",
+            "fa_icon": "fas fa-tags",
+            "description": "Options for `--stage annotate`: add cell type predictions from pre-trained models (`--celltypist_model`, `--scanvi_model`) to a processed h5ad (`--base_adata`).",
+            "properties": {
+                "annotate_batch_col": {
+                    "type": "string",
+                    "default": "batch",
+                    "description": "Obs column whose values become the scANVI query batches.",
+                    "help_text": "Each value of this column is mapped onto the scANVI model as its own new batch. The default `batch` is already one value per sample in the output of `--stage qc_clustering`. If the column does not exist, `sample` is used instead, and if that does not exist either, all cells are mapped as a single batch. The column is only set in a working copy for the tools; the `batch` and `sample` columns of the output object are unchanged. Not used by CellTypist.",
+                    "fa_icon": "fas fa-layer-group"
+                },
+                "annotate_symbol_col": {
+                    "type": "string",
+                    "default": "index",
+                    "description": "Var column with the gene symbols, or `index` for the var index.",
+                    "help_text": "The models are applied to these gene names, so they must match the gene names the models were trained on (see `--train_symbol_col`). The gene names of the output object are unchanged.",
+                    "fa_icon": "fas fa-dna"
+                },
+                "annotate_subset_col": {
+                    "type": "string",
+                    "description": "Obs column to select the cells to annotate by, e.g. `leiden` or `celltypist:Adult_Human_Brain`. Requires `--annotate_subset_values`.",
+                    "help_text": "Only the cells whose value in this column is one of `--annotate_subset_values` are annotated, and the output `<name>_annotate.h5ad` contains only those cells. The UMAPs and the Leiden clusterings are kept as they were computed on the full object; they are not recomputed for the subset. Not set by default: all cells are annotated.",
+                    "fa_icon": "fas fa-filter"
+                },
+                "annotate_subset_values": {
+                    "type": "string",
+                    "description": "Comma-separated values of `--annotate_subset_col` whose cells are annotated, e.g. `3,7` or `Microglia`. Requires `--annotate_subset_col`.",
+                    "help_text": "Only the matching cells are annotated, and the output `<name>_annotate.h5ad` contains only those cells. The UMAPs and the Leiden clusterings are kept as they were computed on the full object. In a params file, quote numeric values, e.g. `'3,7'` or `'3'`.",
+                    "fa_icon": "fas fa-filter"
+                }
+            }
+        },
         "institutional_config_options": {
             "title": "Institutional config options",
             "type": "object",
@@ -995,6 +1029,9 @@
         },
         {
             "$ref": "#/$defs/model_training_options"
+        },
+        {
+            "$ref": "#/$defs/cell_type_annotation_options"
         },
         {
             "$ref": "#/$defs/institutional_config_options"
