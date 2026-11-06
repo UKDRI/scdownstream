@@ -14,12 +14,13 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 - `--stage annotate`: adds cell type predictions from pre-trained models to an object that is
   already processed, without re-running QC, integration and clustering.
-  - **Input:** `--base_adata` with raw counts in `layers["counts"]`, plus CellTypist
+  - **Input:** `--base_adata` with raw counts in `layers["counts"]` (or in `X` if there is no
+    `counts` layer), plus CellTypist
     (`--celltypist_model`) and/or scANVI (`--scanvi_model`) models.
   - **Recomputed from the counts:** what each tool needs (CellTypist's normalisation, scANVI's raw
     counts and gene space).
   - **Query batches:** taken from `--annotate_batch_col`, default `batch`, which is one value per
-    sample in `qc_clustering` output, with fallbacks to `sample` and then one batch.
+    sample in `qc_clustering` output; one batch for all cells if the column is missing.
   - **Gene symbols:** `--annotate_symbol_col`.
   - **Subset:** `--annotate_subset_col` / `--annotate_subset_values` restrict the stage, and its
     output, to some cells, e.g. a few Leiden clusters.

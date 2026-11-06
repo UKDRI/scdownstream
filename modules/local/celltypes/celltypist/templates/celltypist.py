@@ -62,7 +62,16 @@ duplicated = sorted({name for name in model_names if model_names.count(name) > 1
 if duplicated:
     raise ValueError(f"CELLTYPES_CELLTYPIST: more than one model named {duplicated}; the prediction columns would clash.")
 
+# CellTypist input: the raw counts, normalised and log-transformed on a copy, so the X of the output
+# h5ad stays as it was. The counts come from layers['counts'] when there is one, otherwise from X.
 adata_celltypist = adata.copy()  # make a copy of our adata
+if "counts" in adata_celltypist.layers:
+    print("CellTypist input: raw counts from layers['counts']")
+    adata_celltypist.X = adata_celltypist.layers["counts"].copy()
+else:
+    print("CellTypist input: raw counts from X")
+# X of the copy now holds counts; without this, scanpy warns that X seems to be already log-transformed
+adata_celltypist.uns.pop("log1p", None)
 sc.pp.normalize_per_cell(
     adata_celltypist, counts_per_cell_after=10**4
 )  # normalize to 10,000 counts per cell

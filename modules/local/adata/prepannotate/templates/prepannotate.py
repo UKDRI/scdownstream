@@ -23,19 +23,14 @@ batch_col = "${batch_col}"
 symbol_col = "${symbol_col}"
 subset_col = "${subset_col}"
 subset_values = "${subset_values}"
-
-# Non-integer values that stay at or below this maximum look log-normalised, not like raw counts
-max_lognorm_value = 20
+prediction_cols = "${prediction_cols}"
 
 # Names the annotation modules read (CELLTYPES_CELLTYPIST, SCVITOOLS_SCANVI with the batch key of the
 # scANVI models); they define the structure of the output, not a setting
 counts_key = "counts"
+# Batch key of the scANVI models: SCVITOOLS_SCANVI reads the query batches from obs['batch']
 batch_key = "batch"
-# Batches when the batch column is missing: the samples, else one batch for all cells
-fallback_batch_col = "sample"
-single_batch = "batch_1"
-# Columns of earlier predictions are dropped, so the annotation modules only return the new ones
-prediction_prefixes = ("celltypist:", "scanvi:")
+
 # var column that keeps the input var_names when the gene symbols come from another column
 input_var_names_key = "var_names_input"
 
@@ -88,101 +83,78 @@ if subset_col or subset_values:
     adata = adata[selected].copy()
 
 # Raw counts, as a float32 CSR matrix
-
 if counts_key not in adata.layers:
-    raise ValueError(
-        f"ADATA_PREPANNOTATE: the input has no layers['{counts_key}']. This stage needs the raw counts "
-        f"there, as written by --stage qc_clustering. Available layers: {short_list(adata.layers.keys()) or 'none'}"
-    )
-counts = sp.csr_matrix(adata.layers[counts_key], dtype=np.float32)
+    warn(f"the input has no layers['{counts_key}']; it will be created from X.")
+    adata.layers[counts_key] = adata.X.copy()
+    
+if not sp.issparse(adata.layers[counts_key]):
+    warn(f"the input layers['{counts_key}'] is not sparse; it will be converted to a sparse matrix.")
+    adata.layers[counts_key] = sp.csr_matrix(adata.layers[counts_key], dtype=np.float32)
 
-values = counts.data
-if not values.size or not np.any(values):
+if not adata.layers[counts_key].size or not np.any(adata.layers[counts_key].data):
     raise ValueError(f"ADATA_PREPANNOTATE: layers['{counts_key}'] holds no counts (all zero).")
-if not np.all(np.isfinite(values)):
+if not np.all(np.isfinite(adata.layers[counts_key].data)):
     raise ValueError(f"ADATA_PREPANNOTATE: layers['{counts_key}'] has non-finite values (NaN or infinite).")
-if np.any(values < 0):
+if np.any(adata.layers[counts_key].data < 0):
     raise ValueError(f"ADATA_PREPANNOTATE: layers['{counts_key}'] has negative values; it must hold raw counts.")
-is_integer = bool(np.all(values == np.round(values)))
-max_value = float(values.max())
-if not is_integer:
-    if max_value <= max_lognorm_value:
-        raise ValueError(
-            f"ADATA_PREPANNOTATE: layers['{counts_key}'] looks log-normalised (non-integer values, maximum "
-            f"{max_value:.2f}); it must hold raw counts."
-        )
-    # e.g. SoupX or decontX corrected counts
-    warn(f"layers['{counts_key}'] has non-integer values (e.g. ambient RNA corrected counts); used as they are.")
 
 # CellTypist cannot normalise, and scANVI cannot model, cells without counts
-cell_totals = np.asarray(counts.sum(axis=1)).ravel()
+cell_totals = np.asarray(adata.layers[counts_key].sum(axis=1)).ravel()
 n_empty = int((cell_totals == 0).sum())
 if n_empty:
     raise ValueError(
         f"ADATA_PREPANNOTATE: {n_empty} cells have no counts in layers['{counts_key}']; remove them first."
     )
 
-# obs: all columns (a scANVI model may need its covariates) except earlier predictions
-
-obs = adata.obs.copy()
-old_predictions = [col for col in obs.columns if str(col).startswith(prediction_prefixes)]
-if old_predictions:
-    print(f"Dropped {len(old_predictions)} earlier prediction columns from the working copy: {short_list(old_predictions)}")
-    obs = obs.drop(columns=old_predictions)
-
-# Batches (the scANVI query batches)
-
-if batch_col and batch_col in obs.columns:
-    batch_source = batch_col
-elif fallback_batch_col in obs.columns:
-    warn(f"the batch column '{batch_col}' is not in obs; using '{fallback_batch_col}' as the batches.")
-    batch_source = fallback_batch_col
-else:
-    warn(
-        f"neither the batch column '{batch_col}' nor '{fallback_batch_col}' is in obs; "
-        f"the cells are mapped as a single batch '{single_batch}'."
+# Earlier predictions of the models this run predicts with are dropped, so the annotation modules
+# only return the new ones (they would otherwise return the old column next to / instead of the new
+# one); predictions of other models stay untouched
+prediction_col_list = list(dict.fromkeys(col.strip() for col in prediction_cols.split(",") if col.strip()))
+old_predictions = [
+    name for col in prediction_col_list for name in (col, f"{col}:conf") if name in adata.obs.columns
+]
+# SCANVI_ANNOTATE latent key, X_scanvi_<model>; it does not exist for the CellTypist columns
+old_latents = [key for key in ("X_" + col.replace(":", "_", 1) for col in prediction_col_list) if key in adata.obsm]
+if old_predictions or old_latents:
+    adata.obs = adata.obs.drop(columns=old_predictions)
+    for key in old_latents:
+        del adata.obsm[key]
+    print(
+        f"Dropped {len(old_predictions) + len(old_latents)} earlier prediction columns from the working copy: "
+        f"{short_list(old_predictions + old_latents)}"
     )
-    batch_source = None
 
-if batch_source is None:
-    obs[batch_key] = pd.Categorical([single_batch] * len(obs))
+# if no batches add all as batch 1
+if batch_col and batch_col in adata.obs.columns:
+    adata.obs[batch_key] = pd.Categorical(adata.obs[batch_col].astype(str).to_numpy())
 else:
-    if obs[batch_source].isna().any():
-        warn(f"{int(obs[batch_source].isna().sum())} cells have no value in '{batch_source}'; they form the batch 'nan'.")
-    obs[batch_key] = pd.Categorical(obs[batch_source].astype(str).to_numpy())
+    warn(f"did not find a batch column '{batch_col}' in obs; all cells are mapped as a single batch '1'.")
+    adata.obs[batch_key] = pd.Categorical(["1"] * adata.n_obs)
 
 # Gene symbols
-
-var = adata.var.copy()
 if symbol_col not in ("index", ""):
-    if symbol_col not in var.columns:
+    if symbol_col not in adata.var.columns:
         raise ValueError(
             f"ADATA_PREPANNOTATE: the symbol column '{symbol_col}' is not in var. "
-            f"Available: {short_list(var.columns)}"
+            f"Available: {short_list(adata.var.columns)}"
         )
-    symbols = var[symbol_col].astype(object)
+    symbols = adata.var[symbol_col].astype(object)
     missing = symbols.isna() | (symbols.astype(str).str.strip() == "")
     if missing.any():
         warn(f"{int(missing.sum())} genes have no symbol in '{symbol_col}'; they keep their var_names.")
-    if input_var_names_key not in var.columns:
-        var[input_var_names_key] = var.index.astype(str)
-    var.index = pd.Index(np.where(missing, var.index.astype(str), symbols.astype(str)))
-var.index.name = None
+    if input_var_names_key not in adata.var.columns:
+        adata.var[input_var_names_key] = adata.var.index.astype(str)
+    adata.var.index = pd.Index(np.where(missing, adata.var.index.astype(str), symbols.astype(str)))
 
-adata = ad.AnnData(X=counts, obs=obs, var=var)
+adata.var.index.name = None
+
 if not adata.var_names.is_unique:
     n_duplicated = int(adata.var_names.duplicated().sum())
     warn(f"{n_duplicated} duplicated gene names made unique by appending numbers.")
     adata.var_names_make_unique()
-adata.layers[counts_key] = adata.X.copy()
 
+# X is kept as in the input; the annotation modules take the raw counts from layers['counts']
 adata.write_h5ad(f"{prefix}.h5ad")
-
-print_counts(f"Query batches from '{batch_source or single_batch}', cells per batch", adata.obs[batch_key])
-print(
-    f"{adata.n_obs} cells, {adata.n_vars} genes, {adata.obs[batch_key].nunique()} batches; "
-    f"counts are {'integers' if is_integer else 'non-integer'} (maximum {max_value:g})."
-)
 
 # Versions
 

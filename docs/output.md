@@ -345,7 +345,7 @@ Adds CellTypist and/or scANVI predictions to a processed object (`--base_adata`)
   - the agreement between methods;
   - the majority label per Leiden cluster;
   - the label composition per sample.
-- **`annotate/intermediates/`**: with `--save_intermediates`, the working copy (counts only) and
+- **`annotate/intermediates/`**: with `--save_intermediates`, the working copy (raw counts in `layers["counts"]`, gene symbols as `var_names`) and
   the per-tool objects.
 
 </details>

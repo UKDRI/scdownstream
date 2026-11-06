@@ -21,19 +21,25 @@ include { splitCelltypistModels                       } from '../subworkflows/lo
 
 workflow ANNOTATE {
     take:
-    ch_base // channel: [ val(meta), path(h5ad) ] - the processed object (raw counts in layers['counts']), meta.id is the output name
+    ch_base // channel: [ val(meta), path(h5ad) ] - the processed object (raw counts in layers['counts'], or in X), meta.id is the output name
 
     main:
 
     ch_versions = Channel.empty()
     ch_predictions = Channel.empty()
-    prediction_cols = []
 
     // A method runs when its model is given (validateAnnotateParameters() requires at least one)
     celltypist = splitCelltypistModels(params.celltypist_model)
     run_celltypist = celltypist.names || celltypist.files
     // The scANVI prediction columns are named after the folder holding model.pt, as in INTEGRATE
     scanvi_model_name = params.scanvi_model ? file(params.scanvi_model).parent.name : null
+
+    // This run's prediction columns: celltypist:<model> (the built-in name, or the file name
+    // without .pkl - splitCelltypistModels() treats every entry ending in .pkl or containing
+    // a / as a file) and scanvi:<model>
+    prediction_cols = celltypist.names.collect { name -> "celltypist:${name}" } +
+        celltypist.files.collect { model_file -> "celltypist:${model_file.baseName}" } +
+        (scanvi_model_name ? ["scanvi:${scanvi_model_name}"] : [])
 
     // Optional cell subset (validateAnnotateParameters() requires both or neither), described
     // for the report as "<column>: <value>, <value>"
@@ -45,8 +51,9 @@ workflow ANNOTATE {
         : ''
 
     //
-    // MODULE: Working copy for the tools (counts in X, gene symbols as var_names, obs['batch'],
-    // only the cells of the subset if one is given)
+    // MODULE: Working copy for the tools (raw counts in layers['counts'], X as in the input,
+    // gene symbols as var_names, obs['batch'], only the cells of the subset if one is given,
+    // without earlier values of this run's prediction columns)
     //
     ADATA_PREPANNOTATE(
         ch_base,
@@ -54,6 +61,7 @@ workflow ANNOTATE {
         params.annotate_symbol_col,
         params.annotate_subset_col ?: '',
         params.annotate_subset_values ?: '',
+        prediction_cols.join(','),
     )
     ch_versions = ch_versions.mix(ADATA_PREPANNOTATE.out.versions)
 
@@ -69,11 +77,6 @@ workflow ANNOTATE {
         )
         ch_versions = ch_versions.mix(CELLTYPIST_ANNOTATE.out.versions)
         ch_predictions = ch_predictions.mix(CELLTYPIST_ANNOTATE.out.h5ad.map { _meta, h5ad -> h5ad })
-        // Columns celltypist:<model>: the built-in name, or the file name without .pkl
-        // (splitCelltypistModels() treats every entry ending in .pkl as a file)
-        celltypist_cols = celltypist.names.collect { name -> "celltypist:${name}" } +
-            celltypist.files.collect { model_file -> "celltypist:${model_file.baseName}" }
-        prediction_cols = prediction_cols + celltypist_cols
     }
 
     //
@@ -93,7 +96,6 @@ workflow ANNOTATE {
         )
         ch_versions = ch_versions.mix(SCANVI_ANNOTATE.out.versions)
         ch_predictions = ch_predictions.mix(SCANVI_ANNOTATE.out.h5ad.map { _meta, h5ad -> h5ad })
-        prediction_cols = prediction_cols + ["scanvi:${scanvi_model_name}"]
     }
 
     //
@@ -101,9 +103,11 @@ workflow ANNOTATE {
     //
     // Fan-in: the one or two tool outputs become a single list of files next to the base
     // object. The extra [ ] keeps combine() from flattening the list into separate elements.
+    // meta.prediction_cols and meta.scanvi_model_name select the obs columns and the obsm key
+    // to copy (ext.obs_prefixes / ext.obsm_keys in conf/modules.config).
     ADD_PREDICTIONS(
         ch_base
-            .map { meta, h5ad -> [meta + [scanvi_model_name: scanvi_model_name], h5ad] }
+            .map { meta, h5ad -> [meta + [scanvi_model_name: scanvi_model_name, prediction_cols: prediction_cols.join(',')], h5ad] }
             .combine(ch_predictions.collect().map { files -> [files] })
     )
     ch_versions = ch_versions.mix(ADD_PREDICTIONS.out.versions)

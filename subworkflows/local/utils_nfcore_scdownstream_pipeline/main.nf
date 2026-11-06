@@ -271,7 +271,7 @@ def splitCelltypistModels(value) {
 //
 def validateAnnotateParameters() {
     if (!params.base_adata) {
-        throw new Exception("--stage annotate requires --base_adata, the processed h5ad to annotate (with raw counts in layers['counts']).")
+        throw new Exception("--stage annotate requires --base_adata, the processed h5ad to annotate (with raw counts in layers['counts'], or in X).")
     }
 
     def celltypist = splitCelltypistModels(params.celltypist_model)

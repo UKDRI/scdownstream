@@ -833,14 +833,18 @@ nextflow run UKDRI/scdownstream -r dev_ukdri --stage annotate \
 ```
 
 **Input**
-- **Raw counts.** The object must hold raw counts in `layers["counts"]`, as every `qc_clustering`
-  output does.
-  - The stage stops if the layer is missing, has negative values, or looks log-normalised.
-  - Non-integer counts, e.g. after SoupX or decontX, give only a warning.
-- **Data each tool needs is recomputed from the counts**, on a working copy that holds only the
-  counts: CellTypist normalises to 10,000 counts per cell and log-transforms, and scANVI maps the
-  raw counts. `X`, the other layers and the embeddings of your object are not used, and are not
-  changed.
+- **Raw counts are required: you must provide them, and the stage does not check them.**
+  - **Where:** in `layers["counts"]`, as every `qc_clustering` output has them. If the object has
+    no `counts` layer, `X` is taken as the raw counts, with a warning.
+  - **No check that the data are raw:** the stage does not check whether these are raw counts or
+    normalised data. Normalised or log-transformed values give wrong predictions without an
+    error. Non-integer counts, e.g. after SoupX or decontX, are fine.
+  - **Stops on:** negative or non-finite values, or cells without any counts.
+- **Each tool works from the raw counts**, and recomputes the data it needs from them:
+  - CellTypist normalises them to 10,000 counts per cell and log-transforms them.
+  - scANVI maps the raw counts.
+
+  Your object's `X`, other layers and embeddings are not used, and are not changed.
 - **Gene names** must be the kind the models were trained on, usually gene symbols. If the symbols
   are in a `var` column, give it with `--annotate_symbol_col`.
   - scANVI stops if fewer than half of the model's genes are found, and warns below 80%.
@@ -851,8 +855,9 @@ nextflow run UKDRI/scdownstream -r dev_ukdri --stage annotate \
   `--annotate_batch_col`.
   - The default, `batch`, is already one value per sample in `qc_clustering` output
     (`<batch_col value>_<sample>`), the same as the reference mapping in `qc_clustering`.
-  - If the column is missing, `sample` is used; if that is missing too, all cells are one batch.
-    Both cases give a warning.
+  - For another object, set it to the column with the samples (or the batches), e.g.
+    `annotate_batch_col: "sample_id"`.
+  - If the column is missing, all cells are mapped as one batch, with a warning.
   - The batch is set only on the working copy; your object's `batch` and `sample` columns stay
     unchanged.
 - **Covariates.** If the model was trained with covariates (`--scvi_categorical_covariates` /
@@ -890,11 +895,11 @@ nextflow run UKDRI/scdownstream -r dev_ukdri --stage annotate \
 
 | Parameter                  | Default | Description                                                                 |
 | -------------------------- | ------- | --------------------------------------------------------------------------- |
-| `--base_adata`             | —       | Processed h5ad with raw counts in `layers["counts"]` (required).            |
+| `--base_adata`             | —       | Processed h5ad with raw counts in `layers["counts"]`, or in `X` (required). |
 | `--celltypist_model`       | —       | CellTypist model names and/or `.pkl` files, comma-separated.                |
 | `--scanvi_model`           | —       | scANVI `model.pt`; the columns are named after its folder.                  |
 | `--scvi_query_max_epochs`  | `100`   | Epochs of the scANVI query mapping.                                         |
-| `--annotate_batch_col`     | `batch` | `obs` column with the query batches; falls back to `sample`, then one batch. |
+| `--annotate_batch_col`     | `batch` | `obs` column with the query batches; one batch for all cells if missing.    |
 | `--annotate_symbol_col`    | `index` | `var` column with gene symbols.                                             |
 | `--annotate_subset_col`    | —       | `obs` column to select cells by.                                            |
 | `--annotate_subset_values` | —       | Comma-separated values of that column to annotate.                          |

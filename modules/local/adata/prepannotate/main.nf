@@ -8,10 +8,11 @@ process ADATA_PREPANNOTATE {
 
     input:
     tuple val(meta), path(h5ad)
-    val batch_col  // obs column with the query batches; falls back to 'sample', then to one batch
+    val batch_col  // obs column with the query batches; one batch for all cells if missing
     val symbol_col // var column with the gene symbols, or 'index' for the var_names
     val subset_col    // obs column to select cells by; '' for all cells
     val subset_values // comma-separated values of subset_col to keep; '' for all cells
+    val prediction_cols // comma-separated prediction columns of this run, e.g. 'celltypist:Adult_Human_Brain,scanvi:my_ref'
 
     output:
     tuple val(meta), path("${prefix}.h5ad"), emit: h5ad

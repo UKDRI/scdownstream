@@ -16,7 +16,7 @@
                     "type": "string",
                     "enum": ["qc_clustering", "downstream", "differential_genes", "train_models", "annotate"],
                     "description": "Pipeline stage to run",
-                    "help_text": "The pipeline runs as three sequential stages: `qc_clustering` (QC, integration and clustering from `--input`), `downstream` (marker genes, enrichment and cell-cell communication on the `--base_adata` written by `qc_clustering`) and `differential_genes` (pseudobulk differential expression on the `--base_adata` written by `downstream`, with `--diffgenes_contrasts`). Each stage consumes the finalized h5ad of the previous one. A fourth, independent stage, `train_models`, trains CellTypist and scANVI reference models on an annotated h5ad (`--train_adata`, see the model training options), evaluates them on held-out cells and writes a training report; the models can then be used in `qc_clustering` with `--celltypist_model` and `--scanvi_model`. It needs no `--input`. A fifth stage, `annotate`, adds cell type predictions from pre-trained models (`--celltypist_model` and/or `--scanvi_model`) to a processed h5ad (`--base_adata`, with raw counts in `layers['counts']`) without changing anything else in it, and writes a small report (see the cell type annotation options). It needs no `--input`, and its output can be passed on to `downstream`. This parameter replaces Nextflow's `-entry` option, which the strict syntax parser does not support.",
+                    "help_text": "The pipeline runs as three sequential stages: `qc_clustering` (QC, integration and clustering from `--input`), `downstream` (marker genes, enrichment and cell-cell communication on the `--base_adata` written by `qc_clustering`) and `differential_genes` (pseudobulk differential expression on the `--base_adata` written by `downstream`, with `--diffgenes_contrasts`). Each stage consumes the finalized h5ad of the previous one. A fourth, independent stage, `train_models`, trains CellTypist and scANVI reference models on an annotated h5ad (`--train_adata`, see the model training options), evaluates them on held-out cells and writes a training report; the models can then be used in `qc_clustering` with `--celltypist_model` and `--scanvi_model`. It needs no `--input`. A fifth stage, `annotate`, adds cell type predictions from pre-trained models (`--celltypist_model` and/or `--scanvi_model`) to a processed h5ad (`--base_adata`, with raw counts in `layers['counts']`, or in `X`) without changing anything else in it, and writes a small report (see the cell type annotation options). It needs no `--input`, and its output can be passed on to `downstream`. This parameter replaces Nextflow's `-entry` option, which the strict syntax parser does not support.",
                     "fa_icon": "fas fa-stream"
                 },
                 "input": {
@@ -287,7 +287,7 @@
                     "type": "string",
                     "format": "file-path",
                     "description": "If you want to project new data onto an already integrated object, specify the path to the base AnnData object here. Also the input object of `--stage downstream`, `differential_genes` and `annotate`.",
-                    "help_text": "The file should be in the .h5ad format. In `--stage annotate`, this is the processed object the cell type predictions are added to; it must hold raw counts in `layers['counts']`, as the output of `--stage qc_clustering` does.",
+                    "help_text": "The file should be in the .h5ad format. In `--stage annotate`, this is the processed object the cell type predictions are added to; it must hold raw counts in `layers['counts']`, as the output of `--stage qc_clustering` does, or in `X` if there is no `counts` layer.",
                     "pattern": "^\\S+\\.h5ad$",
                     "exists": true
                 },
@@ -817,7 +817,7 @@
                     "type": "string",
                     "default": "batch",
                     "description": "Obs column whose values become the scANVI query batches.",
-                    "help_text": "Each value of this column is mapped onto the scANVI model as its own new batch. The default `batch` is already one value per sample in the output of `--stage qc_clustering`. If the column does not exist, `sample` is used instead, and if that does not exist either, all cells are mapped as a single batch. The column is only set in a working copy for the tools; the `batch` and `sample` columns of the output object are unchanged. Not used by CellTypist.",
+                    "help_text": "Each value of this column is mapped onto the scANVI model as its own new batch. The default `batch` is already one value per sample in the output of `--stage qc_clustering`. If the column does not exist, all cells are mapped as a single batch, with a warning. The column is only set in a working copy for the tools; the `batch` and `sample` columns of the output object are unchanged. Not used by CellTypist.",
                     "fa_icon": "fas fa-layer-group"
                 },
                 "annotate_symbol_col": {
