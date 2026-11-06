@@ -1,5 +1,6 @@
-include { CELLTYPES_CELLTYPIST } from '../../../modules/local/celltypes/celltypist'
-include { ADATA_ADD_OBS_OBSM   } from '../../../modules/local/adata/add_obs_obsm'
+include { CELLTYPES_CELLTYPIST  } from '../../../modules/local/celltypes/celltypist'
+include { ADATA_ADD_OBS_OBSM    } from '../../../modules/local/adata/add_obs_obsm'
+include { splitCelltypistModels } from '../utils_nfcore_scdownstream_pipeline'
 
 workflow CELLTYPE_ASSIGNMENT {
     take:
@@ -10,9 +11,10 @@ workflow CELLTYPE_ASSIGNMENT {
     ch_obs = Channel.empty()
 
     if (params.celltypist_model) {
-        celltypist_models = Channel.value(params.celltypist_model.split(',').collect{ it -> it.trim() })
+        // Built-in model names and local model files (e.g. from --stage train_models)
+        celltypist = splitCelltypistModels(params.celltypist_model)
 
-        CELLTYPES_CELLTYPIST(ch_h5ad, celltypist_models)
+        CELLTYPES_CELLTYPIST(ch_h5ad, celltypist.names, celltypist.files)
 
         ADATA_ADD_OBS_OBSM(ch_h5ad.join(CELLTYPES_CELLTYPIST.out.h5ad).map{ meta, h5ad1, _symbol_col, h5ad2 -> [meta, h5ad1, h5ad2]})
         ch_h5ad = ADATA_ADD_OBS_OBSM.out.h5ad

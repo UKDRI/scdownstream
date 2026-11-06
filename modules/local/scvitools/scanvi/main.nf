@@ -13,10 +13,12 @@ process SCVITOOLS_SCANVI {
     input:
     tuple val(meta), path(h5ad, arity: 1)
     tuple val(meta2), path(reference_model, stageAs: 'reference_model/model.pt')
+    val mode // 'scratch', 'from_scvi' or 'query'
     tuple val(label_col), val(unlabeled_category)
     val batch_col
     val categorical_covariates
     val continuous_covariates
+    val model_name // prediction columns are named scanvi:<model_name> and scanvi:<model_name>:conf
 
     output:
     tuple val(meta), path("${prefix}.h5ad"), emit: h5ad
@@ -36,6 +38,9 @@ process SCVITOOLS_SCANVI {
     dispersion = task.ext.dispersion ?: 'gene'
     gene_likelihood = task.ext.gene_likelihood ?: 'zinb'
     max_epochs = task.ext.max_epochs ?: null
+    query_max_epochs = task.ext.query_max_epochs ?: 100
+    // obsm key of the latent representation; only the default also writes the generic X_emb
+    latent_key = task.ext.latent_key ?: 'X_scanvi'
 
     if ("${h5ad}" == "${prefix}.h5ad") {
         error("Input and output names are the same, set prefix in module configuration to disambiguate!")
@@ -50,6 +55,11 @@ process SCVITOOLS_SCANVI {
     touch ${prefix}_model/model.pt
     touch ${prefix}.pkl
     touch X_${prefix}.pkl
-    touch versions.yml
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        python: \$(python3 -c 'import platform; print(platform.python_version())')
+        scvi: \$(python3 -c 'import scvi; print(scvi.__version__)')
+    END_VERSIONS
     """
 }

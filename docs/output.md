@@ -13,8 +13,8 @@ are grouped by stage.
 > Most intermediate objects are only published when `--save_intermediates` is set. Without it you get
 > the finalized objects, the HTML reports, MultiQC and `pipeline_info/` — which is usually what you
 > want. Intermediate h5ad files are written uncompressed and may hold dense matrices; only the
-> finalized `<name>_qc_clustering.h5ad` and `<name>_downstream.h5ad` are guaranteed sparse and
-> gzip-compressed.
+> finalized `<name>_qc_clustering.h5ad`, `<name>_downstream.h5ad` and `<name>_annotate.h5ad` are
+> guaranteed sparse and gzip-compressed.
 
 ## Stage 1 — `qc_clustering`
 
@@ -124,7 +124,13 @@ isoforms are optionally aggregated with `--aggregate_isoforms`.
   - `integrate/`
     - `input_hvg/`: the highly-variable-gene subset passed to the integration tools, as `h5ad` and
       `rds`.
-    - `scvi/`: the scVI-integrated object and `X_scvi.pkl`, the latent representation.
+    - `scvi/`: the scVI model (`scvi_model/model.pt`, always published) and, with
+      `--save_intermediates`, the scVI-integrated object and `X_scvi.pkl`.
+    - `scanvi/`: with `scanvi` in `--integration_methods`, the scANVI model
+      (`scanvi_model/model.pt`, always published) and, with `--save_intermediates`, the object with
+      the predictions and the latent space. The predictions (`scanvi:<model>`,
+      `scanvi:<model>:conf`) and `obsm["X_scanvi"]` are also in `<name>_qc_clustering.h5ad`. See
+      [Reference mapping](usage.md#reference-mapping).
 
 </details>
 
@@ -296,6 +302,70 @@ marker JSON and the report are always published.
 > on either side is **skipped** and produces no `.tsv`; the run does not fail. The report lists every
 > contrast of the contrasts file for every group label and marks such combinations as "skipped" in the
 > overview and in the group's table, so you can see what was not tested.
+
+## Stage `train_models`
+
+Trains CellTypist and scANVI cell type models on an annotated reference (`--train_adata`). See
+[Training your own models](usage.md#training-your-own-models). `<name>` is `--train_name`
+(default: `--name`, then `reference`).
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `models/`
+  - `celltypist/<name>.pkl`: the CellTypist model, for `--celltypist_model`.
+  - `scanvi/<name>/model.pt`: the scANVI model, for `--scanvi_model` (with `scvi,scanvi` in
+    `--integration_methods`).
+  - `scvi/<name>/model.pt`: the scVI model the scANVI model was initialised from.
+  - `<name>_reference.h5ad`: the reference as used for training (raw counts, `label`, `batch`), with
+    the scANVI latent space (`obsm["X_scanvi"]`) and its predictions.
+  - `evaluation/`: with `--train_evaluate true` (default):
+    - `<name>_label_counts.tsv`: cells per label in total, training and test set, whether the label
+      was dropped (below `--train_min_cells_per_label`) and, with `--train_max_cells_per_label`,
+      the cells used after downsampling.
+    - `<method>/<method>_metrics.tsv`: accuracy, balanced accuracy, macro and weighted F1 on the
+      held-out test cells.
+    - `<method>/<method>_per_label.tsv`: precision, recall, F1 and support per label.
+    - `<method>/<method>_confusion.tsv`: confusion matrix (rows: true label, columns: predicted).
+  - `intermediates/`: with `--save_intermediates`, the split objects and the evaluation models.
+- `report/<name>_training_report.html`: the labels used, and per method the metrics, the per-label
+  table and a confusion matrix normalised per true label.
+
+</details>
+
+With `--train_final_on_all false`, the published models are the ones trained on the training split
+(the same models the evaluation describes) instead of a refit on all cells.
+
+## Stage `annotate`
+
+Adds CellTypist and/or scANVI predictions to a processed object (`--base_adata`). See
+[Annotating an existing object](usage.md#annotating-an-existing-object-annotate). `<name>` is
+`--name` (default: `scdownstream`).
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- **`<name>_annotate.h5ad`** (sparse, gzip-compressed) and `<name>_annotate.rds`: the input object
+  with these additions:
+  - `obs` columns `celltypist:<model>` / `celltypist:<model>:conf` and `scanvi:<model>` /
+    `scanvi:<model>:conf`: the most probable label and its confidence (0–1);
+  - `obsm["X_scanvi_<model>"]`: the scANVI latent space of the mapped cells.
+
+  Columns of an earlier annotation with the same model name are replaced. With
+  `--annotate_subset_col` / `--annotate_subset_values`, the object holds only the selected cells,
+  and categories without cells are dropped.
+- **`annotate/<name>_annotate_predictions.tsv`**: the new prediction columns, one row per cell
+  (`barcode`).
+- **`report/<name>_annotate_report.html`**:
+  - the models and the subset;
+  - per method: label counts, confidence distribution and UMAPs;
+  - the agreement between methods;
+  - the majority label per Leiden cluster;
+  - the label composition per sample.
+- **`annotate/intermediates/`**: with `--save_intermediates`, the working copy (raw counts in `layers["counts"]`, gene symbols as `var_names`) and
+  the per-tool objects.
+
+</details>
 
 ## Pipeline information
 

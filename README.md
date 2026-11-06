@@ -52,6 +52,16 @@ consumes the previous stage's finalized `.h5ad` via `--base_adata`.
 | 1     | `--stage qc_clustering`      | `--input samplesheet.csv`                                             | `<name>_qc_clustering.h5ad`, MultiQC report, QC/clustering HTML report |
 | 2     | `--stage downstream`         | `--base_adata <stage 1 h5ad>`                                         | `<name>_downstream.h5ad`, `<name>_downstream_markers.json.gz`, analysis HTML report |
 | 3     | `--stage differential_genes` | `--base_adata <stage 2 h5ad>` + `--diffgenes_contrasts contrasts.tsv` | per-contrast DE tables, pseudobulk h5ad, DE HTML report                 |
+| —     | `--stage train_models`       | `--train_adata reference.h5ad` + `--train_label_col <column>`         | CellTypist and scANVI models, held-out evaluation, training report      |
+| —     | `--stage annotate`           | `--base_adata <processed h5ad>` + `--celltypist_model` / `--scanvi_model` | `<name>_annotate.h5ad` with the predictions, prediction table, annotation report |
+
+`train_models` and `annotate` are independent of the other three stages:
+- `train_models` trains your own CellTypist and scANVI cell type models from an annotated
+  reference. See [Training your own models](docs/usage.md#training-your-own-models).
+- `qc_clustering` uses such models via `--celltypist_model` and `--scanvi_model`.
+- `annotate` adds their predictions to an object that is already processed. It can also be
+  restricted to some clusters, without re-running QC and integration. See
+  [Annotating an existing object](docs/usage.md#annotating-an-existing-object-annotate).
 
 ```text
 samplesheet.csv
@@ -267,8 +277,13 @@ nextflow run UKDRI/scdownstream -r dev_ukdri --stage differential_genes \
 ```
 
 > [!WARNING]
-> Provide pipeline parameters on the command line or via `-params-file`. Custom config files passed
-> with `-c` can supply any Nextflow configuration **except parameters**.
+> **Put analysis parameters in a YAML params file (`-params-file params.yml`)** and keep the command
+> line for `--stage` and input/output paths (`--input`, `--base_adata`, `--outdir`, model files).
+> Under Nextflow 26, values given on the command line reach the pipeline as text, so
+> `--some_option false` counts as *true* and numbers are not numbers; a params file keeps `true` /
+> `false` and numbers typed. See
+> [Passing parameters](docs/usage.md#passing-parameters-use-a-params-file).
+> Custom config files passed with `-c` can supply any Nextflow configuration **except parameters**.
 
 ## Container images
 

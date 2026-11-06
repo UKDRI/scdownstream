@@ -2,6 +2,8 @@
 
 import os
 import platform
+import sys
+from pathlib import Path
 
 os.environ["MPLCONFIGDIR"] = "./tmp/mpl"
 os.environ["NUMBA_CACHE_DIR"] = "./tmp/numba"
@@ -35,9 +37,41 @@ def format_yaml_like(data: dict, indent: int = 0) -> str:
 adata = sc.read_h5ad("${h5ad}")
 prefix = "${prefix}"
 
-models = "${models.join(' ')}".split()
+# Share of a model's genes the data should have; below it a warning (the missing genes count as not
+# expressed, which degrades the predictions)
+min_feature_overlap_warn = 0.5
 
+models = "${models.join(' ')}".split()
+# Local model files, staged by the process into this folder (stageAs: 'celltypist_models/*')
+model_files = sorted(str(path) for path in Path("celltypist_models").glob("*") if path.is_file())
+
+if not models and not model_files:
+    raise ValueError("CELLTYPES_CELLTYPIST: no CellTypist model given (neither a model name nor a .pkl file).")
+
+# (column name, model to load): built-in models are downloaded, local files are loaded as they are
+model_specs = []
+for model in models:
+    model_file = f"{model}.pkl" if not model.endswith(".pkl") else model
+    ct_models.download_models(model=model_file)
+    model_specs.append((model_file[:-4], model_file))
+for model_file in model_files:
+    model_specs.append((Path(model_file).stem, model_file))
+
+model_names = [name for name, _ in model_specs]
+duplicated = sorted({name for name in model_names if model_names.count(name) > 1})
+if duplicated:
+    raise ValueError(f"CELLTYPES_CELLTYPIST: more than one model named {duplicated}; the prediction columns would clash.")
+
+# CellTypist input: the raw counts, normalised and log-transformed on a copy, so the X of the output
+# h5ad stays as it was. The counts come from layers['counts'] when there is one, otherwise from X.
 adata_celltypist = adata.copy()  # make a copy of our adata
+if "counts" in adata_celltypist.layers:
+    print("CellTypist input: raw counts from layers['counts']")
+    adata_celltypist.X = adata_celltypist.layers["counts"].copy()
+else:
+    print("CellTypist input: raw counts from X")
+# X of the copy now holds counts; without this, scanpy warns that X seems to be already log-transformed
+adata_celltypist.uns.pop("log1p", None)
 sc.pp.normalize_per_cell(
     adata_celltypist, counts_per_cell_after=10**4
 )  # normalize to 10,000 counts per cell
@@ -51,11 +85,22 @@ if symbol_col != "index" and symbol_col:
 
 df_list = []
 
-for model in models:
-    model_file = f"{model}.pkl" if not model.endswith(".pkl") else model
-    model_name = model_file[:-4]
-    ct_models.download_models(model=model_file)
+for model_name, model_file in model_specs:
+    # A path with a '/' is opened as a file; a bare name is looked up in the downloaded models
     model_obj = ct_models.Model.load(model_file)
+
+    model_features = pd.Index(model_obj.features)
+    n_found = int(model_features.isin(adata_celltypist.var_names).sum())
+    fraction = n_found / len(model_features) if len(model_features) else 0.0
+    print(f"CellTypist model {model_name}: {n_found} of {len(model_features)} model genes ({fraction:.1%}) are in the data.")
+    if fraction < min_feature_overlap_warn:
+        print(
+            f"WARNING: CELLTYPES_CELLTYPIST: only {fraction:.1%} of the genes of the model {model_name} are in the data. "
+            "Check that the var_names are the same kind of gene identifiers as the model (e.g. gene symbols, "
+            f"not Ensembl IDs; first data genes: {list(adata_celltypist.var_names[:5])}, first model genes: "
+            f"{list(model_features[:5])}).",
+            file=sys.stderr,
+        )
 
     predictions = celltypist.annotate(
         adata_celltypist, model=model_obj

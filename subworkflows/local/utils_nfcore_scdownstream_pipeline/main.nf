@@ -59,6 +59,15 @@ workflow PIPELINE_INITIALISATION {
     // Check parameter combinations the schema cannot express
     //
     validatePcaParameters()
+    if (params.stage == 'qc_clustering') {
+        validateInputParameters()
+    }
+    if (params.stage == 'train_models') {
+        validateTrainParameters()
+    }
+    if (params.stage == 'annotate') {
+        validateAnnotateParameters()
+    }
     validateMarkersParameters()
 
     //
@@ -135,28 +144,161 @@ workflow PIPELINE_COMPLETION {
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 //
-// Check and validate pipeline parameters
+// Check the integration parameter combinations of --stage qc_clustering
 //
 def validateInputParameters() {
-    if (!params.input && !(params.base_adata && params.base_embeddings && params.base_label_col)) {
-        throw new Exception("Either an input samplesheet or (base_adata && base_embeddings && base_label_col) must be provided")
+    def integration_methods = params.integration_methods
+        ? params.integration_methods.split(',').collect { it -> it.trim().toLowerCase() }
+        : []
+
+    if (params.scvi_model && !('scvi' in integration_methods)) {
+        throw new Exception("--scvi_model requires scvi in --integration_methods.")
     }
 
-    def integration_methods = params.integration_methods.split(',').collect { it.trim().toLowerCase() }
+    if (params.scanvi_model && !('scanvi' in integration_methods)) {
+        throw new Exception("--scanvi_model requires scanvi in --integration_methods.")
+    }
+
+    // INTEGRATE builds its output object from scVI, so scANVI alone would produce nothing
+    if ('scanvi' in integration_methods && !('scvi' in integration_methods)) {
+        throw new Exception("scanvi in --integration_methods requires scvi as well.")
+    }
+
+    if (params.base_adata && 'scanvi' in integration_methods) {
+        throw new Exception("Reference mapping onto --base_adata with scANVI is not supported yet.")
+    }
+
+    // Extending --base_adata with the --input samples. Without --input, the base is processed
+    // on its own (tests/main_pipeline_sub.nf.test) and these extension checks do not apply.
     if (params.input && params.base_adata && (integration_methods - ['scvi', 'scanvi', 'scimilarity']).size() > 0) {
         throw new Exception("Only scvi, scanvi and scimilarity integration methods are supported if base_adata is provided")
     }
 
-    if (params.base_adata && 'scvi' in integration_methods && !params.scvi_model) {
+    if (params.input && params.base_adata && 'scvi' in integration_methods && !params.scvi_model) {
         throw new Exception("If base_adata is provided and scvi is used as integration method, scvi_model must be provided.")
     }
 
-    if (params.base_adata && 'scanvi' in integration_methods && !params.scanvi_model) {
-        throw new Exception("If base_adata is provided and scanvi is used as integration method, scanvi_model must be provided.")
+    if (params.input && params.base_adata && 'scimilarity' in integration_methods && !params.scimilarity_model) {
+        throw new Exception("If base_adata is provided and scimilarity is used as integration method, scimilarity_model must be provided.")
+    }
+}
+
+//
+// Read a boolean parameter. With the Nextflow 26 strict parser and no typed params block,
+// parameters given on the command line stay strings: `--train_evaluate false` gives "false",
+// which Groovy treats as true. A -params-file (YAML/JSON) and nextflow.config keep the type.
+// Booleans are returned as they are, null is false, and strings are true only for
+// "true", "yes" or "1" (case-insensitive).
+//
+def paramAsBoolean(value) {
+    if (value instanceof Boolean) {
+        return value
+    }
+    if (value == null) {
+        return false
+    }
+    return value.toString().trim().toLowerCase() in ['true', 'yes', '1']
+}
+
+//
+// Check the parameters of --stage train_models. It reads --train_adata, not --input.
+//
+def validateTrainParameters() {
+    if (!params.train_adata) {
+        throw new Exception("--stage train_models requires --train_adata, the annotated reference h5ad.")
     }
 
-    if (params.base_adata && 'scimilarity' in integration_methods && !params.scimilarity_model) {
-        throw new Exception("If base_adata is provided and scimilarity is used as integration method, scimilarity_model must be provided.")
+    if (!params.train_label_col) {
+        throw new Exception("--stage train_models requires --train_label_col, the obs column with the cell type labels.")
+    }
+
+    def supported_methods = ['celltypist', 'scanvi']
+    def train_methods = params.train_methods
+        ? params.train_methods.toString().split(',').collect { it -> it.trim().toLowerCase() }.findAll { it -> it }
+        : []
+    if (!train_methods) {
+        throw new Exception("--train_methods must name at least one method (${supported_methods.join(', ')}).")
+    }
+    def unsupported_methods = train_methods - supported_methods
+    if (unsupported_methods) {
+        throw new Exception("--train_methods: unsupported method(s) ${unsupported_methods.join(', ')}. Supported: ${supported_methods.join(', ')}.")
+    }
+
+    // Numbers given on the command line arrive as strings (see paramAsBoolean), so convert
+    // them before comparing
+    def test_fraction = params.train_test_fraction as BigDecimal
+    if (!(test_fraction > 0 && test_fraction < 1)) {
+        throw new Exception("--train_test_fraction (${params.train_test_fraction}) must be larger than 0 and smaller than 1.")
+    }
+
+    def min_cells_per_label = params.train_min_cells_per_label as Integer
+    if (!(min_cells_per_label >= 1)) {
+        throw new Exception("--train_min_cells_per_label (${params.train_min_cells_per_label}) must be at least 1.")
+    }
+
+    if (params.train_max_cells_per_label != null && !((params.train_max_cells_per_label as Integer) >= 1)) {
+        throw new Exception("--train_max_cells_per_label (${params.train_max_cells_per_label}) must be at least 1.")
+    }
+
+    if (paramAsBoolean(params.train_celltypist_mini_batch) && !paramAsBoolean(params.train_celltypist_use_sgd)) {
+        throw new Exception("--train_celltypist_mini_batch requires --train_celltypist_use_sgd.")
+    }
+
+    // Without the evaluation there is no training-split model to keep, so the final models are
+    // always trained on all cells
+    if (!paramAsBoolean(params.train_evaluate) && !paramAsBoolean(params.train_final_on_all)) {
+        log.warn("--train_final_on_all false is ignored with --train_evaluate false: the final models are trained on all cells.")
+    }
+}
+
+//
+// Split --celltypist_model into built-in model names and local model files. Entries ending in
+// .pkl or holding a path are local model files (e.g. from --stage train_models); everything
+// else is the name of a built-in model to download. Returns [names: [String], files: [Path]].
+//
+def splitCelltypistModels(value) {
+    def entries = value
+        ? value.toString().split(',').collect { entry -> entry.trim() }.findAll { entry -> entry }
+        : []
+    def names = entries.findAll { entry -> !(entry.endsWith('.pkl') || entry.contains('/')) }
+    def files = entries
+        .findAll { entry -> entry.endsWith('.pkl') || entry.contains('/') }
+        .collect { entry -> file(entry, checkIfExists: true) }
+    return [names: names, files: files]
+}
+
+//
+// Check the parameters of --stage annotate. It reads --base_adata, not --input.
+//
+def validateAnnotateParameters() {
+    if (!params.base_adata) {
+        throw new Exception("--stage annotate requires --base_adata, the processed h5ad to annotate (with raw counts in layers['counts'], or in X).")
+    }
+
+    def celltypist = splitCelltypistModels(params.celltypist_model)
+    if (!celltypist.names && !celltypist.files && !params.scanvi_model) {
+        throw new Exception("--stage annotate requires at least one model: --celltypist_model and/or --scanvi_model.")
+    }
+
+    if (params.scanvi_model) {
+        def scanvi_model = file(params.scanvi_model)
+        if (scanvi_model.name != 'model.pt') {
+            throw new Exception("--scanvi_model must be a file named model.pt, e.g. models/scanvi/<name>/model.pt from --stage train_models (got ${params.scanvi_model}). The prediction columns are named after its folder.")
+        }
+        if (!scanvi_model.exists() || scanvi_model.isDirectory()) {
+            throw new Exception("--scanvi_model ${params.scanvi_model} does not exist or is not a file.")
+        }
+    }
+
+    // The cell subset needs both the column and at least one value
+    def subset_values = params.annotate_subset_values != null
+        ? params.annotate_subset_values.toString().split(',').collect { value -> value.trim() }.findAll { value -> value }
+        : []
+    if (params.annotate_subset_col && !subset_values) {
+        throw new Exception("--annotate_subset_col requires --annotate_subset_values, the comma-separated values of the column whose cells are annotated.")
+    }
+    if (subset_values && !params.annotate_subset_col) {
+        throw new Exception("--annotate_subset_values requires --annotate_subset_col, the obs column to select the cells by.")
     }
 }
 
