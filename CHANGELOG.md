@@ -12,6 +12,24 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Added`
 
+- `--stage downstream` marker genes:
+  - **New default:** the Wilcoxon rank-sum test with AUC, a Python re-implementation of the
+    method of the R package presto (`wilcoxauc`; results verified against R presto). Markers
+    are ranked and selected by AUC (`--markers_min_auc`, default 0.7, the usual threshold for
+    acceptable discrimination) instead of by adjusted p-value. The filters on the expressing fraction (`--markers_pct_nz`)
+    and the fold change (`--markers_min_logfc`) stay.
+  - **Option:** `--markers_method cosg` adds the COSG cosine-similarity score
+    (`--markers_cosg_mu`) and ranks the markers by it; the presto statistics are kept. An optional
+    `--markers_min_cosg_score` filters by that score; it is not used by default.
+  - **Report:** the "Differential genes" tables show the AUC, the COSG score when used, and the raw
+    and adjusted p-values. A filter panel (min AUC, log2FC, COSG score, pct in; max pct out, p,
+    adj. p) filters all cluster tables in the browser.
+  - **Marker JSON:** has `list_auc` (and `list_cosg_score`).
+  - **Removed:**
+    - `--markers_thr_adj_pvalue`. Cluster-vs-rest p-values are inflated (cells as replicates,
+      clusters from the same data), so they are still reported but no longer used to select
+      markers;
+    - the `SCANPY_RANKGENESGROUPS` module.
 - `--report_max_celltype_labels` (default 50): the "Predicted labels" UMAPs and count tables in the
   QC/clustering and downstream reports show only the CellTypist labels with the most predicted
   cells; the rest are grouped as `other` (grey in the UMAP, one row in the table), so models with

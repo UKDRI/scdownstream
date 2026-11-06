@@ -109,6 +109,17 @@ Upstream nf-core/scdownstream, and therefore this fork, drew on the learnings an
 
   > McInnes L, Healy J, Melville J. UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction. arXiv:1802.03426.
 
+### Marker genes
+
+- [presto](https://doi.org/10.1101/653253): the Wilcoxon rank-sum test and AUC are re-implemented
+  in Python after presto's method (`MARKERS_PRESTO`). presto's code is not used or included.
+
+  > Korsunsky I, Nathan A, Millard N, Raychaudhuri S. Presto scales Wilcoxon and auROC analyses to millions of observations. bioRxiv. 2019. doi: 10.1101/653253.
+
+- [COSG](https://doi.org/10.1093/bib/bbab579) (`--markers_method cosg`)
+
+  > Dai M, Pei X, Wang XJ. Accurate and fast cell marker gene identification with COSG. Brief Bioinform. 2022 Mar;23(2):bbab579. doi: 10.1093/bib/bbab579.
+
 ### Cell–cell communication
 
 - [LIANA+](https://pubmed.ncbi.nlm.nih.gov/39223377/)

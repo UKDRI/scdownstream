@@ -105,8 +105,10 @@ differential_genes/    ── decoupler pseudobulk → PyDESeq2 per group × con
 
 ### Stage 2 — `downstream`
 
-1. Marker genes per cluster — `scanpy.tl.rank_genes_groups` (Wilcoxon) on the clustering named by
-   `--selected_clustering`
+1. Marker genes per cluster on the clustering named by `--selected_clustering`: Wilcoxon rank-sum
+   test with AUC, as in [presto](https://github.com/immunogenomics/presto), ranked by AUC
+   (default). With `--markers_method cosg`, the [COSG](https://github.com/genecell/COSG)
+   score is added and ranks the markers instead.
 2. Gene set enrichment over those markers
 3. Cell–cell communication — [LIANA+](https://liana-py.readthedocs.io/) rank aggregation, using HCOP
    orthologs for non-human species

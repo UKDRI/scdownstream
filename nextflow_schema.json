@@ -401,12 +401,27 @@
                     "description": "Specify uns key for storing marker genes",
                     "help_text": "Any uns key for storing marker genes can be used."
                 },
-                "markers_thr_adj_pvalue": {
+                "markers_method": {
+                    "type": "string",
+                    "default": "presto",
+                    "enum": ["presto", "cosg"],
+                    "description": "How marker genes per group are ranked.",
+                    "help_text": "`presto` (default) runs a Wilcoxon rank-sum test with AUC, as in the R package presto, and ranks markers by AUC. `cosg` additionally computes the COSG cosine-similarity score (Dai et al. 2022) and ranks markers by it; the presto statistics are kept. `cosg` uses the `cosg` package from bioconda/BioContainers."
+                },
+                "markers_min_auc": {
                     "type": "number",
-                    "default": 0.05,
-                    "minimum": 0,
+                    "default": 0.7,
+                    "minimum": 0.5,
                     "maximum": 1,
-                    "description": "Adjusted P-value threshold for detecting marker genes."
+                    "description": "Minimum AUC for an exported marker gene.",
+                    "help_text": "AUC of the gene's expression in the group against all other cells. An AUC of 0.5 means no difference between the group and the other cells. The default of 0.7 is the conventional threshold for acceptable discrimination in ROC analysis (0.7–0.8 acceptable, 0.8–0.9 excellent)."
+                },
+                "markers_cosg_mu": {
+                    "type": "number",
+                    "default": 1,
+                    "minimum": 0,
+                    "description": "COSG `mu` parameter.",
+                    "help_text": "Penalty for genes that are also expressed in other groups; COSG's default is 1. Only used with `--markers_method cosg`."
                 },
                 "markers_pct_nz": {
                     "type": "number",
@@ -420,6 +435,13 @@
                     "default": 0,
                     "minimum": 0,
                     "description": "Minimum log-fold change to consider gene as marker gene."
+                },
+                "markers_min_cosg_score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Minimum COSG score for an exported marker; not used by default.",
+                    "help_text": "Only with `--markers_method cosg`. COSG scores are between 0 and 1; a higher score means the gene is more specific to the group. The AUC, log2FC and expressing-fraction filters (`--markers_min_auc`, `--markers_min_logfc`, `--markers_pct_nz`) still apply."
                 },
                 "markers_n_top": {
                     "type": "integer",

@@ -59,6 +59,7 @@ workflow PIPELINE_INITIALISATION {
     // Check parameter combinations the schema cannot express
     //
     validatePcaParameters()
+    validateMarkersParameters()
 
     //
     // Check config provided to the pipeline
@@ -165,6 +166,15 @@ def validateInputParameters() {
 def validatePcaParameters() {
     if (params.neighbors_n_pcs && params.pca_n_comps && params.neighbors_n_pcs > params.pca_n_comps) {
         throw new Exception("--neighbors_n_pcs (${params.neighbors_n_pcs}) cannot be larger than --pca_n_comps (${params.pca_n_comps}): the PCA graph can only use PCs that were computed.")
+    }
+}
+
+//
+// Check that the downstream stage's marker-gene filters fit the chosen ranking method
+//
+def validateMarkersParameters() {
+    if (params.stage == 'downstream' && params.markers_min_cosg_score != null && params.markers_method != 'cosg') {
+        throw new Exception("--markers_min_cosg_score needs --markers_method cosg (COSG scores are only computed with it).")
     }
 }
 

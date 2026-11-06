@@ -50,6 +50,34 @@ subworkflows, or the schema here.
   confirm that `dc.pp.pseudobulk` actually accepts `sample_col`, `groups_col`, and `layer`
   in the installed version.
 
+- **Don't re-implement standard functions.** Before writing statistics or data handling
+  yourself, check whether the libraries in the container already provide it, and use their
+  function. Look in `scipy.stats` / `scipy.special`, `numpy`, `pandas`, `scanpy` (`sc.get.*`,
+  `sc.pp.*`, `sc.tl.*`), `statsmodels` (only if installed) or R `stats`. Examples:
+  - multiple-testing correction: `scipy.stats.false_discovery_control`, R `p.adjust`;
+  - rank tests: `scipy.stats.mannwhitneyu`;
+  - ranks: `scipy.stats.rankdata`;
+  - normal tail probabilities: `scipy.special.ndtr`, `scipy.stats.norm.sf`;
+  - per-group means and expressing fractions: `sc.get.aggregate`.
+
+  Write your own code only when the library version really doesn't fit, e.g. it needs
+  dense data and is far too slow or too memory-hungry at the dataset sizes this pipeline
+  handles. In that case:
+  - say in a comment why the library function isn't used;
+  - keep the own code as small as possible;
+  - name the reference implementation it must match, and report how it was checked against it.
+
+- **Raw counts come from `layers["counts"]`.** When a step needs raw counts (normalising
+  itself, count models such as scVI/scANVI, pseudobulk sums, ambient or doublet tools), it
+  reads them from `layers["counts"]`. Never assume `X` holds raw counts: in the stage outputs
+  `X` is log-normalised. Fall back to `X` only where the module documents that inputs may
+  carry the counts in `X` (e.g. objects without a `counts` layer in `--stage annotate`), and
+  print which one is used.
+  - If a tool reads only `X`, put the counts into `X` of a copy inside the template (see
+    `modules/local/celltypes/celltypist/templates/celltypist.py`). Never overwrite the `X` of
+    the object that is written out.
+  - Steps meant for log-normalised data (rank tests and AUC, COSG, plots) use `X` as it is.
+
 - **No hard-coded parameters in function calls.** Values that affect the result (seeds,
   thresholds, numbers of components or neighbours, epochs, cut-offs, ...) come from the
   process inputs or `task.ext.*`, not from literals written into a call. When a fixed value

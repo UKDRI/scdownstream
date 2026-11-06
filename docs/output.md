@@ -204,10 +204,21 @@ a `qc_clustering` run.
 - `<name>_downstream.h5ad` (gzip-compressed, sparse CSR `X`, layers and `raw.X`) / `<name>_downstream.rds`: the
   object with marker genes, enrichment results and LIANA+ output added. **This is the input to `--stage differential_genes`.**
 - `<name>_downstream_markers.json.gz`: the marker genes per group (one set per cluster, id
-  `genes--cluster--<cluster>`; the separator is `--markers_sep`), filtered by `--markers_thr_adj_pvalue`,
-  `--markers_n_top`, `--markers_pct_nz` and `--markers_min_logfc`, in a compact JSON form for
+  `genes--cluster--<cluster>`; the separator is `--markers_sep`), in a compact JSON form for
   downstream tooling.
-- `scanpy/<name>/`: the object after `rank_genes_groups` (Wilcoxon) and after gene set enrichment.
+  - **Filters:** at least `--markers_min_auc`, `--markers_pct_nz` and `--markers_min_logfc`, and
+    `--markers_min_cosg_score` when it is set.
+  - **Order:** in ranking order (AUC, or the COSG score with `--markers_method cosg`), at most
+    `--markers_n_top` genes per set.
+  - **Per gene:** `list_auc`, `list_score` (the ranking metric), `list_logFC` (log2 fold change),
+    `list_p_value` / `list_p_value_adjusted` (Wilcoxon, reported only, not used for selection),
+    the expressing fractions, and `list_cosg_score` with COSG.
+  - **`params`:** records `method`, `ranked_by` and `min_auc`.
+- `scanpy/<name>/`: with `--save_intermediates`, the object after the marker genes and after gene
+  set enrichment.
+  - **Marker results:** in `uns["rank_genes_groups"]`, in scanpy's format: `names`, `scores`
+    (the ranking metric), `auc`, `logfoldchanges`, `pvals`, `pvals_adj`, `pts` / `pts_rest`, and
+    `cosg_scores` with COSG.
 - `per_group/<name>/liana/`: [LIANA+](https://liana-py.readthedocs.io/) rank-aggregate cell–cell
   communication results.
 - `report/<name>_downstream_report.html`: a Quarto report covering the marker genes per group, the
@@ -216,6 +227,12 @@ a `qc_clustering` run.
   per-cluster summary is not limited: for each cluster it lists up to 5 predicted labels that cover
   at least 5 % of the cluster's cells, with their percentage, whatever their overall rank.
   With `--umap_color_by`, it also has the "Requested UMAP plots" section described for stage 1.
+  - **Marker tables:** the "Differential genes" tables list the top `--report_table_row_limit`
+    genes per cluster in ranking order. Columns: AUC, COSG score (with COSG), log2FC, pct in / out,
+    p and adj. p.
+  - **Filter panel:** filters all tables in the browser (min AUC, log2FC, COSG score, pct in; max
+    pct out, p, adj. p). It works only on the rows shown, independently of the parameters used for
+    the marker JSON.
 
 </details>
 

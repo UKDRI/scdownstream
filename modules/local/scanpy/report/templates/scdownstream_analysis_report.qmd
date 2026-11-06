@@ -392,9 +392,34 @@ else:
 
 ## <font color='green'>Differential genes</font>
 
-Differential genes per clusters are identified based on a Wilcoxon rank-sum test by comparing the gene expression between cells of a cluster against all other cells.
+```{python}
+from IPython.display import display, HTML
+
+marker_results = adata.uns['rank_genes_groups']
+marker_ranked_by = marker_results['params'].get('ranked_by', 'auc')
+
+if marker_ranked_by == 'cosg':
+    marker_method_text = (
+        "Marker genes per cluster are ranked by the COSG score, a cosine similarity between the expression "
+        "of a gene and membership of the cluster, penalised when the gene is also similar to other clusters. "
+        "The Wilcoxon rank-sum test and the AUC (presto statistics) of the cluster against all other cells "
+        "are shown alongside."
+    )
+else:
+    marker_method_text = (
+        "Marker genes per cluster are identified with a Wilcoxon rank-sum test and the AUC (presto statistics), "
+        "comparing the cells of a cluster against all other cells, and are ranked by AUC."
+    )
+
+display(HTML(
+    f"<p>{marker_method_text}</p>"
+    "<p>AUC is the probability that a random cell of the cluster expresses the gene more highly than a random "
+    "other cell; 0.5 means no difference, 1 a perfect marker.</p>"
+))
+```
 
 ```{python}
+# top 3 genes per cluster in the stored ranking order (AUC, or the COSG score)
 sc.pl.rank_genes_groups_dotplot(adata, groupby=selected_clustering, standard_scale="var", swap_axes=True, n_genes=3)
 ```
 
@@ -467,22 +492,150 @@ def create_search_table_html(df: pd.DataFrame, search_text: str,
 ```{python}
 from IPython.display import display, HTML
 
-display(HTML(f"<p>Results in tables are limited to the top {ntop} genes.</p>"))
+display(HTML(f"<p>Results in tables are limited to the top {ntop} genes, in ranking order. "
+             "pct in / pct out: percentage of cells of the cluster / of all other cells in which the gene is detected; "
+             "p: p-value of the Wilcoxon test; "
+             "adj. p: Benjamini-Hochberg adjusted p-value of the Wilcoxon test.</p>"))
+```
+
+```{python}
+# filter panel for all marker tables; inputs start empty, an empty input applies no filter
+from IPython.display import display, HTML
+
+has_cosg = 'cosg_scores' in marker_results
+
+marker_filter_js = """
+<script>
+function markerCellValue(text) {
+    let t = text.trim().toLowerCase();
+    if (t === 'inf') return Infinity;
+    if (t === '-inf') return -Infinity;
+    return parseFloat(t);
+}
+
+function markerFilterValues() {
+    let filters = [];
+    document.querySelectorAll('.marker-filter').forEach(input => {
+        let value = parseFloat(input.value);
+        if (!Number.isNaN(value)) {
+            filters.push({col: input.dataset.col, op: input.dataset.op, value: value});
+        }
+    });
+    return filters;
+}
+
+function filterMarkerTable(block, filters) {
+    let headers = Array.from(block.querySelectorAll('thead th')).map(th => th.textContent.trim());
+    let search = document.getElementById(block.dataset.search).value.toLowerCase();
+    let rows = block.querySelectorAll('tbody tr');
+    let shown = 0;
+    rows.forEach(row => {
+        let keep = row.textContent.toLowerCase().includes(search);
+        filters.forEach(f => {
+            let idx = headers.indexOf(f.col);
+            if (!keep || idx < 0) return;
+            let x = markerCellValue(row.cells[idx].textContent);
+            keep = !Number.isNaN(x) && (f.op === 'min' ? x >= f.value : x <= f.value);
+        });
+        row.style.display = keep ? '' : 'none';
+        if (keep) shown++;
+    });
+    document.getElementById(block.dataset.count).textContent = shown + ' of ' + rows.length + ' genes shown';
+}
+
+function applyMarkerFilters() {
+    let filters = markerFilterValues();
+    document.querySelectorAll('.marker-table').forEach(block => filterMarkerTable(block, filters));
+}
+
+function markerSearchTable(inputId, containerId) {
+    filterMarkerTable(document.getElementById(containerId).closest('.marker-table'), markerFilterValues());
+}
+
+function resetMarkerFilters() {
+    document.querySelectorAll('.marker-filter').forEach(input => { input.value = ''; });
+    applyMarkerFilters();
+}
+</script>
+"""
+
+marker_filter_style = ("width: 110px; padding: 6px; margin-top: 4px; font-family: sans-serif; "
+                       "border: 1px solid #D1D5DB; border-radius: 4px;")
+
+def marker_filter_input(input_id: str, label: str, column: str, op: str) -> str:
+    """Numeric filter input; data-col is the table header it applies to, data-op 'min' or 'max'."""
+    return ("<label style='display: flex; flex-direction: column; font-size: 0.85em; font-family: sans-serif;'>"
+            + label
+            + f"<input type='number' step='any' id='{input_id}' class='marker-filter' data-col='{column}' "
+            + f"data-op='{op}' placeholder='no filter' oninput='applyMarkerFilters()' style='{marker_filter_style}'>"
+            + "</label>")
+
+marker_filters = [('markerFilterMinAuc', 'min AUC', 'AUC', 'min')]
+if has_cosg:
+    marker_filters.append(('markerFilterMinCosg', 'min COSG score', 'COSG score', 'min'))
+marker_filters += [
+    ('markerFilterMinLogfc', 'min log2FC', 'log2FC', 'min'),
+    ('markerFilterMaxP', 'max p', 'p', 'max'),
+    ('markerFilterMaxPadj', 'max adj. p', 'adj. p', 'max'),
+    ('markerFilterMinPctIn', 'min pct in (%)', 'pct in', 'min'),
+    ('markerFilterMaxPctOut', 'max pct out (%)', 'pct out', 'max'),
+]
+
+marker_filter_panel = (
+    "<div id='markerFilterPanel' style='display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; "
+    "margin: 12px 0;'>"
+    + "".join(marker_filter_input(*f) for f in marker_filters)
+    + "<button type='button' id='markerFilterReset' onclick='resetMarkerFilters()' "
+    "style='padding: 6px 14px; font-family: sans-serif; border: 1px solid #D1D5DB; border-radius: 4px; "
+    "background: #F9FAFB; cursor: pointer;'>Reset</button>"
+    "</div>"
+)
+
+display(HTML(
+    marker_filter_js
+    + f"<p>The filters below act on the genes shown in the tables (the top {ntop} genes per cluster, in ranking "
+    "order) and apply to all cluster tables together with each table's gene search; an empty field applies no "
+    "filter. The exported marker JSON is filtered with the pipeline parameters --markers_min_auc, "
+    "--markers_min_logfc, --markers_pct_nz and --markers_min_cosg_score instead.</p>"
+    + marker_filter_panel
+))
 ```
 
 ```{python}
 import numpy as np
+import pandas as pd
 from IPython.display import display, HTML
+
+def marker_table(results: dict, group: str, ntop: int) -> pd.DataFrame:
+    """Top ntop genes of one cluster from the uns fields, in the stored ranking order."""
+    names = np.asarray(results['names'][group]).astype(str)[:ntop]
+    table = pd.DataFrame({'gene': names,
+                          'AUC': np.asarray(results['auc'][group][:ntop], dtype=float).round(3)})
+    if 'cosg_scores' in results:
+        table['COSG score'] = np.asarray(results['cosg_scores'][group][:ntop], dtype=float).round(3)
+    table['log2FC'] = np.asarray(results['logfoldchanges'][group][:ntop], dtype=float).round(2)
+    table['pct in'] = (100 * results['pts'][group].reindex(names).to_numpy(dtype=float)).round(1)
+    table['pct out'] = (100 * results['pts_rest'][group].reindex(names).to_numpy(dtype=float)).round(1)
+    table['p'] = [f"{p:.2e}" for p in np.asarray(results['pvals'][group][:ntop], dtype=float)]
+    table['adj. p'] = [f"{p:.2e}" for p in np.asarray(results['pvals_adj'][group][:ntop], dtype=float)]
+    return table
 
 tableid = 0
 for clus in list_clusters:
-    
+
     box_name = 'sboxDiff' + str(tableid)
     table_name = 'tableDiff' + str(tableid)
+    count_name = 'countDiff' + str(tableid)
     text = "Search gene..."
-    
-    html = create_search_table_html(sc.get.rank_genes_groups_df(adata, group=clus), text, box_name, table_name, ntop)
-    display(HTML("<h3><font color='green'>Differential genes cluster" + clus +  "</font></h3><details>" + html + "</details>"))
+
+    df_markers = marker_table(marker_results, clus, ntop)
+    html = create_search_table_html(df_markers, text, box_name, table_name, ntop,
+                                    lookupFunction="markerSearchTable")
+    count_html = (f"<span id='{count_name}' style='margin-left: 12px; font-size: 0.6em; color: #6B7280;'>"
+                  f"{len(df_markers)} of {len(df_markers)} genes shown</span>")
+    display(HTML("<h3><font color='green'>Differential genes cluster" + clus +  "</font>" + count_html + "</h3>"
+                 + f"<details><div class='marker-table' data-search='{box_name}' data-count='{count_name}'>"
+                 + html + "</div></details>"))
     
     tableid += 1
 ```
@@ -664,6 +817,12 @@ _Lopez R, Regier J, Cole MB, Jordan MI, & Yosef N. (2018). Deep generative model
 
 ### <font color='green'>[Celltypist](https://www.celltypist.org/)</font>
 _Domínguez Conde C, Xu C, Jarvis LB, Rainbow DB, Wells SB, Gomes T, ... & Teichmann, SA (2022). Cross-tissue immune cell analysis reveals tissue-specific features in humans. Science, 376(6594):eabl5197._
+
+### <font color='green'>[presto](https://github.com/immunogenomics/presto)</font>
+_Korsunsky I, Nathan A, Millard N, & Raychaudhuri S. (2019). Presto scales Wilcoxon and auROC analyses to millions of observations. bioRxiv, 653253. doi: 10.1101/653253._
+
+### <font color='green'>[COSG](https://github.com/genecell/COSG)</font>
+_Dai M, Pei X, & Wang XJ. (2022). Accurate and fast cell marker gene identification with COSG. Brief. Bioinform., 23(2):bbab579._
 
 ### <font color='green'>[gProfiler](https://biit.cs.ut.ee/gprofiler/gost)</font>
 _Kolberg L, Raudvere U, Kuzmin I, Adler P, Vilo J, & Peterson H. (2023). g: Profiler—interoperable web service for functional enrichment analysis and gene identifier mapping (2023 update). Nucleic Acids Res., 51(W1):W207-W212._

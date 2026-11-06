@@ -477,7 +477,10 @@ nextflow run UKDRI/scdownstream -r dev_ukdri --stage downstream \
 | `--enrich_max_out_group_fraction` | `0.5`                   | Maximum fraction of cells outside the group expressing a gene.                                                                                          |
 | `--ortholog_hcop_directory`       | `null`                  | Directory of HCOP ortholog tables; required for LIANA+ on non-human data — see [Reference data](#reference-data).                                       |
 | `--markers_uns_key`               | `rank_genes_groups`     | `uns` key holding the marker results to export.                                                                                                         |
-| `--markers_thr_adj_pvalue`        | `0.05`                  | Adjusted p-value threshold for the exported markers.                                                                                                    |
+| `--markers_method`                | `presto`                | How markers are ranked: `presto` (by AUC) or `cosg` (by the COSG score, with the presto statistics kept). See below.                                   |
+| `--markers_min_auc`               | `0.7`                   | Minimum AUC for an exported marker (0.5 = no difference between the group and the other cells; 0.7 is the usual threshold for acceptable discrimination). |
+| `--markers_cosg_mu`               | `1`                     | COSG's `mu`: penalty for genes also expressed in other groups. Only used with `--markers_method cosg`.                                                 |
+| `--markers_min_cosg_score`        | —                       | Minimum COSG score (0–1) for an exported marker. Not used by default; needs `--markers_method cosg`. The scores of the top genes vary a lot between groups, so a fixed threshold removes many more markers from some groups than from others. |
 | `--markers_n_top`                 | `100`                   | Number of top markers per group to export.                                                                                                              |
 | `--markers_pct_nz`                | `0.1`                   | Minimum fraction of non-zero expressing cells for an exported marker.                                                                                   |
 | `--markers_min_logfc`             | `0`                     | Minimum log fold change for an exported marker.                                                                                                         |
@@ -488,7 +491,25 @@ nextflow run UKDRI/scdownstream -r dev_ukdri --stage downstream \
 | `--umap_color_by`                 | `''`                    | Comma-separated `obs` columns to plot on the UMAPs in both reports, e.g. `sex,diagnosis`. See [UMAP colourings](#umap-colourings-in-the-reports). |
 | `--umap_color_by_embeddings`      | `X_umap_pca,X_umap_scvi`| UMAPs the `--umap_color_by` columns are plotted on, one block each: before (PCA) and after (scVI) integration. |
 
-Marker genes are computed with `scanpy.tl.rank_genes_groups` using the **Wilcoxon** test.
+**Marker genes.** Each group of `--selected_clustering` is compared with all other cells, on the
+log-normalised `X`.
+- **`presto` (default):** the Wilcoxon rank-sum test with the **AUC**, a Python re-implementation
+  of the method of the R package [presto](https://github.com/immunogenomics/presto) (`wilcoxauc`);
+  the results match R presto.
+  - **AUC:** the probability that a random cell of the group expresses the gene more highly than a
+    random other cell. 0.5 means no difference, 1 a perfect marker.
+  - **Ranking and filter:** markers are ranked by AUC. The exported markers need at least
+    `--markers_min_auc`, `--markers_pct_nz` and `--markers_min_logfc`.
+  - **Why not p-values:** p-values of a group against the rest are inflated (cells count as
+    replicates, and the groups come from the same data), so they are reported but not used to
+    select markers.
+- **`cosg`:** additionally the [COSG](https://github.com/genecell/COSG) score (cosine similarity
+  to an ideal marker of the group; Dai et al. 2022), which favours genes specific to one group.
+  - **Ranking and filter:** markers are ranked by the COSG score, and the same filters apply.
+  - **Report:** it shows the COSG score next to the presto columns.
+  - **Container:** it runs in the BioContainers `cosg` image.
+
+`--markers_thr_adj_pvalue` was removed: markers are no longer selected by p-value.
 
 ## `differential_genes`
 
