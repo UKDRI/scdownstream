@@ -13,6 +13,7 @@ process SCVITOOLS_SCVI {
     input:
     tuple val(meta), path(h5ad, arity: 1)
     tuple val(meta2), path(reference_model, stageAs: 'reference_model/model.pt')
+    val mode // 'scratch' or 'query'
     val batch_col
     val categorical_covariates
     val continuous_covariates
@@ -34,6 +35,7 @@ process SCVITOOLS_SCVI {
     dispersion = task.ext.dispersion ?: 'gene'
     gene_likelihood = task.ext.gene_likelihood ?: 'zinb'
     max_epochs = task.ext.max_epochs ?: null
+    query_max_epochs = task.ext.query_max_epochs ?: 100
 
     if ("${h5ad}" == "${prefix}.h5ad") {
         error("Input and output names are the same, set prefix in module configuration to disambiguate!")
@@ -47,6 +49,11 @@ process SCVITOOLS_SCVI {
     mkdir -p ${prefix}_model
     touch ${prefix}_model/model.pt
     touch X_${prefix}.pkl
-    touch versions.yml
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        python: \$(python3 -c 'import platform; print(platform.python_version())')
+        scvi: \$(python3 -c 'import scvi; print(scvi.__version__)')
+    END_VERSIONS
     """
 }

@@ -1,0 +1,439 @@
+---
+title: '<font color=''green''><b><u>Single-cell downstream: model training report</u></b></font>'
+jupyter: python3
+execute:
+  echo: false
+  warning: false
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    embed-resources: true
+---
+
+```{python}
+#| tags: [parameters]
+
+# label, n_total, n_train, n_test, dropped (ADATA_TRAINSPLIT)
+LABEL_COUNTS = "label_counts.tsv"
+# <method>_metrics.tsv, <method>_per_label.tsv and <method>_confusion.tsv (MODEL_EVALUATE);
+# missing or empty without the evaluation (--train_evaluate false)
+EVALUATION_DIR = "evaluation"
+MODEL_NAME = "reference"
+VERSIONS_FILE = "versions.yml"
+# Confusion matrices with more true labels show the labels with the most test cells
+MAX_CONFUSION_LABELS = 50
+```
+
+```{python}
+import warnings
+warnings.filterwarnings('ignore')
+```
+
+```{python}
+import base64
+import io
+import os
+from html import escape as escape_html
+
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+from IPython.display import display, HTML
+```
+
+```{python}
+model_name = str(MODEL_NAME)
+evaluation_dir = str(EVALUATION_DIR)
+max_confusion_labels = int(MAX_CONFUSION_LABELS)
+
+# Category of unlabelled cells (ADATA_TRAINSPLIT)
+unknown_category = 'unknown'
+method_titles = {'celltypist': 'CellTypist', 'scanvi': 'scANVI'}
+
+
+def method_title(method: str) -> str:
+    return method_titles.get(method, method)
+
+
+def inline_table_html(df: pd.DataFrame, index: bool = False) -> str:
+    """
+    A table on a single line, for printing from an `output: asis` cell: pandoc reads the
+    indentation of to_html's rows as an indented code block, so every line is stripped.
+    """
+    return ''.join(line.strip() for line in df.to_html(index=index, na_rep='').splitlines())
+
+
+def scroll_table_html(df: pd.DataFrame, index: bool = False, max_height: int = 400) -> str:
+    return (f"<div style='overflow-y: scroll; overflow-x: auto; max-height: {max_height}px'>"
+            f"{inline_table_html(df, index=index)}</div>")
+
+
+def read_tsv(path: str, **kwargs) -> pd.DataFrame:
+    # keep_default_na=False: a label such as "NA" stays a label
+    return pd.read_csv(path, sep='\t', keep_default_na=False, na_values=[''], **kwargs)
+
+
+label_counts = read_tsv(LABEL_COUNTS, dtype={'label': str})
+label_counts['dropped'] = label_counts['dropped'].astype(str).str.lower() == 'true'
+
+methods = []
+if os.path.isdir(evaluation_dir):
+    methods = sorted(name[: -len('_metrics.tsv')] for name in os.listdir(evaluation_dir)
+                     if name.endswith('_metrics.tsv'))
+```
+
+```{python}
+#| output: asis
+
+is_unknown = label_counts['label'] == unknown_category
+kept = label_counts[~label_counts['dropped'] & ~is_unknown]
+dropped = label_counts[label_counts['dropped']]
+n_unknown = int(label_counts.loc[is_unknown, 'n_total'].sum())
+
+print(
+    f"\n<p>This report describes the training of the reference model <b>{escape_html(model_name)}</b>: "
+    f"{len(kept)} labels with {int(kept['n_total'].sum())} cells were used, "
+    f"{len(dropped)} labels with too few cells were dropped, and {n_unknown} cells were unlabelled. "
+    f"{'The models were evaluated with ' + ', '.join(method_title(m) for m in methods) + '.' if methods else 'No evaluation was run.'}"
+    "</p>\n"
+)
+```
+
+## <font color='green'>Labels</font>
+
+The labels are used exactly as given in the label column (`--train_label_col`). Only the unknown label (`--train_unknown_label`) and missing values are treated as unlabelled (`unknown`). Labels with fewer cells than `--train_min_cells_per_label` are removed with their cells, from both the evaluation and the final model, so the final model knows no label the evaluation did not test.
+
+```{python}
+#| output: asis
+
+# --train_max_cells_per_label: the cells used after the cap, shown only when the cap removed cells
+used = label_counts[~label_counts['dropped']]
+capped = ({'n_train_used', 'n_all_used'} <= set(label_counts.columns)
+          and ((used['n_train_used'] != used['n_train']).any() or (used['n_all_used'] != used['n_total']).any()))
+
+count_columns = ['label', 'n_total', 'n_train', 'n_test'] + (['n_train_used', 'n_all_used'] if capped else [])
+counts_table = kept[count_columns].rename(columns={
+    'n_total': 'cells', 'n_train': 'training cells', 'n_test': 'test cells',
+    'n_train_used': 'training cells used', 'n_all_used': 'cells used for the final model'})
+print(f"\n<p>Labels used for training ({len(kept)}):</p>\n")
+if capped:
+    # A capped label keeps exactly the cap, every other label fewer cells
+    max_cells_used = int(used[['n_train_used', 'n_all_used']].to_numpy().max())
+    print(f"\n<p><b>Training data downsampled to at most {max_cells_used} cells per label</b> "
+          "(<code>--train_max_cells_per_label</code>; the unlabelled cells count as one label). "
+          "The test cells are not downsampled.</p>\n")
+print(f"\n{scroll_table_html(counts_table)}\n")
+
+if n_unknown:
+    unknown_used = ''
+    if capped:
+        unknown_row = label_counts[is_unknown].iloc[0]
+        unknown_used = (f" After downsampling, {int(unknown_row['n_train_used'])} of them are used for the "
+                        f"evaluated models and {int(unknown_row['n_all_used'])} for the final model.")
+    print(f"\n<p>{n_unknown} unlabelled cells are never tested. CellTypist ignores them; scANVI uses them "
+          f"as unlabelled cells in its semi-supervised training.{unknown_used}</p>\n")
+
+if dropped.empty:
+    print("\n<p>No label was dropped.</p>\n")
+else:
+    dropped_table = dropped[['label', 'n_total']].rename(columns={'n_total': 'cells'})
+    print(f"\n<details><summary><font color='green'>{len(dropped)} dropped labels</font>"
+          f" - click to expand table</summary>{scroll_table_html(dropped_table)}</details>\n")
+```
+
+## <font color='green'>Evaluation</font>
+
+**What the test set means.** A share of the labelled cells of every label (`--train_test_fraction`) is held out as a test set, models are trained on the remaining cells with the same settings as the final models, and the held-out cells are predicted with their labels hidden (scANVI maps them as a query onto the reference trained on the training split). By default cells are held out one by one: test cells then come from the same samples as the training cells, so the metrics are optimistic for data from new donors or studies. With `--train_test_split_by <column>` (e.g. a donor column) whole groups are held out instead, which is closer to using the model on new data; labels whose groups all ended up in training have no test cells and are not evaluated.
+
+The final models are trained on all cells (unless `--train_final_on_all false`). The test metrics therefore describe the training *procedure*; they are slightly pessimistic for the final model, which sees more data.
+
+Macro F1 and balanced accuracy weigh every label equally; accuracy and weighted F1 are dominated by the large labels. All averages run over the labels of the test set, so a prediction of a label that has no test cells counts as an error but adds no label of its own.
+
+```{python}
+#| output: asis
+
+def metrics_table(method: str) -> pd.Series:
+    metrics = read_tsv(os.path.join(evaluation_dir, f'{method}_metrics.tsv'))
+    return metrics.set_index('metric')['value']
+
+
+if not methods:
+    print("\n<p>No evaluation results: the evaluation was switched off (<code>--train_evaluate false</code>) "
+          "or no method was evaluated.</p>\n")
+else:
+    comparison = pd.DataFrame({method_title(m): metrics_table(m) for m in methods})
+    comparison = comparison.apply(pd.to_numeric, errors='coerce')
+    formatted = comparison.copy().astype(object)
+    for metric in formatted.index:
+        if metric == 'n_cells':
+            formatted.loc[metric] = comparison.loc[metric].map(lambda v: '' if pd.isna(v) else f'{int(v)}')
+        else:
+            formatted.loc[metric] = comparison.loc[metric].map(lambda v: '' if pd.isna(v) else f'{v:.3f}')
+    print("\n<p>Overall metrics on the test cells:</p>\n")
+    print(f"\n{inline_table_html(formatted.rename_axis('metric').reset_index())}\n")
+```
+
+```{python}
+def confusion_png(confusion: pd.DataFrame, title: str) -> tuple:
+    """
+    Heatmap of the confusion matrix normalised per true label (each row sums to 1).
+
+    With more than max_confusion_labels true labels, the rows show the labels with the most
+    test cells; columns follow the rows, then other predicted labels while there is room, and
+    the rest are summed into one 'other' column. Returns (base64 PNG, note or None).
+    """
+    fractions = confusion.div(confusion.sum(axis=1).replace(0, np.nan), axis=0).fillna(0)
+    note = None
+
+    rows = list(confusion.index)
+    if len(rows) > max_confusion_labels:
+        support = confusion.sum(axis=1)
+        top = set(support.sort_values(ascending=False).index[:max_confusion_labels])
+        rows = [label for label in confusion.index if label in top]
+        note = (f"Showing the {len(rows)} true labels with the most test cells out of "
+                f"{len(confusion.index)}.")
+
+    extra = [label for label in confusion.columns if label not in rows
+             and fractions.loc[rows, label].sum() > 0]
+    room = max(0, max_confusion_labels - len(rows))
+    columns = rows + extra[:room]
+    other = [label for label in confusion.columns if label not in columns]
+
+    shown = fractions.loc[rows, columns].copy()
+    if other and fractions.loc[rows, other].to_numpy().sum() > 0:
+        shown[f'other ({len(other)} labels)'] = fractions.loc[rows, other].sum(axis=1)
+
+    n_rows, n_cols = shown.shape
+    fig_width = min(max(5, 0.3 * n_cols + 3), 22)
+    fig_height = min(max(4, 0.3 * n_rows + 2), 22)
+    font_size = 8 if max(n_rows, n_cols) <= 30 else 6
+
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    image = ax.imshow(shown.to_numpy(), cmap='Blues', vmin=0, vmax=1, aspect='auto')
+    ax.set_xticks(range(n_cols))
+    ax.set_xticklabels(shown.columns, rotation=90, fontsize=font_size)
+    ax.set_yticks(range(n_rows))
+    ax.set_yticklabels(shown.index, fontsize=font_size)
+    ax.set_xlabel('predicted label')
+    ax.set_ylabel('true label')
+    ax.set_title(title)
+
+    # Percentages in the cells only while they stay readable
+    if n_rows <= 25 and n_cols <= 25:
+        for i in range(n_rows):
+            for j in range(n_cols):
+                value = shown.iat[i, j]
+                if value >= 0.005:
+                    ax.text(j, i, f'{100 * value:.0f}', ha='center', va='center', fontsize=6,
+                            color='white' if value > 0.5 else 'black')
+
+    fig.colorbar(image, ax=ax, fraction=0.03, pad=0.02, label='fraction of the true label')
+    fig.tight_layout()
+
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format='png', dpi=120, bbox_inches='tight')
+    plt.close(fig)
+    return base64.b64encode(buffer.getvalue()).decode('utf-8'), note
+```
+
+```{python}
+#| output: asis
+
+for method in methods:
+    title = method_title(method)
+    print(f"\n### <font color='green'>{escape_html(title)}</font>\n")
+
+    per_label_path = os.path.join(evaluation_dir, f'{method}_per_label.tsv')
+    if os.path.exists(per_label_path):
+        per_label = read_tsv(per_label_path, dtype={'label': str})
+        # Worst labels first; labels that only occur as predictions (no F1) last
+        per_label = per_label.sort_values(['f1', 'support'], ascending=[True, False], na_position='last')
+        for col in ['precision', 'recall', 'f1']:
+            per_label[col] = per_label[col].map(lambda v: '' if pd.isna(v) else f'{v:.3f}')
+        per_label = per_label.rename(columns={'support': 'test cells', 'n_predicted': 'predicted cells'})
+        print(f"\n<details><summary><font color='green'>Per-label precision, recall and F1, lowest F1 first"
+              f"</font> - click to expand table</summary>{scroll_table_html(per_label)}"
+              "<p>Empty cells are undefined: the precision of a label that was never predicted, and the "
+              "recall and F1 of a predicted label without test cells.</p></details>\n")
+    else:
+        print(f"\n<p>No per-label table for {escape_html(title)}.</p>\n")
+
+    confusion_path = os.path.join(evaluation_dir, f'{method}_confusion.tsv')
+    if os.path.exists(confusion_path):
+        confusion = read_tsv(confusion_path, index_col=0, dtype=str)
+        confusion.index = confusion.index.astype(str)
+        confusion.columns = confusion.columns.astype(str)
+        confusion = confusion.apply(pd.to_numeric, errors='coerce').fillna(0)
+        image_string, note = confusion_png(confusion, f'{title}: confusion matrix (per true label)')
+        caption = ("Rows are the true labels and sum to 1; columns are the predicted labels. "
+                   "The diagonal holds the correctly predicted cells.")
+        if note:
+            caption += ' ' + note
+        print(f'\n<figure><img alt="{escape_html(title)} confusion matrix" '
+              f'src="data:image/png;base64,{image_string}" />'
+              f'<figcaption>{escape_html(caption)}</figcaption></figure>\n')
+    else:
+        print(f"\n<p>No confusion matrix for {escape_html(title)}.</p>\n")
+```
+
+---
+
+## <font color='green'>Using the models</font>
+
+The models are written to `models/` in the output directory: the CellTypist model to `models/celltypist/<name>.pkl`, the scVI and scANVI models to `models/scvi/<name>/model.pt` and `models/scanvi/<name>/model.pt`, and the reference cells with the scANVI latent space and labels to `models/<name>_reference.h5ad`. To annotate new data in the `qc_clustering` stage, pass `--celltypist_model models/celltypist/<name>.pkl` and/or `--scanvi_model models/scanvi/<name>/model.pt` with `--integration_methods scvi,scanvi`.
+
+---
+
+## <font color='green'>Citations</font>
+
+### <font color='green'>[Nextflow](https://www.nextflow.io/)</font>
+
+_Di Tommaso P, Chatzou M, Floden EW, Barja PP, Palumbo E, Notredame C. (2017). Nextflow enables reproducible computational workflows. Nat Biotechnol., 35(4):316-319._
+
+### <font color='green'>[Nfcore](https://nf-co.re/)</font>
+This pipelines is a substantially modified version of [nfcore:scdowntream](https://github.com/nf-core/scdownstream), which was originally written by Nico Trummer, and uses [nfcore modules](https://github.com/nf-core/modules):
+
+_Ewels PA, Peltzer A, Fillinger S, Patel H, Alneberg J, Wilm A, Garcia MU, Di Tommaso P, Nahnsen S. (2020). The nf-core framework for community-curated bioinformatics pipelines. Nat Biotechnol., 38(3):276-278_
+
+### <font color='green'>[Scanpy](https://scanpy.readthedocs.io/en/stable/)</font>
+
+_Wolf FA, Angerer P, & Theis, FJ. (2018). SCANPY: large-scale single-cell gene expression data analysis. Genome Biol., 19(1):15._
+
+### <font color='green'>[Analytic Pearson residuals](https://scanpy.readthedocs.io/en/stable/generated/scanpy.experimental.pp.highly_variable_genes.html)</font>
+
+_Lause J, Berens P, & Kobak D. (2021). Analytic Pearson residuals for normalization of single-cell RNA-seq UMI data. Genome Biol., 22(1):258._
+
+### <font color='green'>[Celltypist](https://www.celltypist.org/)</font>
+_Domínguez Conde C, Xu C, Jarvis LB, Rainbow DB, Wells SB, Gomes T, ... & Teichmann, SA (2022). Cross-tissue immune cell analysis reveals tissue-specific features in humans. Science, 376(6594):eabl5197._
+
+### <font color='green'>[scVI](https://scvi-tools.org/)</font>
+_Lopez R, Regier J, Cole MB, Jordan MI, & Yosef N. (2018). Deep generative modeling for single-cell transcriptomics. Nature methods, 15(12):1053-1058._
+
+### <font color='green'>[scANVI](https://scvi-tools.org/)</font>
+_Xu C, Lopez R, Mehlman E, Regier J, Jordan MI, & Yosef N. (2021). Probabilistic harmonization and annotation of single-cell transcriptomics data with deep generative models. Mol. Syst. Biol., 17(1):e9620._
+
+### <font color='green'>[scikit-learn](https://scikit-learn.org/)</font>
+_Pedregosa F, Varoquaux G, Gramfort A, Michel V, Thirion B, Grisel O, ... & Duchesnay É. (2011). Scikit-learn: Machine learning in Python. J. Mach. Learn. Res., 12:2825-2830._
+
+---
+
+## <font color='green'>Software versions</font>
+
+The first table lists the software of the pipeline modules that produced the results in
+this report, as collected by Nextflow. The second one is read from the rendering
+environment itself, so it describes the software that produced the report.
+
+```{python}
+def pipeline_versions(path: str) -> pd.DataFrame:
+    """
+    Software versions collected by Nextflow from the modules of this stage.
+
+    The file is the collated versions.yml of the pipeline: one mapping per process, each
+    holding the tools that process reported. It is flattened into one row per tool so the
+    table reads the same way as the one below.
+    """
+    import yaml
+
+    collected = {}
+    if os.path.exists(path):
+        with open(path) as handle:
+            collected = yaml.safe_load(handle) or {}
+
+    rows = [
+        (process, tool, str(version))
+        for process, tools in collected.items()
+        for tool, version in (tools or {}).items()
+    ]
+
+    return pd.DataFrame(rows, columns=['process', 'software', 'version'])
+
+
+modules = pipeline_versions(str(VERSIONS_FILE))
+
+display(HTML('<font color="black">' + modules.to_html(index=False) + '</font>'))
+```
+
+```{python}
+import platform
+import shutil
+import subprocess
+
+import IPython
+
+
+def library_version(module) -> str:
+    """
+    Version of an already imported library.
+
+    The attribute is preferred over the installed distribution metadata because it is what
+    the running code reports about itself; the metadata is only consulted as a fallback.
+    """
+    reported = getattr(module, '__version__', None)
+    if reported:
+        return str(reported)
+
+    from importlib.metadata import PackageNotFoundError, version as distribution_version
+
+    try:
+        return distribution_version(module.__name__)
+    except PackageNotFoundError:
+        return 'unknown'
+
+
+def quarto_version():
+    """
+    Version of the quarto binary rendering this document, or None if it cannot be read.
+
+    Quarto does not export its own version into the rendering environment, so the binary is
+    asked directly. The row is dropped rather than guessed when no binary can be reached.
+    """
+    reported = os.environ.get('QUARTO_VERSION')
+    if reported and reported.strip():
+        return reported.strip()
+
+    bin_path = os.environ.get('QUARTO_BIN_PATH')
+    candidates = [os.path.join(bin_path, 'quarto')] if bin_path else []
+    candidates.append(shutil.which('quarto'))
+
+    for candidate in candidates:
+        if not candidate or not os.path.exists(candidate):
+            continue
+        try:
+            completed = subprocess.run(
+                [candidate, '--version'],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=True,
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if completed.stdout.strip():
+            return completed.stdout.strip()
+
+    return None
+```
+
+```{python}
+rows = [('python', platform.python_version())]
+
+quarto = quarto_version()
+if quarto is not None:
+    rows.append(('quarto', quarto))
+
+rows += [
+    ('matplotlib', library_version(matplotlib)),
+    ('numpy', library_version(np)),
+    ('pandas', library_version(pd)),
+    ('ipython', library_version(IPython)),
+]
+
+versions = pd.DataFrame(rows, columns=['software', 'version'])
+
+display(HTML('<font color="black">' + versions.to_html(index=False) + '</font>'))
+```

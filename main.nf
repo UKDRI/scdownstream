@@ -18,6 +18,7 @@
 include { QC_CLUSTER              } from './workflows/qc_clustering'
 include { DOWNSTREAM_ANALYSIS     } from './workflows/downstream'
 include { DIFFERENTIAL_GENES      } from './workflows/differential_genes'
+include { TRAIN_MODELS            } from './workflows/train_models'
 include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_scdownstream_pipeline'
 include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_scdownstream_pipeline'
 include { samplesheetToList       } from 'plugin/nf-schema'
@@ -158,6 +159,52 @@ workflow differential_genes {
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    RUN MODEL TRAINING WORKFLOW
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+workflow train_models {
+
+    main:
+    //
+    // SUBWORKFLOW: Run initialisation tasks
+    //
+    PIPELINE_INITIALISATION (
+        params.version,
+        params.validate_params,
+        params.monochrome_logs,
+        args,
+        params.outdir,
+        params.input
+    )
+
+    // Name of the trained models and of their prediction columns
+    train_name = params.train_name ?: params.name ?: 'reference'
+
+    //
+    // WORKFLOW: Run main workflow
+    //
+    TRAIN_MODELS (
+        Channel.value([[id: train_name], file(params.train_adata, checkIfExists: true)]),
+        train_name
+    )
+
+    //
+    // SUBWORKFLOW: Run completion tasks
+    //
+    // There is no MultiQC report in this stage
+    PIPELINE_COMPLETION (
+        params.email,
+        params.email_on_fail,
+        params.plaintext_email,
+        params.outdir,
+        params.monochrome_logs,
+        params.hook_url,
+        Channel.empty()
+    )
+}
+
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     RUN MAIN WORKFLOW
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
@@ -166,7 +213,7 @@ workflow {
 
     main:
     // Dispatch on --stage. The strict syntax parser does not support -entry, so the
-    // three named workflows above are selected here instead.
+    // four named workflows above are selected here instead.
     if (params.help || params.help_full) {
         // nf-schema already printed the help at pipeline start; run no stage, even with --stage
     }
@@ -190,8 +237,11 @@ workflow {
     else if (params.stage == 'differential_genes') {
         differential_genes()
     }
+    else if (params.stage == 'train_models') {
+        train_models()
+    }
     else {
-        error "Invalid or missing --stage '${params.stage}'. Valid values: qc_clustering, downstream, differential_genes."
+        error "Invalid or missing --stage '${params.stage}'. Valid values: qc_clustering, downstream, differential_genes, train_models."
     }
 }
 

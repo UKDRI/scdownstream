@@ -12,6 +12,14 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Added`
 
+- `--stage train_models`: trains CellTypist and scANVI cell type models on an annotated reference
+  (`--train_adata`, `--train_label_col`, other `--train_*` options). Labels are kept exactly as
+  given; small labels are dropped; a stratified held-out split (optionally by donor,
+  `--train_test_split_by`) evaluates both methods the way they are used (scANVI by query mapping),
+  then the final models are refit on all cells. Outputs the models under `models/`, evaluation tables
+  and a training report.
+- `--celltypist_model` accepts local `.pkl` model files (e.g. from `train_models`), mixed with
+  built-in model names.
 - `--report_max_celltype_labels` (default 50): the "Predicted labels" UMAPs and count tables in the
   QC/clustering and downstream reports show only the CellTypist labels with the most predicted
   cells; the rest are grouped as `other` (grey in the UMAP, one row in the table), so models with
@@ -76,6 +84,9 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Changed`
 
+- The docs now recommend passing analysis parameters in a YAML params file (`-params-file`) and
+  keeping the command line for `--stage` and input/output paths: under Nextflow 26 command-line
+  values reach the pipeline as text, so `--some_option false` counts as true.
 - The differential_genes report is easier to read: a **Contrasts** table at the top (target vs
   reference, the direction of the log2 fold change in words, blocking variables, excluded samples), a
   **Significant genes overview** (up / down per group label × contrast, skipped contrasts marked),
@@ -123,6 +134,24 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Fixed`
 
+- The QC/clustering report no longer crashes with an `IndexError` on the "Clusters" UMAPs when
+  there are three or fewer Leiden clusterings, which includes the default
+  `--clustering_resolutions 0.5,1.0` (`leiden`, `leiden_0.5`, `leiden_1.0`). With a single row of
+  panels, `plt.subplots` returned a 1-D axes array that the cells indexed as 2-D; the panel grid now
+  always stays 2-D and has at most three columns. If there are no Leiden clusterings, the report
+  says so instead of drawing an empty figure.
+- Reference mapping onto a supplied scVI / scANVI model now works. Before, a supplied model was never
+  loaded (a new model was trained from scratch without a warning), scANVI was fitted to
+  log-normalised data, the query's own labels leaked into the predictions, only the query's HVGs
+  were used, and scANVI's results never reached the output. Now `--scvi_model` / `--scanvi_model`
+  map the cells onto the model (scArches fine-tuning, weight decay 0,
+  `--scvi_query_max_epochs`, default 100) on all genes and raw counts, with the input labels hidden.
+- `scanvi` in `--integration_methods` writes `scanvi:<model>` and `scanvi:<model>:conf` (most
+  probable label and its probability) and `obsm["X_scanvi"]` into `<name>_qc_clustering.h5ad`;
+  both reports treat `scanvi:` columns like CellTypist predictions.
+- The `qc_clustering` parameter checks were never run. They now are, and stop on `--scanvi_model`
+  without `scanvi`, `--scvi_model` without `scvi`, `scanvi` without `scvi`, and `--base_adata` with
+  `scanvi` (not supported yet).
 - The downstream analysis report no longer crashes in the LIANA+ dotplots when a cluster is a
   target of some clusters but not of others (seen on SCR_HS_1, cluster 40). `li.pl.dotplot`
   (liana 1.6.1) checks the requested targets among the rows of the chosen source only, so each

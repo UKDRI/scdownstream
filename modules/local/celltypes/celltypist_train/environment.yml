@@ -1,0 +1,10 @@
+name: celltypes_celltypist_train
+# Same packages as celltypes/celltypist (community.wave.seqera.io/library/celltypist_scanpy)
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - bioconda::celltypist=1.6.3
+  - conda-forge::scanpy=1.10.4
+  # celltypist 1.6.3 passes LogisticRegression(multi_class=...), which scikit-learn 1.8 removed
+  - conda-forge::scikit-learn<1.8

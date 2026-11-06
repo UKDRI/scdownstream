@@ -9,7 +9,8 @@ process CELLTYPES_CELLTYPIST {
 
     input:
     tuple val(meta), path(h5ad), val(symbol_col)
-    val models
+    val models // built-in model names, without .pkl; may be empty
+    path(model_files, stageAs: 'celltypist_models/*') // local .pkl models; may be empty ([])
 
     output:
     tuple val(meta), path("*.h5ad"), emit: h5ad

@@ -10,9 +10,15 @@ workflow CELLTYPE_ASSIGNMENT {
     ch_obs = Channel.empty()
 
     if (params.celltypist_model) {
-        celltypist_models = Channel.value(params.celltypist_model.split(',').collect{ it -> it.trim() })
+        celltypist_entries = params.celltypist_model.split(',').collect { entry -> entry.trim() }.findAll { entry -> entry }
+        // Entries ending in .pkl or holding a path are local model files (e.g. from --stage
+        // train_models); everything else is the name of a built-in model to download
+        celltypist_names = celltypist_entries.findAll { entry -> !(entry.endsWith('.pkl') || entry.contains('/')) }
+        celltypist_files = celltypist_entries
+            .findAll { entry -> entry.endsWith('.pkl') || entry.contains('/') }
+            .collect { entry -> file(entry, checkIfExists: true) }
 
-        CELLTYPES_CELLTYPIST(ch_h5ad, celltypist_models)
+        CELLTYPES_CELLTYPIST(ch_h5ad, celltypist_names, celltypist_files)
 
         ADATA_ADD_OBS_OBSM(ch_h5ad.join(CELLTYPES_CELLTYPIST.out.h5ad).map{ meta, h5ad1, _symbol_col, h5ad2 -> [meta, h5ad1, h5ad2]})
         ch_h5ad = ADATA_ADD_OBS_OBSM.out.h5ad
