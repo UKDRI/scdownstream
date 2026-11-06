@@ -1,0 +1,583 @@
+---
+title: '<font color=''green''><b><u>Single-cell downstream: cell type annotation report</u></b></font>'
+jupyter: python3
+execute:
+  echo: false
+  warning: false
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    embed-resources: true
+---
+
+```{python}
+#| tags: [parameters]
+
+FILE = "scdownstream_annotate.h5ad"
+# Comma-separated prediction columns added by this run, e.g. celltypist:<model>,scanvi:<model>
+PREDICTION_COLS = ""
+# Description of the cell subset, e.g. "leiden: 3, 7"; empty for all cells
+SUBSET = ""
+UMAP_FOR_PLOTS = "X_umap_scvi"
+MAX_CELLTYPE_LABELS = 50
+VERSIONS_FILE = "versions.yml"
+# Cells with a lower confidence are counted as low-confidence predictions
+LOW_CONFIDENCE = 0.5
+# Labels per axis of the agreement heatmaps; the others are grouped as "other"
+MAX_HEATMAP_LABELS = 30
+```
+
+```{python}
+import warnings
+warnings.filterwarnings('ignore')
+```
+
+```{python}
+import base64
+import io
+import itertools
+import os
+from html import escape as escape_html
+
+import anndata as ad
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import scanpy as sc
+
+from IPython.display import display, HTML
+```
+
+```{python}
+max_predicted_labels = int(MAX_CELLTYPE_LABELS)
+low_confidence = float(LOW_CONFIDENCE)
+max_heatmap_labels = int(MAX_HEATMAP_LABELS)
+subset_description = str(SUBSET).strip() if SUBSET and str(SUBSET).strip().lower() not in ("none", "null") else ""
+
+# obs column prefixes of the label prediction tools; the confidence of <col> is in <col>:conf
+prediction_prefixes = ('celltypist:', 'scanvi:')
+method_titles = {'celltypist': 'CellTypist', 'scanvi': 'scANVI'}
+
+
+def parse_list_param(value):
+    # comma-separated -P value; quarto passes an empty value as null
+    if value is None:
+        return []
+    items = [item.strip() for item in str(value).split(",")]
+    return list(dict.fromkeys(item for item in items if item and item.lower() not in ("none", "null")))
+
+
+def resolve_umap(adata, requested):
+    requested = str(requested).strip() if requested else ""
+    for key in ([requested, f"X_{requested}"] if requested else []):
+        if key in adata.obsm:
+            return key, None
+    for key in ["X_umap_scvi", "X_umap_pca", "X_umap"]:
+        if key in adata.obsm:
+            note = (f"UMAP '{requested}' was not found in adata.obsm, plotting '{key}' instead. "
+                    f"Available: {', '.join(adata.obsm.keys())}.") if requested else None
+            return key, note
+    raise ValueError(f"No UMAP found in adata.obsm (available: {', '.join(adata.obsm.keys())})")
+
+
+def group_predicted_labels(values, max_labels):
+    # cells per label, most cells first; the labels after the first max_labels are grouped as "other"
+    counts = values.value_counts()
+    counts = counts[counts > 0]
+    top, rest = counts.iloc[:max_labels], counts.iloc[max_labels:]
+    return top, rest, f"other ({len(rest)} labels)"
+
+
+def grouped_labels_note(top, rest):
+    return (f"Showing the {len(top)} labels with the most cells out of {len(top) + len(rest)}; "
+            f"the other {len(rest)} labels ({rest.sum()} cells)")
+
+
+def grouped_values(values, top, rest, other_name):
+    # labels outside the top labels replaced by other_name
+    return values if rest.empty else values.where(values.isin(top.index), other_name)
+
+
+def label_colors(labels, other_name):
+    # scanpy's default colours for this many categories (default_102), grey for "other"
+    palette = sc.pl.palettes.default_102
+    return [("lightgrey" if label == other_name else palette[i % len(palette)]) for i, label in enumerate(labels)]
+
+
+def method_of(col):
+    method, _, model = col.partition(':')
+    return method_titles.get(method, method), model
+
+
+def inline_table_html(df, index=False):
+    """
+    A table on a single line, for printing from an `output: asis` cell: pandoc reads the
+    indentation of to_html's rows as an indented code block, so every line is stripped.
+    """
+    return ''.join(line.strip() for line in df.to_html(index=index, na_rep='').splitlines())
+
+
+def scroll_table_html(df, index=False, max_height=400):
+    return (f"<div style='overflow-y: scroll; overflow-x: auto; max-height: {max_height}px'>"
+            f"{inline_table_html(df, index=index)}</div>")
+
+
+def details_html(summary, body):
+    return f"<details><summary><font color='green'>{summary}</font> - click to expand table</summary>{body}</details>"
+
+
+def figure_html(fig, alt, caption=None):
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+    plt.close(fig)
+    image = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    caption_html = f"<figcaption>{escape_html(caption)}</figcaption>" if caption else ""
+    return f'<figure><img alt="{escape_html(alt)}" src="data:image/png;base64,{image}" />{caption_html}</figure>'
+
+
+def note_html(text):
+    return f"<p><b>Note:</b> {text}</p>"
+```
+
+```{python}
+adata = sc.read(FILE, backed="r")
+obs = adata.obs.copy()
+n_cells, n_genes = adata.n_obs, adata.n_vars
+
+# UMAP for the plots, set by --umap_for_plots; external objects may have none
+umap_notes = []
+try:
+    umap_key, umap_note = resolve_umap(adata, UMAP_FOR_PLOTS)
+    if umap_note:
+        umap_notes.append(umap_note)
+    umap_coords = np.asarray(adata.obsm[umap_key])[:, :2]
+except ValueError as err:
+    umap_key, umap_coords = None, None
+    umap_notes.append(f"{err}; the UMAP plots are skipped.")
+
+adata.file.close()
+
+# Prediction columns of this run: label columns, with their confidence in <col>:conf
+requested_cols = parse_list_param(PREDICTION_COLS)
+column_notes = []
+if not requested_cols:
+    requested_cols = [col for col in obs.columns if col.startswith(prediction_prefixes) and not col.endswith(':conf')]
+    column_notes.append("No prediction columns given; showing all prediction columns of the object.")
+label_cols = list(dict.fromkeys(col[:-len(':conf')] if col.endswith(':conf') else col for col in requested_cols))
+missing_cols = [col for col in label_cols if col not in obs.columns]
+label_cols = [col for col in label_cols if col in obs.columns]
+if missing_cols:
+    column_notes.append(f"Prediction column(s) not found in the object: {escape_html(', '.join(missing_cols))}.")
+
+
+def conf_col_of(col):
+    conf = f"{col}:conf"
+    return conf if conf in obs.columns else None
+
+
+def labels_of(col):
+    values = obs[col]
+    return values.astype(object).where(values.notna(), 'missing').astype(str)
+
+
+def confidence_of(col):
+    conf = conf_col_of(col)
+    return pd.to_numeric(obs[conf], errors='coerce') if conf else None
+
+
+group_col = 'sample' if 'sample' in obs.columns else 'batch' if 'batch' in obs.columns else None
+```
+
+```{python}
+#| output: asis
+
+subset_html = ""
+if subset_description:
+    subset_html = (f" The stage annotated only the cells selected by <b>{escape_html(subset_description)}</b> "
+                   # &#45;&#45;: pandoc's smart typography would turn a printed "--" into an en dash
+                   "(<code>&#45;&#45;annotate_subset_col</code> / <code>&#45;&#45;annotate_subset_values</code>), and the "
+                   "annotated object holds only these cells.")
+print(f"\n<p>The annotated object holds {n_cells} cells and {n_genes} genes.{subset_html}</p>\n")
+
+counts = []
+if 'sample' in obs.columns:
+    counts.append(f"{obs['sample'].nunique()} samples")
+if 'batch' in obs.columns:
+    counts.append(f"{obs['batch'].nunique()} batches")
+if counts:
+    print(f"\n<p>{' and '.join(counts)}.</p>\n")
+
+for note in column_notes + umap_notes:
+    print(f"\n{note_html(note)}\n")
+
+if not label_cols:
+    print("\n<p>No prediction columns to report.</p>\n")
+else:
+    rows = []
+    for col in label_cols:
+        method, model = method_of(col)
+        values = labels_of(col)
+        conf = confidence_of(col)
+        rows.append({
+            'column': col,
+            'method': method,
+            'model': model,
+            'labels predicted': int(values.nunique()),
+            'median confidence': '' if conf is None else f"{conf.median():.3f}",
+            f'% cells below {low_confidence:g} confidence': '' if conf is None else f"{100 * (conf < low_confidence).mean():.1f}",
+        })
+    print("\n<p>Prediction columns added by this run:</p>\n")
+    print(f"\n{inline_table_html(pd.DataFrame(rows))}\n")
+```
+
+## <font color='green'>Predictions</font>
+
+CellTypist (columns `celltypist:<model>`) predicts with pre-trained logistic regression models; its confidence (`:conf`) is the probability of the predicted label. scANVI (columns `scanvi:<model>`) maps the cells onto a pre-trained reference model (scArches), and its confidence is the probability of the most likely label. The latent space of the scANVI mapping is stored in `obsm['X_scanvi_<model>']`.
+
+```{python}
+#| output: asis
+
+def umap_panels_html(col, values, top, rest, other_name, conf):
+    grouped = grouped_values(values, top, rest, other_name).to_numpy()
+    categories = [*top.index] + ([] if rest.empty else [other_name])
+    # "other" cells first, so they are drawn below the coloured cells
+    order = np.argsort(grouped != other_name, kind='stable')
+    plot_obs = pd.DataFrame({'label': pd.Categorical(grouped[order], categories=categories)},
+                            index=obs.index[order].astype(str))
+    panels = [('label', col)]
+    if conf is not None:
+        plot_obs['confidence'] = conf.to_numpy()[order]
+        panels.append(('confidence', f"{col}:conf"))
+    adata_plot = ad.AnnData(obs=plot_obs, obsm={umap_key: umap_coords[order]})
+
+    fig, axs = plt.subplots(1, len(panels), figsize=(len(panels) * 8, 6), squeeze=False, layout='constrained')
+    for ax, (panel, title) in zip(axs.ravel(), panels):
+        if panel == 'label':
+            sc.pl.embedding(adata_plot, basis=umap_key, color=panel, ax=ax, show=False, title=title,
+                            palette=label_colors(categories, other_name), legend_fontsize=7)
+        else:
+            sc.pl.embedding(adata_plot, basis=umap_key, color=panel, ax=ax, show=False, title=title,
+                            vmin=0, vmax=1)
+    return figure_html(fig, f"{col} on the UMAP")
+
+
+for col in label_cols:
+    method, model = method_of(col)
+    print(f"\n### <font color='green'>{escape_html(method)}: {escape_html(model)}</font>\n")
+
+    values = labels_of(col)
+    conf = confidence_of(col)
+    top, rest, other_name = group_predicted_labels(values, max_predicted_labels)
+
+    # top labels, then one row with the cells of all other labels
+    count_table = pd.DataFrame({'label': top.index, 'cells': top.to_numpy()})
+    if not rest.empty:
+        count_table = pd.concat([count_table, pd.DataFrame({'label': [other_name], 'cells': [rest.sum()]})],
+                                ignore_index=True)
+    count_table['% cells'] = (100 * count_table['cells'] / len(values)).round(1)
+    table_note = "" if rest.empty else note_html(f"{grouped_labels_note(top, rest)} are summed in the last row.")
+    print(f"\n{details_html(f'Cells per label ({len(top) + len(rest)} labels)', table_note + scroll_table_html(count_table))}\n")
+
+    if conf is None:
+        print(f"\n{note_html(f'No confidence column {escape_html(col)}:conf.')}\n")
+    else:
+        n_low = int((conf < low_confidence).sum())
+        print(f"\n<p>{n_low} of {len(conf)} cells ({100 * n_low / len(conf):.1f}%) have a confidence below "
+              f"{low_confidence:g}.</p>\n")
+        fig, ax = plt.subplots(figsize=(7, 3.5))
+        ax.hist(conf.dropna().to_numpy(), bins=50, range=(0, 1), color='tab:blue')
+        ax.axvline(low_confidence, color='grey', linestyle='--')
+        ax.set_xlabel('confidence')
+        ax.set_ylabel('cells')
+        ax.set_title(f"{col}:conf")
+        print(f"\n{figure_html(fig, f'{col} confidence histogram')}\n")
+
+    if umap_key is not None:
+        print(f"\n{umap_panels_html(col, values, top, rest, other_name, conf)}\n")
+        if not rest.empty:
+            print(f"\n{note_html(grouped_labels_note(top, rest) + ' are shown in grey as other.')}\n")
+```
+
+## <font color='green'>Agreement between the methods</font>
+
+```{python}
+#| output: asis
+
+def crosstab_html(col_a, col_b):
+    values_a, values_b = labels_of(col_a), labels_of(col_b)
+    top_a, rest_a, other_a = group_predicted_labels(values_a, max_heatmap_labels)
+    top_b, rest_b, other_b = group_predicted_labels(values_b, max_heatmap_labels)
+    table = pd.crosstab(grouped_values(values_a, top_a, rest_a, other_a),
+                        grouped_values(values_b, top_b, rest_b, other_b))
+    rows = [label for label in [*top_a.index, other_a] if label in table.index]
+    columns = [label for label in [*top_b.index, other_b] if label in table.columns]
+    # fraction of the cells of each row label (col_a) predicted as each column label (col_b)
+    fractions = table.loc[rows, columns]
+    fractions = fractions.div(fractions.sum(axis=1).replace(0, np.nan), axis=0).fillna(0)
+
+    n_rows, n_cols = fractions.shape
+    font_size = 8 if max(n_rows, n_cols) <= 30 else 6
+    fig, ax = plt.subplots(figsize=(min(max(5, 0.3 * n_cols + 3), 22), min(max(4, 0.3 * n_rows + 2), 22)))
+    image = ax.imshow(fractions.to_numpy(), cmap='Blues', vmin=0, vmax=1, aspect='auto')
+    ax.set_xticks(range(n_cols))
+    ax.set_xticklabels(fractions.columns, rotation=90, fontsize=font_size)
+    ax.set_yticks(range(n_rows))
+    ax.set_yticklabels(fractions.index, fontsize=font_size)
+    ax.set_xlabel(col_b)
+    ax.set_ylabel(col_a)
+    fig.colorbar(image, ax=ax, fraction=0.03, pad=0.02, label=f'fraction of the {col_a} label')
+    fig.tight_layout()
+
+    caption = (f"Rows: the labels of {col_a}, each summing to 1; columns: the labels of {col_b} of the same cells.")
+    if not (rest_a.empty and rest_b.empty):
+        caption += f" At most {max_heatmap_labels} labels per axis are shown; the others are grouped as 'other'."
+    return figure_html(fig, f"{col_a} vs {col_b}", caption)
+
+
+if len(label_cols) < 2:
+    print("\n<p>Only one prediction column; there is nothing to compare.</p>\n")
+else:
+    rows = []
+    for col_a, col_b in itertools.combinations(label_cols, 2):
+        same = labels_of(col_a) == labels_of(col_b)
+        rows.append({'column 1': col_a, 'column 2': col_b,
+                     'cells with the same label': int(same.sum()), '% cells': f"{100 * same.mean():.1f}"})
+    print("\n<p>The labels are compared as text, so models with different label names (e.g. trained on "
+          "different references) agree only where their names match; the heatmaps show how the labels "
+          "of one column are split across the labels of the other.</p>\n")
+    print(f"\n{inline_table_html(pd.DataFrame(rows))}\n")
+    for col_a, col_b in itertools.combinations(label_cols, 2):
+        print(f"\n{crosstab_html(col_a, col_b)}\n")
+```
+
+## <font color='green'>Clusters</font>
+
+```{python}
+#| output: asis
+
+clustering_col = 'leiden'
+
+
+def cluster_order(clusters):
+    # numerical order for numbered clusters, text order otherwise
+    names = list(clusters.unique())
+    return sorted(names, key=int) if all(name.isdigit() for name in names) else sorted(names)
+
+
+if clustering_col not in obs.columns:
+    print(f"\n<p>No <code>{clustering_col}</code> column in the object; the per-cluster summary is skipped.</p>\n")
+elif not label_cols:
+    print("\n<p>No prediction columns.</p>\n")
+else:
+    clusters = obs[clustering_col].astype(str)
+    order = cluster_order(clusters)
+    summary = pd.DataFrame({'cluster': order, 'cells': clusters.value_counts().reindex(order).to_numpy()})
+    for col in label_cols:
+        table = pd.crosstab(clusters, labels_of(col)).reindex(order)
+        summary[f'{col}: majority label'] = table.idxmax(axis=1).to_numpy()
+        summary[f'{col}: fraction'] = (table.max(axis=1) / table.sum(axis=1)).map(lambda v: f"{v:.2f}").to_numpy()
+    print(f"\n<p>The most frequent label of each method in each <code>{clustering_col}</code> cluster, and the "
+          "fraction of the cluster's cells with that label.</p>\n")
+    print(f"\n{scroll_table_html(summary)}\n")
+```
+
+## <font color='green'>Label composition per sample</font>
+
+```{python}
+#| output: asis
+
+def composition_plot_html(col, fractions, colors):
+    n_groups, n_labels = fractions.shape
+    fig, ax = plt.subplots(figsize=(10, min(max(3, 0.3 * n_groups + 1.5), 30)))
+    left = np.zeros(n_groups)
+    for label, color in zip(fractions.columns, colors):
+        widths = fractions[label].to_numpy()
+        ax.barh(np.arange(n_groups), widths, left=left, color=color, label=label)
+        left += widths
+    ax.set_yticks(np.arange(n_groups))
+    ax.set_yticklabels(fractions.index, fontsize=8)
+    ax.invert_yaxis()
+    ax.set_xlim(0, 1)
+    ax.set_xlabel('fraction of cells')
+    ax.set_title(col)
+    ax.legend(loc='upper left', bbox_to_anchor=(1.01, 1), fontsize=7, frameon=False,
+              ncol=1 if n_labels <= 25 else 2)
+    return figure_html(fig, f"{col} per {group_col}")
+
+
+if group_col is None:
+    print("\n<p>The object has no <code>sample</code> or <code>batch</code> column; the composition per sample "
+          "is skipped.</p>\n")
+elif not label_cols:
+    print("\n<p>No prediction columns.</p>\n")
+else:
+    groups = obs[group_col].astype(str)
+    print(f"\n<p>Share of each label among the cells of each {group_col} (column <code>{group_col}</code>).</p>\n")
+    for col in label_cols:
+        method, model = method_of(col)
+        print(f"\n### <font color='green'>{escape_html(method)}: {escape_html(model)}</font>\n")
+        values = labels_of(col)
+        top, rest, other_name = group_predicted_labels(values, max_predicted_labels)
+        columns = [*top.index] + ([] if rest.empty else [other_name])
+        table = pd.crosstab(groups, grouped_values(values, top, rest, other_name)).reindex(columns=columns, fill_value=0)
+        table = table.loc[sorted(table.index)]
+        fractions = table.div(table.sum(axis=1), axis=0)
+
+        percent_table = (100 * fractions).round(1)
+        percent_table.insert(0, 'cells', table.sum(axis=1), allow_duplicates=True)
+        percent_table.columns.name = None
+        percent_table.index.name = group_col
+        table_note = "" if rest.empty else note_html(f"{grouped_labels_note(top, rest)} are summed as other.")
+        print(f"\n{details_html(f'% cells per label and {group_col}', table_note + scroll_table_html(percent_table.reset_index()))}\n")
+        print(f"\n{composition_plot_html(col, fractions, label_colors(columns, other_name))}\n")
+```
+
+---
+
+## <font color='green'>Citations</font>
+
+### <font color='green'>[Nextflow](https://www.nextflow.io/)</font>
+
+_Di Tommaso P, Chatzou M, Floden EW, Barja PP, Palumbo E, Notredame C. (2017). Nextflow enables reproducible computational workflows. Nat Biotechnol., 35(4):316-319._
+
+### <font color='green'>[Nfcore](https://nf-co.re/)</font>
+This pipelines is a substantially modified version of [nfcore:scdowntream](https://github.com/nf-core/scdownstream), which was originally written by Nico Trummer, and uses [nfcore modules](https://github.com/nf-core/modules):
+
+_Ewels PA, Peltzer A, Fillinger S, Patel H, Alneberg J, Wilm A, Garcia MU, Di Tommaso P, Nahnsen S. (2020). The nf-core framework for community-curated bioinformatics pipelines. Nat Biotechnol., 38(3):276-278_
+
+### <font color='green'>[Scanpy](https://scanpy.readthedocs.io/en/stable/)</font>
+
+_Wolf FA, Angerer P, & Theis, FJ. (2018). SCANPY: large-scale single-cell gene expression data analysis. Genome Biol., 19(1):15._
+
+### <font color='green'>[Celltypist](https://www.celltypist.org/)</font>
+_Domínguez Conde C, Xu C, Jarvis LB, Rainbow DB, Wells SB, Gomes T, ... & Teichmann, SA (2022). Cross-tissue immune cell analysis reveals tissue-specific features in humans. Science, 376(6594):eabl5197._
+
+### <font color='green'>[scANVI](https://scvi-tools.org/)</font>
+_Xu C, Lopez R, Mehlman E, Regier J, Jordan MI, & Yosef N. (2021). Probabilistic harmonization and annotation of single-cell transcriptomics data with deep generative models. Mol. Syst. Biol., 17(1):e9620._
+
+### <font color='green'>[scArches](https://docs.scarches.org/)</font>
+_Lotfollahi M, Naghipourfar M, Luecken MD, Khajavi M, Büttner M, Wagenstetter M, ... & Theis FJ (2022). Mapping single-cell data to reference atlases by transfer learning. Nat Biotechnol., 40(1):121-130._
+
+---
+
+## <font color='green'>Software versions</font>
+
+The first table lists the software of the pipeline modules that produced the results in
+this report, as collected by Nextflow. The second one is read from the rendering
+environment itself, so it describes the software that produced the report.
+
+```{python}
+def pipeline_versions(path: str) -> pd.DataFrame:
+    """
+    Software versions collected by Nextflow from the modules of this stage.
+
+    The file is the collated versions.yml of the pipeline: one mapping per process, each
+    holding the tools that process reported. It is flattened into one row per tool so the
+    table reads the same way as the one below.
+    """
+    import yaml
+
+    collected = {}
+    if os.path.exists(path):
+        with open(path) as handle:
+            collected = yaml.safe_load(handle) or {}
+
+    rows = [
+        (process, tool, str(version))
+        for process, tools in collected.items()
+        for tool, version in (tools or {}).items()
+    ]
+
+    return pd.DataFrame(rows, columns=['process', 'software', 'version'])
+
+
+modules = pipeline_versions(str(VERSIONS_FILE))
+
+display(HTML('<font color="black">' + modules.to_html(index=False) + '</font>'))
+```
+
+```{python}
+import platform
+import shutil
+import subprocess
+
+import IPython
+
+
+def library_version(module) -> str:
+    """
+    Version of an already imported library.
+
+    The attribute is preferred over the installed distribution metadata because it is what
+    the running code reports about itself; the metadata is only consulted as a fallback.
+    """
+    reported = getattr(module, '__version__', None)
+    if reported:
+        return str(reported)
+
+    from importlib.metadata import PackageNotFoundError, version as distribution_version
+
+    try:
+        return distribution_version(module.__name__)
+    except PackageNotFoundError:
+        return 'unknown'
+
+
+def quarto_version():
+    """
+    Version of the quarto binary rendering this document, or None if it cannot be read.
+
+    Quarto does not export its own version into the rendering environment, so the binary is
+    asked directly. The row is dropped rather than guessed when no binary can be reached.
+    """
+    reported = os.environ.get('QUARTO_VERSION')
+    if reported and reported.strip():
+        return reported.strip()
+
+    bin_path = os.environ.get('QUARTO_BIN_PATH')
+    candidates = [os.path.join(bin_path, 'quarto')] if bin_path else []
+    candidates.append(shutil.which('quarto'))
+
+    for candidate in candidates:
+        if not candidate or not os.path.exists(candidate):
+            continue
+        try:
+            completed = subprocess.run(
+                [candidate, '--version'],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=True,
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if completed.stdout.strip():
+            return completed.stdout.strip()
+
+    return None
+```
+
+```{python}
+rows = [('python', platform.python_version())]
+
+quarto = quarto_version()
+if quarto is not None:
+    rows.append(('quarto', quarto))
+
+rows += [
+    ('scanpy', library_version(sc)),
+    ('anndata', library_version(ad)),
+    ('matplotlib', library_version(matplotlib)),
+    ('numpy', library_version(np)),
+    ('pandas', library_version(pd)),
+    ('ipython', library_version(IPython)),
+]
+
+versions = pd.DataFrame(rows, columns=['software', 'version'])
+
+display(HTML('<font color="black">' + versions.to_html(index=False) + '</font>'))
+```

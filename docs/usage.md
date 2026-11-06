@@ -18,6 +18,8 @@
 - [Container images](#container-images)
 - [Reference data](#reference-data)
 - [Cell type annotation](#cell-type-annotation)
+- [Training your own models](#training-your-own-models)
+- [Annotating an existing object (`annotate`)](#annotating-an-existing-object-annotate)
 - [Ambient RNA correction](#ambient-rna-correction)
 - [Reference mapping](#reference-mapping)
 - [GPU acceleration](#gpu-acceleration)
@@ -28,8 +30,11 @@
 
 The pipeline is split into three sequential stages, each selected with the `--stage` parameter.
 **`--stage` is always required.** Each stage consumes the previous stage's finalized `.h5ad` via
-`--base_adata`. A fourth, independent stage, `train_models`, trains your own cell type annotation
-models from an annotated reference; see [Training your own models](#training-your-own-models).
+`--base_adata`. Two independent stages complement them:
+- `train_models` trains your own cell type annotation models from an annotated reference; see
+  [Training your own models](#training-your-own-models).
+- `annotate` adds predictions from such models, or built-in CellTypist models, to an object that
+  is already processed; see [Annotating an existing object](#annotating-an-existing-object-annotate).
 
 | Stage | `--stage`            | Required input                                          | Main output                                       |
 | ----- | -------------------- | ------------------------------------------------------- | ------------------------------------------------- |
@@ -37,6 +42,7 @@ models from an annotated reference; see [Training your own models](#training-you
 | 2     | `downstream`         | `--base_adata` (stage 1 h5ad)                           | `<name>_downstream.h5ad`, `<name>_downstream_markers.json.gz` |
 | 3     | `differential_genes` | `--base_adata` (stage 2 h5ad) + `--diffgenes_contrasts` | per-contrast DE tables                            |
 | —     | `train_models`       | `--train_adata` (annotated h5ad) + `--train_label_col`  | CellTypist / scANVI models, evaluation, report    |
+| —     | `annotate`           | `--base_adata` (processed h5ad) + `--celltypist_model` and/or `--scanvi_model` | `<name>_annotate.h5ad`, predictions, report |
 
 `--name` sets the identifier used in output file names; it defaults to the stage name.
 
@@ -693,7 +699,8 @@ files with the same file name cannot be used together.
 
 > [!NOTE]
 > Cell type predictions are merged into the per-sample objects as `obs` columns during the
-> finalisation step of `qc_clustering`.
+> finalisation step of `qc_clustering`. To add predictions to an object that is already processed,
+> use [`--stage annotate`](#annotating-an-existing-object-annotate).
 
 ## Training your own models
 
@@ -796,6 +803,108 @@ trained with (the pipeline's containers: CellTypist 1.6.3, scvi-tools 1.3.3).
 | `--train_celltypist_mini_batch`        | `false`             | Mini-batch SGD (requires `--train_celltypist_use_sgd`).                     |
 | `--train_celltypist_batch_size`        | `1000`              | Cells per mini-batch.                                                       |
 
+## Annotating an existing object (`annotate`)
+
+`--stage annotate` adds cell type predictions from pre-trained models to an object that is already
+processed, for example a `<name>_qc_clustering.h5ad`, without re-running QC, integration and
+clustering. The models are the same as in `qc_clustering`:
+- CellTypist: built-in names and/or local `.pkl` files in `--celltypist_model`;
+- scANVI: a `model.pt` in `--scanvi_model`, e.g. from `--stage train_models`.
+
+Give at least one of them. A method runs only when its model is given.
+
+```yaml
+# params_annotate.yml
+celltypist_model: "Adult_Human_Brain,/path/to/models/celltypist/my_reference.pkl"
+annotate_batch_col: "batch"     # default; one value per sample in qc_clustering output
+annotate_symbol_col: "index"    # default; var column with gene symbols otherwise
+# optional: annotate only some cells, e.g. two Leiden clusters (quote numbers)
+# annotate_subset_col: "leiden"
+# annotate_subset_values: "3,7"
+```
+
+```bash
+nextflow run UKDRI/scdownstream -r dev_ukdri --stage annotate \
+    -profile <docker/singularity/.../institute> \
+    --base_adata results_qc/<name>_qc_clustering.h5ad \
+    --scanvi_model /path/to/models/scanvi/my_reference/model.pt \
+    -params-file params_annotate.yml \
+    --outdir results_annotate
+```
+
+**Input**
+- **Raw counts are required: you must provide them, and the stage does not check them.**
+  - **Where:** in `layers["counts"]`, as every `qc_clustering` output has them. If the object has
+    no `counts` layer, `X` is taken as the raw counts, with a warning.
+  - **No check that the data are raw:** the stage does not check whether these are raw counts or
+    normalised data. Normalised or log-transformed values give wrong predictions without an
+    error. Non-integer counts, e.g. after SoupX or decontX, are fine.
+  - **Stops on:** negative or non-finite values, or cells without any counts.
+- **Each tool works from the raw counts**, and recomputes the data it needs from them:
+  - CellTypist normalises them to 10,000 counts per cell and log-transforms them.
+  - scANVI maps the raw counts.
+
+  Your object's `X`, other layers and embeddings are not used, and are not changed.
+- **Gene names** must be the kind the models were trained on, usually gene symbols. If the symbols
+  are in a `var` column, give it with `--annotate_symbol_col`.
+  - scANVI stops if fewer than half of the model's genes are found, and warns below 80%.
+  - CellTypist warns below 50%.
+
+**Samples and batches for scANVI**
+- **Batches.** The new cells are mapped onto the model as new batches, taken from
+  `--annotate_batch_col`.
+  - The default, `batch`, is already one value per sample in `qc_clustering` output
+    (`<batch_col value>_<sample>`), the same as the reference mapping in `qc_clustering`.
+  - For another object, set it to the column with the samples (or the batches), e.g.
+    `annotate_batch_col: "sample_id"`.
+  - If the column is missing, all cells are mapped as one batch, with a warning.
+  - The batch is set only on the working copy; your object's `batch` and `sample` columns stay
+    unchanged.
+- **Covariates.** If the model was trained with covariates (`--scvi_categorical_covariates` /
+  `--scvi_continuous_covariates`), the object needs the same `obs` columns. New categories are
+  added during mapping.
+- **Labels.** Labels in the model's label column (e.g. `label`) are hidden during mapping, as in
+  `qc_clustering`.
+
+**Output**
+- **Annotated object:** `<name>_annotate.h5ad` (+ `.rds`) is your object with these additions:
+  - `celltypist:<model>` / `celltypist:<model>:conf` and `scanvi:<model>` / `scanvi:<model>:conf`
+    columns;
+  - the scANVI latent space as `obsm["X_scanvi_<model>"]`.
+  - **Re-annotating** with a model of the same name replaces its earlier columns.
+- **Prediction table:** `annotate/<name>_annotate_predictions.tsv`.
+- **Report:** `report/<name>_annotate_report.html`. It shows the label counts, confidences and
+  UMAPs for each method, the agreement between methods, the labels per Leiden cluster and the label
+  composition per sample.
+
+**Annotating only some cells**
+- `--annotate_subset_col` and `--annotate_subset_values` (comma-separated, both required) restrict
+  the stage to the cells whose column has one of the values.
+  - Examples: `leiden` `3,7`, or a stage 1 prediction such as `celltypist:Adult_Human_Brain`
+    `Microglia`.
+  - This is useful with a model for one cell population, e.g. microglia states.
+- **Output holds only the selected cells.** Categories that no longer have cells are dropped, e.g.
+  Leiden clusters. The UMAPs and Leiden clusters are those of the full object; they are not
+  recomputed.
+- **Values containing a comma** cannot be selected.
+- **In a params file**, quote numeric values: `annotate_subset_values: "3,7"`.
+
+**Continuing with `downstream`.** The annotated object is a valid `--base_adata` for
+`--stage downstream`; use a prediction column as the grouping, e.g.
+`--selected_clustering scanvi:my_reference`.
+
+| Parameter                  | Default | Description                                                                 |
+| -------------------------- | ------- | --------------------------------------------------------------------------- |
+| `--base_adata`             | —       | Processed h5ad with raw counts in `layers["counts"]`, or in `X` (required). |
+| `--celltypist_model`       | —       | CellTypist model names and/or `.pkl` files, comma-separated.                |
+| `--scanvi_model`           | —       | scANVI `model.pt`; the columns are named after its folder.                  |
+| `--scvi_query_max_epochs`  | `100`   | Epochs of the scANVI query mapping.                                         |
+| `--annotate_batch_col`     | `batch` | `obs` column with the query batches; one batch for all cells if missing.    |
+| `--annotate_symbol_col`    | `index` | `var` column with gene symbols.                                             |
+| `--annotate_subset_col`    | —       | `obs` column to select cells by.                                            |
+| `--annotate_subset_values` | —       | Comma-separated values of that column to annotate.                          |
+| `--report_max_celltype_labels` | `50` | Labels shown in the report's tables and UMAPs; the rest are grouped as `other`. |
+
 ## Ambient RNA correction
 
 Ambient RNA correction removes contaminating RNA from cell-free droplets. It is **off by default**
@@ -869,7 +978,8 @@ trained on are transferred to the new cells.
 
 > [!WARNING]
 > Mapping onto an existing object with `--base_adata` is supported for scVI only; `--base_adata`
-> together with `scanvi` stops with "not supported yet".
+> together with `scanvi` stops with "not supported yet". To add scANVI predictions to an object that
+> is already processed, use [`--stage annotate`](#annotating-an-existing-object-annotate).
 
 ## GPU acceleration
 

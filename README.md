@@ -53,10 +53,15 @@ consumes the previous stage's finalized `.h5ad` via `--base_adata`.
 | 2     | `--stage downstream`         | `--base_adata <stage 1 h5ad>`                                         | `<name>_downstream.h5ad`, `<name>_downstream_markers.json.gz`, analysis HTML report |
 | 3     | `--stage differential_genes` | `--base_adata <stage 2 h5ad>` + `--diffgenes_contrasts contrasts.tsv` | per-contrast DE tables, pseudobulk h5ad, DE HTML report                 |
 | —     | `--stage train_models`       | `--train_adata reference.h5ad` + `--train_label_col <column>`         | CellTypist and scANVI models, held-out evaluation, training report      |
+| —     | `--stage annotate`           | `--base_adata <processed h5ad>` + `--celltypist_model` / `--scanvi_model` | `<name>_annotate.h5ad` with the predictions, prediction table, annotation report |
 
-`train_models` is independent of the other three: it trains your own CellTypist and scANVI cell
-type models from an annotated reference, which `qc_clustering` then uses via `--celltypist_model`
-and `--scanvi_model`. See [Training your own models](docs/usage.md#training-your-own-models).
+`train_models` and `annotate` are independent of the other three stages:
+- `train_models` trains your own CellTypist and scANVI cell type models from an annotated
+  reference. See [Training your own models](docs/usage.md#training-your-own-models).
+- `qc_clustering` uses such models via `--celltypist_model` and `--scanvi_model`.
+- `annotate` adds their predictions to an object that is already processed. It can also be
+  restricted to some clusters, without re-running QC and integration. See
+  [Annotating an existing object](docs/usage.md#annotating-an-existing-object-annotate).
 
 ```text
 samplesheet.csv

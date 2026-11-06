@@ -13,8 +13,8 @@ are grouped by stage.
 > Most intermediate objects are only published when `--save_intermediates` is set. Without it you get
 > the finalized objects, the HTML reports, MultiQC and `pipeline_info/` — which is usually what you
 > want. Intermediate h5ad files are written uncompressed and may hold dense matrices; only the
-> finalized `<name>_qc_clustering.h5ad` and `<name>_downstream.h5ad` are guaranteed sparse and
-> gzip-compressed.
+> finalized `<name>_qc_clustering.h5ad`, `<name>_downstream.h5ad` and `<name>_annotate.h5ad` are
+> guaranteed sparse and gzip-compressed.
 
 ## Stage 1 — `qc_clustering`
 
@@ -318,6 +318,37 @@ Trains CellTypist and scANVI cell type models on an annotated reference (`--trai
 
 With `--train_final_on_all false`, the published models are the ones trained on the training split
 (the same models the evaluation describes) instead of a refit on all cells.
+
+## Stage `annotate`
+
+Adds CellTypist and/or scANVI predictions to a processed object (`--base_adata`). See
+[Annotating an existing object](usage.md#annotating-an-existing-object-annotate). `<name>` is
+`--name` (default: `scdownstream`).
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- **`<name>_annotate.h5ad`** (sparse, gzip-compressed) and `<name>_annotate.rds`: the input object
+  with these additions:
+  - `obs` columns `celltypist:<model>` / `celltypist:<model>:conf` and `scanvi:<model>` /
+    `scanvi:<model>:conf`: the most probable label and its confidence (0–1);
+  - `obsm["X_scanvi_<model>"]`: the scANVI latent space of the mapped cells.
+
+  Columns of an earlier annotation with the same model name are replaced. With
+  `--annotate_subset_col` / `--annotate_subset_values`, the object holds only the selected cells,
+  and categories without cells are dropped.
+- **`annotate/<name>_annotate_predictions.tsv`**: the new prediction columns, one row per cell
+  (`barcode`).
+- **`report/<name>_annotate_report.html`**:
+  - the models and the subset;
+  - per method: label counts, confidence distribution and UMAPs;
+  - the agreement between methods;
+  - the majority label per Leiden cluster;
+  - the label composition per sample.
+- **`annotate/intermediates/`**: with `--save_intermediates`, the working copy (raw counts in `layers["counts"]`, gene symbols as `var_names`) and
+  the per-tool objects.
+
+</details>
 
 ## Pipeline information
 
