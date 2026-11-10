@@ -263,6 +263,15 @@ The `stub:` block is a plain shell block — it never calls the template. `touch
 declared output, including `versions.yml`, and guard `optional:` outputs behind the same
 condition the template uses. 35 of the 38 stubs in this repo take exactly this form.
 
+**Library versions across containers.** h5ad files pass from process to process, so every image that
+reads or writes an h5ad must use the pipeline's anndata/pandas generation: the base image
+`docker.io/gcfntnu/scanpy:1.11.4` (scanpy 1.11.4, anndata 0.12.2, pandas 2.3.x). Never pick an image
+with pandas ≥ 3 / anndata ≥ 0.13. BioContainers built with unpinned dependencies often have them
+(this broke `SCANPY_ENRICH` after `MARKERS_COSG`). Check the versions of a new image first; if no
+image matches, add a Dockerfile `FROM docker.io/gcfntnu/scanpy:1.11.4` with
+`pip install --no-deps <tool>` (example: `modules/local/markers/cosg/Dockerfile`) for the user to
+build and push.
+
 Prefer the nf-core Seqera-container ternary shown above. A hardcoded apptainer image path
 (e.g. `container "/nfsdata/apptainer/scanpy_1.11.4_coreinf_0.3.sif"`) is used by a few
 modules — only follow that form when the user asks for it or when extending one of them.

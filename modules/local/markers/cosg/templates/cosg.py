@@ -15,9 +15,6 @@
 #   auc:  AUC desc, adjusted p-value asc, log2 fold change desc, COSG score desc
 #   cosg: COSG score desc, log2 fold change desc, fraction of expressing cells in the group desc
 # Remaining ties keep the gene order of adata.var_names.
-#
-# The BioContainer has no scanpy and no PyYAML: read and write with anndata, and write
-# versions.yml by hand.
 
 import os
 import platform
@@ -30,33 +27,15 @@ os.environ["MPLCONFIGDIR"] = "./tmp/matplotlib"
 import anndata as ad
 import numpy as np
 import pandas as pd
+import scanpy as sc
+import yaml
 import cosg
 
 from threadpoolctl import threadpool_limits
 threadpool_limits(int("${task.cpus}"))
 
 
-def format_yaml_like(data: dict, indent: int = 0) -> str:
-    """Formats a dictionary to a YAML-like string.
-
-    Args:
-        data (dict): The dictionary to format.
-        indent (int): The current indentation level.
-
-    Returns:
-        str: A string formatted as YAML.
-    """
-    yaml_str = ""
-    for key, value in data.items():
-        spaces = "  " * indent
-        if isinstance(value, dict):
-            yaml_str += f"{spaces}{key}:\\n{format_yaml_like(value, indent + 1)}"
-        else:
-            yaml_str += f"{spaces}{key}: {value}\\n"
-    return yaml_str
-
-
-adata = ad.read_h5ad("${h5ad}")
+adata = sc.read_h5ad("${h5ad}")
 prefix = "${prefix}"
 obs_key = "${obs_key}"
 mu = float("${mu}")
@@ -82,22 +61,6 @@ def is_per_group(value, group_names: list) -> bool:
     """True for scanpy's per-group record arrays (one field per group)."""
     return (isinstance(value, np.ndarray) and value.dtype.names is not None
             and set(value.dtype.names) == set(group_names))
-
-
-def nonzero_fractions(X, codes: np.ndarray, n_groups: int) -> tuple[np.ndarray, np.ndarray]:
-    """Fractions of cells with X != 0, genes x groups: in the group (pts) and in all other cells (pts_rest).
-
-    The same numbers as scanpy's pts / pts_rest and as MARKERS_PRESTO (sc.get.aggregate with
-    func="count_nonzero"). This container has no scanpy, so the counts are taken here, one group at a
-    time; X != 0 drops stored zeros of a sparse X, as count_nonzero does.
-    """
-    nonzero = np.column_stack([
-        np.asarray((X[codes == g] != 0).sum(axis=0)).ravel() for g in range(n_groups)
-    ]).astype(np.float64)
-    group_size = np.bincount(codes, minlength=n_groups).astype(np.float64)
-    pts = nonzero / group_size
-    pts_rest = (nonzero.sum(axis=1, keepdims=True) - nonzero) / (codes.size - group_size)
-    return pts, pts_rest
 
 
 # Checks
@@ -143,8 +106,6 @@ if X is None:
 if not labelled.all():
     X = X[labelled]
 
-pts, pts_rest = nonzero_fractions(X, codes, n_groups)
-
 rgg = adata.uns.get(uns_key)
 
 if presto_ran:
@@ -183,6 +144,20 @@ adata_cosg = ad.AnnData(
     ),
     var=pd.DataFrame(index=var_names),
 )
+
+# Fractions of cells with a non-zero value, genes x groups: in the group (pts) and in all other
+# cells (pts_rest), as scanpy's pts / pts_rest and MARKERS_PRESTO. count_nonzero tests X != 0, so
+# stored zeros count as zeros. aggregate drops empty categories and may order the groups
+# differently, so its rows are matched to the groups by name. Taken before COSG runs on adata_cosg.
+aggregated = sc.get.aggregate(adata_cosg, by=obs_key, func=["count_nonzero"])
+group_rows = aggregated.obs_names.get_indexer(group_names)
+if (group_rows < 0).any() or aggregated.n_obs != n_groups:
+    raise ValueError(f"sc.get.aggregate returned the groups {list(aggregated.obs_names)}, expected {group_names}")
+nonzero_in = np.asarray(aggregated.layers["count_nonzero"][group_rows], dtype=np.float64).T
+del aggregated
+group_size = np.bincount(codes, minlength=n_groups).astype(np.float64)
+pts = nonzero_in / group_size
+pts_rest = (nonzero_in.sum(axis=1, keepdims=True) - nonzero_in) / (codes.size - group_size)
 
 print(f"COSG on adata.X, grouped by '{obs_key}' ({n_groups} groups, {adata_cosg.n_obs} cells), mu = {mu}")
 
@@ -313,12 +288,13 @@ adata.write_h5ad(f"{prefix}.h5ad")
 versions = {
     "${task.process}": {
         "python": platform.python_version(),
-        "cosg": version("cosg"),
+        "scanpy": sc.__version__,
         "anndata": ad.__version__,
         "numpy": np.__version__,
         "pandas": pd.__version__,
+        "cosg": version("cosg"),
     }
 }
 
 with open("versions.yml", "w") as f:
-    f.write(format_yaml_like(versions))
+    yaml.dump(versions, f)

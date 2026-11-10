@@ -538,7 +538,7 @@ only the listed ones.
     select markers.
 - **`cosg`:** the [COSG](https://github.com/genecell/COSG) score (cosine similarity to an ideal
   marker of the group; Dai et al. 2022), which favours genes specific to one group. It runs in the
-  BioContainers `cosg` image, and can filter the exported markers (`--markers_min_cosg_score`).
+  pipeline's own `scanpy-cosg` image (see [Container images](#container-images)), and can filter the exported markers (`--markers_min_cosg_score`).
 - **COSG only (`--markers_method cosg`):** there is no AUC and no p-value. `--markers_min_auc` is
   not applied, and the marker JSON and report have no AUC or p-value columns. log2FC and the
   expressing fractions are still computed.
@@ -681,7 +681,7 @@ regardless.
 
 Every process runs from a public container image, so nothing has to be built by hand. Nextflow
 pulls each image on first use. Under the `singularity` or `apptainer` profile it converts the image
-to a `.sif` in `$NXF_SINGULARITY_CACHEDIR`. Two images are specific to this fork. They are hosted on
+to a `.sif` in `$NXF_SINGULARITY_CACHEDIR`. Three images are specific to this fork. They are hosted on
 Docker Hub and pulled the same way; their Dockerfiles are kept in the repository only as the recipe
 they were built from:
 
@@ -689,10 +689,19 @@ they were built from:
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
 | `docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4` | `SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`, `SCANPY_ENRICH` | `modules/local/scanpy/report/Dockerfile`               |
 | `docker.io/nhecker/pydeseq2:0.1`                    | `DIFFERENTIAL_GENES_PER_CONTRAST`                                                                  | `modules/local/pydeseq2/differential_genes/Dockerfile` |
+| `docker.io/nhecker/scanpy-cosg:1.11.4-cosg1.2.1`     | `MARKERS_COSG`                                                                                     | `modules/local/markers/cosg/Dockerfile`                |
 
-Both extend the public `gcfntnu/scanpy:1.11.4` image. `DECOUPLER_PSEUDOBULK`, `FILTER_PSEUDOBULK` and
+All three extend the public `gcfntnu/scanpy:1.11.4` image. `DECOUPLER_PSEUDOBULK`, `FILTER_PSEUDOBULK` and
 `SCANPY_EXPORT_MARKERS` use that public image directly. The images are published for `linux/amd64`
 only.
+
+> [!NOTE]
+> **For developers: one anndata/pandas generation.** h5ad files are passed between processes, so every
+> image that reads or writes them uses the versions of `gcfntnu/scanpy:1.11.4` (anndata 0.12.2,
+> pandas 2.3.x). Images with pandas ≥ 3 / anndata ≥ 0.13 write string indices in a form the older
+> anndata cannot write back (`allow_write_nullable_strings is False`). Such images, e.g.
+> BioContainers built with unpinned dependencies, must not be mixed in. Upgrading means updating
+> all images together.
 
 Prefer `-profile apptainer` over `-profile docker`. Docker Hub limits anonymous pulls, and Docker
 pulls on every host, while Apptainer pulls each image once into `$NXF_SINGULARITY_CACHEDIR`. See the

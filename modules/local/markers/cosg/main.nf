@@ -3,11 +3,8 @@ process MARKERS_COSG {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    // BioContainer of bioconda's cosg: has anndata, numpy, pandas, scipy, scikit-learn and numba,
-    // but no scanpy and no PyYAML, so the template uses neither.
-    container "${workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container
-        ? 'https://depot.galaxyproject.org/singularity/cosg:1.2.1--pyhdfd78af_0'
-        : 'quay.io/biocontainers/cosg:1.2.1--pyhdfd78af_0'}"
+    // Built from modules/local/markers/cosg/Dockerfile.
+    container 'docker.io/nhecker/scanpy-cosg:1.11.4-cosg1.2.1'
 
     input:
     tuple val(meta), path(h5ad)
@@ -35,6 +32,7 @@ process MARKERS_COSG {
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         python: \$(python3 -c 'import platform; print(platform.python_version())')
+        scanpy: \$(python3 -c 'import scanpy; print(scanpy.__version__)')
         cosg: \$(python3 -c 'from importlib.metadata import version; print(version("cosg"))')
         anndata: \$(python3 -c 'import anndata; print(anndata.__version__)')
         numpy: \$(python3 -c 'import numpy; print(numpy.__version__)')

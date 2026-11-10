@@ -1,7 +1,14 @@
----
-# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/environment-schema.json
+# Same package versions as docker.io/gcfntnu/scanpy:1.11.4 (scipy pin not checked against the image), plus cosg
 channels:
   - conda-forge
   - bioconda
 dependencies:
+  - conda-forge::python=3.11.11
+  - conda-forge::scanpy=1.11.4
+  - conda-forge::anndata=0.12.2
+  - conda-forge::pandas=2.3.2
+  - conda-forge::numpy=2.2.6
+  - conda-forge::scipy=1.16.1
+  - conda-forge::pyyaml=6.0.2
+  - conda-forge::threadpoolctl=3.6.0
   - bioconda::cosg=1.2.1
