@@ -507,10 +507,11 @@ nextflow run UKDRI/scdownstream -r dev_ukdri --stage downstream \
 | `--enrich_max_out_group_fraction` | `0.5`                   | Maximum fraction of cells outside the group expressing a gene.                                                                                          |
 | `--ortholog_hcop_directory`       | `null`                  | Directory of HCOP ortholog tables; required for LIANA+ on non-human data — see [Reference data](#reference-data).                                       |
 | `--markers_uns_key`               | `rank_genes_groups`     | `uns` key holding the marker results to export.                                                                                                         |
-| `--markers_method`                | `presto`                | How markers are ranked: `presto` (by AUC) or `cosg` (by the COSG score, with the presto statistics kept). See below.                                   |
-| `--markers_min_auc`               | `0.7`                   | Minimum AUC for an exported marker (0.5 = no difference between the group and the other cells; 0.7 is the usual threshold for acceptable discrimination). |
-| `--markers_cosg_mu`               | `1`                     | COSG's `mu`: penalty for genes also expressed in other groups. Only used with `--markers_method cosg`.                                                 |
-| `--markers_min_cosg_score`        | —                       | Minimum COSG score (0–1) for an exported marker. Not used by default; needs `--markers_method cosg`. The scores of the top genes vary a lot between groups, so a fixed threshold removes many more markers from some groups than from others. |
+| `--markers_method`                | `presto,cosg`           | Marker methods to run, comma-separated: `presto` (Wilcoxon test + AUC) and/or `cosg` (COSG score). See below.                                          |
+| `--markers_rank_by`               | auto                    | Ranking: `auc` or `cosg`. Default: `auc` when presto runs, otherwise `cosg`.                                                                          |
+| `--markers_min_auc`               | `0.7`                   | Minimum AUC for an exported marker (0.5 = no difference between the group and the other cells; 0.7 is the usual threshold for acceptable discrimination). Only applied when presto runs. |
+| `--markers_cosg_mu`               | `1`                     | COSG's `mu`: penalty for genes also expressed in other groups. Only used when cosg runs.                                                               |
+| `--markers_min_cosg_score`        | —                       | Minimum COSG score (0–1) for an exported marker, with either ranking; needs cosg in `--markers_method`. Not used by default. The scores of the top genes vary a lot between groups, so a fixed threshold removes many more markers from some groups than from others. |
 | `--markers_n_top`                 | `100`                   | Number of top markers per group to export.                                                                                                              |
 | `--markers_pct_nz`                | `0.1`                   | Minimum fraction of non-zero expressing cells for an exported marker.                                                                                   |
 | `--markers_min_logfc`             | `0`                     | Minimum log fold change for an exported marker.                                                                                                         |
@@ -523,21 +524,33 @@ nextflow run UKDRI/scdownstream -r dev_ukdri --stage downstream \
 
 **Marker genes.** Each group of `--selected_clustering` is compared with all other cells, on the
 log-normalised `X`.
-- **`presto` (default):** the Wilcoxon rank-sum test with the **AUC**, a Python re-implementation
+Two methods, both run by default (`--markers_method presto,cosg`); setting `--markers_method` runs
+only the listed ones.
+- **`presto`:** the Wilcoxon rank-sum test with the **AUC**, a Python re-implementation
   of the method of the R package [presto](https://github.com/immunogenomics/presto) (`wilcoxauc`);
   the results match R presto.
   - **AUC:** the probability that a random cell of the group expresses the gene more highly than a
     random other cell. 0.5 means no difference, 1 a perfect marker.
-  - **Ranking and filter:** markers are ranked by AUC. The exported markers need at least
-    `--markers_min_auc`, `--markers_pct_nz` and `--markers_min_logfc`.
+  - **Filter:** the exported markers need at least `--markers_min_auc` (besides `--markers_pct_nz`
+    and `--markers_min_logfc`).
   - **Why not p-values:** p-values of a group against the rest are inflated (cells count as
     replicates, and the groups come from the same data), so they are reported but not used to
     select markers.
-- **`cosg`:** additionally the [COSG](https://github.com/genecell/COSG) score (cosine similarity
-  to an ideal marker of the group; Dai et al. 2022), which favours genes specific to one group.
-  - **Ranking and filter:** markers are ranked by the COSG score, and the same filters apply.
-  - **Report:** it shows the COSG score next to the presto columns.
-  - **Container:** it runs in the BioContainers `cosg` image.
+- **`cosg`:** the [COSG](https://github.com/genecell/COSG) score (cosine similarity to an ideal
+  marker of the group; Dai et al. 2022), which favours genes specific to one group. It runs in the
+  BioContainers `cosg` image, and can filter the exported markers (`--markers_min_cosg_score`).
+- **COSG only (`--markers_method cosg`):** there is no AUC and no p-value. `--markers_min_auc` is
+  not applied, and the marker JSON and report have no AUC or p-value columns. log2FC and the
+  expressing fractions are still computed.
+
+**Ranking** (`--markers_rank_by`; the same order in the marker JSON and the report tables):
+- **`auc`** (default when presto runs): AUC, then adjusted p-value, then log2FC, then COSG score.
+- **`cosg`** (default with COSG only; needs cosg): COSG score, then log2FC, then the fraction of
+  expressing cells in the group.
+
+Later keys only break ties of the earlier ones. With `auc`, the adjusted p-value follows almost
+directly from the AUC, so in practice the order is by AUC, with log2FC and COSG deciding between
+genes of equal AUC (e.g. AUC 1.0).
 
 `--markers_thr_adj_pvalue` was removed: markers are no longer selected by p-value.
 

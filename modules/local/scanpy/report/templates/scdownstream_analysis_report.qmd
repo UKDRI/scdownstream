@@ -402,31 +402,52 @@ else:
 from IPython.display import display, HTML
 
 marker_results = adata.uns['rank_genes_groups']
-marker_ranked_by = marker_results['params'].get('ranked_by', 'auc')
+# presto results (Wilcoxon test, AUC, p-values) have 'auc', COSG results 'cosg_scores'; either or both
+has_presto = 'auc' in marker_results
+has_cosg = 'cosg_scores' in marker_results
+marker_ranked_by = marker_results['params'].get('ranked_by', 'auc' if has_presto else 'cosg')
 
+cosg_definition = (
+    "the COSG score, a cosine similarity between the expression of a gene and membership of the cluster, "
+    "penalised when the gene is also similar to other clusters (higher means more specific to the cluster)"
+)
 if marker_ranked_by == 'cosg':
     marker_method_text = (
-        "Marker genes per cluster are ranked by the COSG score, a cosine similarity between the expression "
-        "of a gene and membership of the cluster, penalised when the gene is also similar to other clusters. "
-        "The Wilcoxon rank-sum test and the AUC (presto statistics) of the cluster against all other cells "
-        "are shown alongside."
+        f"Marker genes per cluster are ranked by {cosg_definition}, comparing the cells of a cluster against "
+        "all other cells. Ties are ordered by log2 fold change and then by the fraction of cells of the "
+        "cluster that express the gene."
     )
+    if has_presto:
+        marker_method_text += (
+            " The Wilcoxon rank-sum test and the AUC (presto statistics) of the same comparison are shown alongside."
+        )
 else:
     marker_method_text = (
         "Marker genes per cluster are identified with a Wilcoxon rank-sum test and the AUC (presto statistics), "
-        "comparing the cells of a cluster against all other cells, and are ranked by AUC."
+        "comparing the cells of a cluster against all other cells, and are ranked by AUC; ties are ordered by "
+        "adjusted p-value and then by log2 fold change"
+        + (", then by the COSG score." if has_cosg else ".")
     )
+    if has_cosg:
+        marker_method_text += f" The COSG score is {cosg_definition}; it is shown alongside."
 
-display(HTML(
-    f"<p>{marker_method_text}</p>"
+marker_auc_text = (
     "<p>AUC is the probability that a random cell of the cluster expresses the gene more highly than a random "
     "other cell; 0.5 means no difference, 1 a perfect marker.</p>"
-))
+    if has_presto else ""
+)
+display(HTML(f"<p>{marker_method_text}</p>" + marker_auc_text))
 ```
 
 ```{python}
-# top 3 genes per cluster in the stored ranking order (AUC, or the COSG score)
-sc.pl.rank_genes_groups_dotplot(adata, groupby=selected_clustering, standard_scale="var", swap_axes=True, n_genes=3)
+# top 3 genes per cluster in the stored ranking order. Passed as var_names: without them the plot reads
+# the genes through sc.get.rank_genes_groups_df, which needs p-values (absent when only COSG ran).
+marker_dotplot_genes = {
+    group: [gene for gene in marker_results['names'][group] if pd.notna(gene)][:3]
+    for group in marker_results['names'].dtype.names
+}
+sc.pl.rank_genes_groups_dotplot(adata, groupby=selected_clustering, standard_scale="var", swap_axes=True,
+                                var_names=marker_dotplot_genes)
 ```
 
 ```{python}
@@ -499,16 +520,15 @@ def create_search_table_html(df: pd.DataFrame, search_text: str,
 from IPython.display import display, HTML
 
 display(HTML(f"<p>Results in tables are limited to the top {ntop} genes, in ranking order. "
-             "pct in / pct out: percentage of cells of the cluster / of all other cells in which the gene is detected; "
-             "p: p-value of the Wilcoxon test; "
-             "adj. p: Benjamini-Hochberg adjusted p-value of the Wilcoxon test.</p>"))
+             "pct in / pct out: percentage of cells of the cluster / of all other cells in which the gene is detected"
+             + ("; p: p-value of the Wilcoxon test; "
+                "adj. p: Benjamini-Hochberg adjusted p-value of the Wilcoxon test" if has_presto else "")
+             + ".</p>"))
 ```
 
 ```{python}
 # filter panel for all marker tables; inputs start empty, an empty input applies no filter
 from IPython.display import display, HTML
-
-has_cosg = 'cosg_scores' in marker_results
 
 marker_filter_js = """
 <script>
@@ -576,16 +596,27 @@ def marker_filter_input(input_id: str, label: str, column: str, op: str) -> str:
             + f"data-op='{op}' placeholder='no filter' oninput='applyMarkerFilters()' style='{marker_filter_style}'>"
             + "</label>")
 
-marker_filters = [('markerFilterMinAuc', 'min AUC', 'AUC', 'min')]
+# one input per table column that exists (AUC, p and adj. p only with presto; COSG score only with COSG)
+marker_filters = []
+if has_presto:
+    marker_filters.append(('markerFilterMinAuc', 'min AUC', 'AUC', 'min'))
 if has_cosg:
     marker_filters.append(('markerFilterMinCosg', 'min COSG score', 'COSG score', 'min'))
+marker_filters.append(('markerFilterMinLogfc', 'min log2FC', 'log2FC', 'min'))
+if has_presto:
+    marker_filters += [
+        ('markerFilterMaxP', 'max p', 'p', 'max'),
+        ('markerFilterMaxPadj', 'max adj. p', 'adj. p', 'max'),
+    ]
 marker_filters += [
-    ('markerFilterMinLogfc', 'min log2FC', 'log2FC', 'min'),
-    ('markerFilterMaxP', 'max p', 'p', 'max'),
-    ('markerFilterMaxPadj', 'max adj. p', 'adj. p', 'max'),
     ('markerFilterMinPctIn', 'min pct in (%)', 'pct in', 'min'),
     ('markerFilterMaxPctOut', 'max pct out (%)', 'pct out', 'max'),
 ]
+
+# the pipeline parameters that filter the exported marker JSON for these results
+marker_export_params = ((["--markers_min_auc"] if has_presto else [])
+                        + ["--markers_min_logfc", "--markers_pct_nz"]
+                        + (["--markers_min_cosg_score"] if has_cosg else []))
 
 marker_filter_panel = (
     "<div id='markerFilterPanel' style='display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; "
@@ -601,8 +632,8 @@ display(HTML(
     marker_filter_js
     + f"<p>The filters below act on the genes shown in the tables (the top {ntop} genes per cluster, in ranking "
     "order) and apply to all cluster tables together with each table's gene search; an empty field applies no "
-    "filter. The exported marker JSON is filtered with the pipeline parameters --markers_min_auc, "
-    "--markers_min_logfc, --markers_pct_nz and --markers_min_cosg_score instead.</p>"
+    "filter. The exported marker JSON is filtered with the pipeline parameters "
+    + ", ".join(marker_export_params[:-1]) + " and " + marker_export_params[-1] + " instead.</p>"
     + marker_filter_panel
 ))
 ```
@@ -615,15 +646,17 @@ from IPython.display import display, HTML
 def marker_table(results: dict, group: str, ntop: int) -> pd.DataFrame:
     """Top ntop genes of one cluster from the uns fields, in the stored ranking order."""
     names = np.asarray(results['names'][group]).astype(str)[:ntop]
-    table = pd.DataFrame({'gene': names,
-                          'AUC': np.asarray(results['auc'][group][:ntop], dtype=float).round(3)})
+    table = pd.DataFrame({'gene': names})
+    if 'auc' in results:
+        table['AUC'] = np.asarray(results['auc'][group][:ntop], dtype=float).round(3)
     if 'cosg_scores' in results:
         table['COSG score'] = np.asarray(results['cosg_scores'][group][:ntop], dtype=float).round(3)
     table['log2FC'] = np.asarray(results['logfoldchanges'][group][:ntop], dtype=float).round(2)
     table['pct in'] = (100 * results['pts'][group].reindex(names).to_numpy(dtype=float)).round(1)
     table['pct out'] = (100 * results['pts_rest'][group].reindex(names).to_numpy(dtype=float)).round(1)
-    table['p'] = [f"{p:.2e}" for p in np.asarray(results['pvals'][group][:ntop], dtype=float)]
-    table['adj. p'] = [f"{p:.2e}" for p in np.asarray(results['pvals_adj'][group][:ntop], dtype=float)]
+    if 'pvals' in results:
+        table['p'] = [f"{p:.2e}" for p in np.asarray(results['pvals'][group][:ntop], dtype=float)]
+        table['adj. p'] = [f"{p:.2e}" for p in np.asarray(results['pvals_adj'][group][:ntop], dtype=float)]
     return table
 
 tableid = 0
@@ -650,7 +683,7 @@ for clus in list_clusters:
 
 ## <font color='green'>Gene Set Enrichment</font>
 
-g:Profiler gene set enrichment per cluster. Differential genes per cluster are further filtered by their expression inside and outside of the cluster before computing enrichment.
+g:Profiler gene set enrichment per cluster. Differential genes per cluster are further filtered by their expression inside and outside of the cluster (and, when the Wilcoxon test ran, by adjusted p-value < 0.05) before computing enrichment.
 
 ```{python}
 from IPython.display import display, HTML

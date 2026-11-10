@@ -212,19 +212,19 @@ a `qc_clustering` run.
 - `<name>_downstream_markers.json.gz`: the marker genes per group (one set per cluster, id
   `genes--cluster--<cluster>`; the separator is `--markers_sep`), in a compact JSON form for
   downstream tooling.
-  - **Filters:** at least `--markers_min_auc`, `--markers_pct_nz` and `--markers_min_logfc`, and
-    `--markers_min_cosg_score` when it is set.
-  - **Order:** in ranking order (AUC, or the COSG score with `--markers_method cosg`), at most
+  - **Filters:** at least `--markers_pct_nz` and `--markers_min_logfc`, `--markers_min_auc` when
+    presto ran, and `--markers_min_cosg_score` when it is set.
+  - **Order:** the ranking of `--markers_rank_by` (see [usage](usage.md)), at most
     `--markers_n_top` genes per set.
-  - **Per gene:** `list_auc`, `list_score` (the ranking metric), `list_logFC` (log2 fold change),
-    `list_p_value` / `list_p_value_adjusted` (Wilcoxon, reported only, not used for selection),
-    the expressing fractions, and `list_cosg_score` with COSG.
-  - **`params`:** records `method`, `ranked_by` and `min_auc`.
+  - **Per gene:** `list_score` (the primary ranking metric), `list_logFC` (log2 fold change), the
+    expressing fractions; with presto `list_auc` and `list_p_value` / `list_p_value_adjusted`
+    (Wilcoxon, reported only, not used for selection); with COSG `list_cosg_score`.
+  - **`params`:** records `methods`, `ranked_by` and the filters.
 - `scanpy/<name>/`: with `--save_intermediates`, the object after the marker genes and after gene
   set enrichment.
   - **Marker results:** in `uns["rank_genes_groups"]`, in scanpy's format: `names`, `scores`
-    (the ranking metric), `auc`, `logfoldchanges`, `pvals`, `pvals_adj`, `pts` / `pts_rest`, and
-    `cosg_scores` with COSG.
+    (the primary ranking metric), `logfoldchanges`, `pts` / `pts_rest`, with presto `auc`, `pvals`,
+    `pvals_adj`, and with COSG `cosg_scores`.
 - `per_group/<name>/liana/`: [LIANA+](https://liana-py.readthedocs.io/) rank-aggregate cell–cell
   communication results.
 - `report/<name>_downstream_report.html`: a Quarto report covering the marker genes per group, the
@@ -234,8 +234,8 @@ a `qc_clustering` run.
   at least 5 % of the cluster's cells, with their percentage, whatever their overall rank.
   With `--umap_color_by`, it also has the "Requested UMAP plots" section described for stage 1.
   - **Marker tables:** the "Differential genes" tables list the top `--report_table_row_limit`
-    genes per cluster in ranking order. Columns: AUC, COSG score (with COSG), log2FC, pct in / out,
-    p and adj. p.
+    genes per cluster, in the same order as the marker JSON. Columns: AUC, COSG score, log2FC, pct
+    in / out, p and adj. p (AUC and p-values only with presto, COSG score only with COSG).
   - **Filter panel:** filters all tables in the browser (min AUC, log2FC, COSG score, pct in; max
     pct out, p, adj. p). It works only on the rows shown, independently of the parameters used for
     the marker JSON.

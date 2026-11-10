@@ -13,6 +13,8 @@ process MARKERS_COSG {
     tuple val(meta), path(h5ad)
     val(obs_key)
     val(mu)
+    val(rank_by)
+    val(presto_ran)
 
     output:
     tuple val(meta), path("${prefix}.h5ad"), emit: h5ad

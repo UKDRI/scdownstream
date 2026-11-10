@@ -403,10 +403,16 @@
                 },
                 "markers_method": {
                     "type": "string",
-                    "default": "presto",
-                    "enum": ["presto", "cosg"],
-                    "description": "How marker genes per group are ranked.",
-                    "help_text": "`presto` (default) runs a Wilcoxon rank-sum test with AUC, as in the R package presto, and ranks markers by AUC. `cosg` additionally computes the COSG cosine-similarity score (Dai et al. 2022) and ranks markers by it; the presto statistics are kept. `cosg` uses the `cosg` package from bioconda/BioContainers."
+                    "default": "presto,cosg",
+                    "pattern": "^(presto|cosg)(, *(presto|cosg))*$",
+                    "description": "Comma-separated marker gene methods to run: presto and/or cosg.",
+                    "help_text": "By default both run. `presto` computes the Wilcoxon rank-sum statistics with AUC, as in the R package presto (AUC, p-values, expressing fractions, log2FC). `cosg` computes the COSG cosine-similarity score (Dai et al. 2022), using the `cosg` package from bioconda/BioContainers. Only the listed methods run. With `cosg` alone there are no AUC values or p-values, and `--markers_min_auc` is not applied. The ranking is set by `--markers_rank_by`."
+                },
+                "markers_rank_by": {
+                    "type": "string",
+                    "enum": ["auc", "cosg"],
+                    "description": "Score the marker genes per group are ranked by; by default `auc` if presto runs, else `cosg`.",
+                    "help_text": "`auc` ranks by AUC (descending), then adjusted p-value (ascending), then log2FC (descending), then the COSG score (descending, if computed); it requires `presto` in `--markers_method`. `cosg` ranks by the COSG score (descending), then log2FC (descending), then the fraction of expressing cells in the group (descending); it requires `cosg` in `--markers_method`. If not set, `auc` is used when presto runs, otherwise `cosg`."
                 },
                 "markers_min_auc": {
                     "type": "number",
@@ -414,14 +420,14 @@
                     "minimum": 0.5,
                     "maximum": 1,
                     "description": "Minimum AUC for an exported marker gene.",
-                    "help_text": "AUC of the gene's expression in the group against all other cells. An AUC of 0.5 means no difference between the group and the other cells. The default of 0.7 is the conventional threshold for acceptable discrimination in ROC analysis (0.7–0.8 acceptable, 0.8–0.9 excellent)."
+                    "help_text": "AUC of the gene's expression in the group against all other cells. An AUC of 0.5 means no difference between the group and the other cells. The default of 0.7 is the conventional threshold for acceptable discrimination in ROC analysis (0.7–0.8 acceptable, 0.8–0.9 excellent). Applies only when `presto` is in `--markers_method`; COSG alone computes no AUC."
                 },
                 "markers_cosg_mu": {
                     "type": "number",
                     "default": 1,
                     "minimum": 0,
                     "description": "COSG `mu` parameter.",
-                    "help_text": "Penalty for genes that are also expressed in other groups; COSG's default is 1. Only used with `--markers_method cosg`."
+                    "help_text": "Penalty for genes that are also expressed in other groups; COSG's default is 1. Used only when `cosg` is in `--markers_method`."
                 },
                 "markers_pct_nz": {
                     "type": "number",
@@ -441,7 +447,7 @@
                     "minimum": 0,
                     "maximum": 1,
                     "description": "Minimum COSG score for an exported marker; not used by default.",
-                    "help_text": "Only with `--markers_method cosg`. COSG scores are between 0 and 1; a higher score means the gene is more specific to the group. The AUC, log2FC and expressing-fraction filters (`--markers_min_auc`, `--markers_min_logfc`, `--markers_pct_nz`) still apply."
+                    "help_text": "Requires `cosg` in `--markers_method`; applies with either ranking (`--markers_rank_by auc` or `cosg`). Not used by default. COSG scores are between 0 and 1; a higher score means the gene is more specific to the group. The log2FC and expressing-fraction filters (`--markers_min_logfc`, `--markers_pct_nz`) still apply, and so does `--markers_min_auc` when presto runs."
                 },
                 "markers_n_top": {
                     "type": "integer",

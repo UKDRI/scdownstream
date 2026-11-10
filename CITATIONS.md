@@ -116,7 +116,7 @@ Upstream nf-core/scdownstream, and therefore this fork, drew on the learnings an
 
   > Korsunsky I, Nathan A, Millard N, Raychaudhuri S. Presto scales Wilcoxon and auROC analyses to millions of observations. bioRxiv. 2019. doi: 10.1101/653253.
 
-- [COSG](https://doi.org/10.1093/bib/bbab579) (`--markers_method cosg`)
+- [COSG](https://doi.org/10.1093/bib/bbab579): specificity score of the marker genes (`MARKERS_COSG`)
 
   > Dai M, Pei X, Wang XJ. Accurate and fast cell marker gene identification with COSG. Brief Bioinform. 2022 Mar;23(2):bbab579. doi: 10.1093/bib/bbab579.
 

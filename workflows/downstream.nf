@@ -39,12 +39,27 @@ workflow DOWNSTREAM_ANALYSIS {
 
     ch_h5ad = ch_base
 
-    // MODULE: marker genes per group (presto Wilcoxon + AUC; optionally re-ranked by COSG)
-    MARKERS_PRESTO(ch_h5ad, clustering_name)
-    ch_versions = ch_versions.mix(MARKERS_PRESTO.out.versions)
-    ch_h5ad = MARKERS_PRESTO.out.h5ad
-    if (params.markers_method == 'cosg') {
-        MARKERS_COSG(ch_h5ad, clustering_name, params.markers_cosg_mu)
+    // Marker gene methods from --markers_method (presto and/or cosg); the ranking defaults to
+    // AUC when presto runs, else to the COSG score. validateMarkersParameters() checks both.
+    def markers_methods = params.markers_method.toString().tokenize(',').collect { method -> method.trim().toLowerCase() }.findAll { method -> method }.unique()
+    def markers_rank_by = params.markers_rank_by ?: ('presto' in markers_methods ? 'auc' : 'cosg')
+
+    // MODULE: marker genes per group (presto Wilcoxon + AUC)
+    if ('presto' in markers_methods) {
+        MARKERS_PRESTO(ch_h5ad, clustering_name)
+        ch_versions = ch_versions.mix(MARKERS_PRESTO.out.versions)
+        ch_h5ad = MARKERS_PRESTO.out.h5ad
+    }
+
+    // MODULE: COSG score per group, added to the presto results if presto ran
+    if ('cosg' in markers_methods) {
+        MARKERS_COSG(
+            ch_h5ad,
+            clustering_name,
+            params.markers_cosg_mu,
+            markers_rank_by,
+            'presto' in markers_methods
+        )
         ch_versions = ch_versions.mix(MARKERS_COSG.out.versions)
         ch_h5ad = MARKERS_COSG.out.h5ad
     }

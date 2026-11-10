@@ -1,15 +1,27 @@
 #!/usr/bin/env python3
 
-# Re-ranks the presto marker genes (MARKERS_PRESTO) by the COSG score (Dai et al., cosine
-# similarity between a gene and a group indicator, penalised by the gene's similarity to the
-# other groups; https://github.com/genecell/COSG). The presto statistics stay; the COSG score is
-# added as "cosg_scores", becomes "scores", and every per-group field is re-sorted by it.
+# Marker genes by the COSG score (Dai et al. 2022, cosine similarity between a gene and a group
+# indicator, penalised by the gene's similarity to the other groups; https://github.com/genecell/COSG).
+# Two cases, decided by the input presto_ran (set by the workflow):
+# - presto_ran is true (MARKERS_PRESTO ran right before; its output is this input): the COSG score
+#   is added to the presto results as "cosg_scores" (matched by gene name) and every per-group field
+#   is re-sorted with the keys of rank_by. "scores" is the primary metric (AUC or COSG score).
+# - presto_ran is false (--markers_method cosg): the results are built from COSG alone in the
+#   structure of sc.tl.rank_genes_groups: names, scores and cosg_scores (the COSG score),
+#   logfoldchanges (COSG's, computed like scanpy's), pts and pts_rest. No AUC and no p-values.
+#   rank_by must be "cosg". Results already in the input (e.g. from an earlier downstream run) are
+#   replaced.
+# Ranking keys, in order (the stored order is the ranking used by the marker export and the report):
+#   auc:  AUC desc, adjusted p-value asc, log2 fold change desc, COSG score desc
+#   cosg: COSG score desc, log2 fold change desc, fraction of expressing cells in the group desc
+# Remaining ties keep the gene order of adata.var_names.
 #
 # The BioContainer has no scanpy and no PyYAML: read and write with anndata, and write
 # versions.yml by hand.
 
 import os
 import platform
+from collections.abc import Mapping
 from importlib.metadata import version
 
 os.environ["NUMBA_CACHE_DIR"] = "./tmp/numba"
@@ -48,8 +60,16 @@ adata = ad.read_h5ad("${h5ad}")
 prefix = "${prefix}"
 obs_key = "${obs_key}"
 mu = float("${mu}")
+# Ranking of the stored results: "auc" (needs presto results) or "cosg"
+rank_by = "${rank_by}".strip().lower()
+# True when MARKERS_PRESTO ran right before and its output is this input
+presto_ran = "${presto_ran}" == "true"
 
-# The presto results, written by MARKERS_PRESTO under scanpy's rank_genes_groups key
+if rank_by not in ("auc", "cosg"):
+    raise ValueError(f"rank_by must be 'auc' or 'cosg' (--markers_rank_by), not '{rank_by}'")
+
+# Results go where sc.tl.rank_genes_groups (and MARKERS_PRESTO) put them, so the dot plot, the
+# enrichment and the marker export find them
 uns_key = "rank_genes_groups"
 # Where COSG writes its own result; it is merged into uns_key and then dropped
 cosg_key = "cosg"
@@ -64,17 +84,23 @@ def is_per_group(value, group_names: list) -> bool:
             and set(value.dtype.names) == set(group_names))
 
 
+def nonzero_fractions(X, codes: np.ndarray, n_groups: int) -> tuple[np.ndarray, np.ndarray]:
+    """Fractions of cells with X != 0, genes x groups: in the group (pts) and in all other cells (pts_rest).
+
+    The same numbers as scanpy's pts / pts_rest and as MARKERS_PRESTO (sc.get.aggregate with
+    func="count_nonzero"). This container has no scanpy, so the counts are taken here, one group at a
+    time; X != 0 drops stored zeros of a sparse X, as count_nonzero does.
+    """
+    nonzero = np.column_stack([
+        np.asarray((X[codes == g] != 0).sum(axis=0)).ravel() for g in range(n_groups)
+    ]).astype(np.float64)
+    group_size = np.bincount(codes, minlength=n_groups).astype(np.float64)
+    pts = nonzero / group_size
+    pts_rest = (nonzero.sum(axis=1, keepdims=True) - nonzero) / (codes.size - group_size)
+    return pts, pts_rest
+
+
 # Checks
-if uns_key not in adata.uns or "auc" not in adata.uns[uns_key]:
-    raise ValueError(
-        f"adata.uns['{uns_key}'] has no presto results (no 'auc' field); MARKERS_COSG needs the "
-        f"output of MARKERS_PRESTO"
-    )
-rgg = adata.uns[uns_key]
-if rgg["params"].get("groupby") != obs_key:
-    raise ValueError(
-        f"The presto results are grouped by '{rgg['params'].get('groupby')}', not by '{obs_key}'"
-    )
 if obs_key not in adata.obs.columns:
     raise ValueError(
         f"The grouping '{obs_key}' is not a column of adata.obs; "
@@ -84,93 +110,198 @@ if obs_key not in adata.obs.columns:
 var_names = adata.var_names.astype(str)
 if not var_names.is_unique:
     raise ValueError("adata.var_names are not unique, so the COSG scores cannot be matched to the genes")
+n_genes = len(var_names)
 
-group_names = list(rgg["names"].dtype.names)
-
-# COSG on the same cells and groups as presto: cells without a label are left out (COSG
-# raises on them), and the labels are the presto group names, in presto's order
+# Groups as MARKERS_PRESTO defines them: the categories with cells, in category order (else the
+# sorted values); cells without a label are left out (COSG raises on them)
 labels = adata.obs[obs_key]
 labelled = labels.notna().to_numpy()
-label_text = labels[labelled].astype(str).to_numpy()
-if set(label_text) != set(group_names):
-    raise ValueError(
-        f"The groups of adata.obs['{obs_key}'] ({sorted(set(label_text))}) differ from the groups of "
-        f"the presto results ({group_names})"
-    )
+counts = labels.value_counts(dropna=True)
+if isinstance(labels.dtype, pd.CategoricalDtype):
+    groups = [group for group in labels.cat.categories if counts.get(group, 0) > 0]
+else:
+    try:
+        groups = sorted(counts.index)
+    except TypeError:
+        groups = sorted(counts.index, key=str)
+group_names = [str(group) for group in groups]
+n_groups = len(group_names)
 
-# A light AnnData that only references adata.X (no copy when every cell has a label)
+if len(set(group_names)) != n_groups:
+    raise ValueError(f"The values of adata.obs['{obs_key}'] are not unique when written as text: {group_names}")
+if n_groups < 2:
+    raise ValueError(f"adata.obs['{obs_key}'] has fewer than 2 groups with cells, so there are no marker genes")
+n_unlabelled = int((~labelled).sum())
+if n_unlabelled > 0:
+    print(f"{n_unlabelled} cells have no '{obs_key}' label and are left out.")
+
+codes = pd.Categorical(labels[labelled], categories=groups).codes.astype(np.intp)
+
+X = adata.X
+if X is None:
+    raise ValueError("adata.X is empty; the COSG score is computed on adata.X")
+if not labelled.all():
+    X = X[labelled]
+
+pts, pts_rest = nonzero_fractions(X, codes, n_groups)
+
+rgg = adata.uns.get(uns_key)
+
+if presto_ran:
+    # MARKERS_PRESTO ran right before, so its results must be in the input; anything else is a wiring bug
+    params = rgg.get("params", {}) if isinstance(rgg, Mapping) else {}
+    if params.get("method") != "presto" or params.get("groupby") != obs_key:
+        raise ValueError(
+            f"presto_ran is true, but adata.uns['{uns_key}'] holds no presto results grouped by '{obs_key}' "
+            f"(method '{params.get('method')}', groupby '{params.get('groupby')}'). The input of MARKERS_COSG "
+            f"must be the output of MARKERS_PRESTO when presto_ran is true."
+        )
+    if set(rgg["names"].dtype.names) != set(group_names):
+        raise ValueError(
+            f"The groups of the presto results {list(rgg['names'].dtype.names)} differ from the groups of "
+            f"adata.obs['{obs_key}'] {group_names}"
+        )
+    print("Adding the COSG score to the presto results of MARKERS_PRESTO")
+else:
+    if rank_by != "cosg":
+        raise ValueError(
+            f"rank_by is '{rank_by}', but MARKERS_PRESTO did not run: ranking by AUC needs MARKERS_PRESTO "
+            f"(--markers_method presto,cosg); with COSG alone, rank by 'cosg'"
+        )
+    if rgg is not None:
+        method = rgg.get("params", {}).get("method") if isinstance(rgg, Mapping) else None
+        print(f"Replacing the existing adata.uns['{uns_key}'] (method '{method}', e.g. from an earlier downstream run)")
+    print("The marker results are built from COSG alone (no AUC, no p-values)")
+
+# COSG on the labelled cells, with the group names as labels, in group order. A light AnnData that
+# only references X; no uns, so COSG's fold change uses the natural log, as MARKERS_PRESTO does.
 adata_cosg = ad.AnnData(
-    X=adata.X if labelled.all() else adata.X[labelled],
+    X=X,
     obs=pd.DataFrame(
-        {obs_key: pd.Categorical(label_text, categories=group_names)},
+        {obs_key: pd.Categorical.from_codes(codes, categories=group_names)},
         index=adata.obs_names[labelled],
     ),
     var=pd.DataFrame(index=var_names),
 )
 
-print(f"COSG on adata.X, grouped by '{obs_key}' ({len(group_names)} groups, {adata_cosg.n_obs} cells), mu = {mu}")
+print(f"COSG on adata.X, grouped by '{obs_key}' ({n_groups} groups, {adata_cosg.n_obs} cells), mu = {mu}")
 
 cosg.cosg(
     adata_cosg,
     groupby=obs_key,
     mu=mu,
     remove_lowly_expressed=remove_lowly_expressed,
-    n_genes_user=adata_cosg.n_vars,
+    n_genes_user=n_genes,
     key_added=cosg_key,
     use_raw=False,
     layer=None,
-    calculate_logfoldchanges=False,
+    # presto's fold change (the same formula) is kept when presto ran
+    calculate_logfoldchanges=not presto_ran,
     calculate_pvalues=False,
     return_by_group=False,
 )
 cosg_result = adata_cosg.uns[cosg_key]
+del adata_cosg, X
 
-cosg_groups = [str(name) for name in cosg_result["names"].dtype.names]
-if set(cosg_groups) != set(group_names):
-    raise ValueError(f"COSG returned the groups {cosg_groups}, presto has {group_names}")
+cosg_fields = {str(field): field for field in cosg_result["names"].dtype.names}
+if set(cosg_fields) != set(group_names):
+    raise ValueError(f"COSG returned the groups {list(cosg_fields)}, expected {group_names}")
+if not presto_ran and "logfoldchanges" not in cosg_result:
+    raise ValueError("COSG returned no log fold changes (calculate_logfoldchanges=True)")
 
-# Merge by gene name and re-sort every per-group field by the COSG score. Genes without a COSG
-# score get 0, the score COSG itself gives a gene with no expression. Ties (e.g. all those zeros)
-# keep the presto order, i.e. by AUC.
-per_group_fields = [key for key, value in rgg.items() if is_per_group(value, group_names)]
-reordered = {key: {} for key in per_group_fields}
-cosg_sorted = {}
+
+def cosg_in_var_order(key: str, group: str, fill: float) -> tuple[np.ndarray, int]:
+    """COSG's per-group field `key` in adata.var_names order; genes COSG did not return get `fill`."""
+    field = cosg_fields[group]
+    values = pd.Series(
+        np.asarray(cosg_result[key][field], dtype=np.float32),
+        index=np.asarray(cosg_result["names"][field]).astype(str),
+    ).reindex(var_names)
+    n_missing = int(values.isna().sum())
+    return values.fillna(fill).to_numpy(dtype=np.float32), n_missing
+
+
+# Per-group fields as genes x groups arrays in adata.var_names order (dtype per field), so that
+# sorting with a stable sort leaves the remaining ties in var_names order
+fields = {}
+dtypes = {}
 n_missing = 0
 
-for cosg_name, name in zip(cosg_result["names"].dtype.names, cosg_groups):
-    cosg_by_gene = pd.Series(
-        np.asarray(cosg_result["scores"][cosg_name], dtype=np.float64),
-        index=np.asarray(cosg_result["names"][cosg_name]).astype(str),
-    )
-    presto_names = np.asarray(rgg["names"][name]).astype(str)
-    scores = cosg_by_gene.reindex(presto_names)
-    n_missing += int(scores.isna().sum())
-    scores = scores.fillna(0).to_numpy()
+if presto_ran:
+    for key in [key for key, value in rgg.items() if is_per_group(value, group_names) and key != "names"]:
+        dtypes[key] = rgg[key].dtype[group_names[0]]
+        fields[key] = np.empty((n_genes, n_groups), dtype=dtypes[key])
+    for g, name in enumerate(group_names):
+        position = var_names.get_indexer(np.asarray(rgg["names"][name]).astype(str))
+        if (position < 0).any() or np.unique(position).size != n_genes:
+            raise ValueError(f"The presto results of group '{name}' do not hold each gene of adata.var_names once")
+        for key in fields:
+            fields[key][position, g] = np.asarray(rgg[key][name])
+fields["cosg_scores"] = np.empty((n_genes, n_groups), dtype=np.float32)
+dtypes["cosg_scores"] = np.float32
+if not presto_ran:
+    fields["logfoldchanges"] = np.empty((n_genes, n_groups), dtype=np.float32)
+    dtypes["logfoldchanges"] = np.float32
 
-    order = np.argsort(-scores, kind="stable")
-    for key in per_group_fields:
-        reordered[key][name] = np.asarray(rgg[key][name])[order]
-    cosg_sorted[name] = scores[order]
+for g, name in enumerate(group_names):
+    # Genes without a COSG score get 0, the score COSG itself gives a gene with no expression
+    fields["cosg_scores"][:, g], missing = cosg_in_var_order("scores", name, 0.0)
+    n_missing += missing
+    if not presto_ran:
+        fields["logfoldchanges"][:, g], _ = cosg_in_var_order("logfoldchanges", name, np.nan)
 
 if n_missing > 0:
     print(f"{n_missing} gene-group pairs had no COSG score and got 0")
 
-for key in per_group_fields:
-    if key == "names":
-        dtypes = {name: "O" for name in group_names}
-        columns = {name: reordered[key][name].astype(str) for name in group_names}
-    else:
-        dtypes = {name: rgg[key].dtype[name] for name in group_names}
-        columns = reordered[key]
-    rgg[key] = pd.DataFrame(columns, columns=group_names).to_records(index=False, column_dtypes=dtypes)
+# "scores" is the primary metric: the AUC (as MARKERS_PRESTO stores it, float32) or the COSG score
+fields["scores"] = fields["auc"].astype(np.float32) if rank_by == "auc" else fields["cosg_scores"].copy()
+dtypes["scores"] = np.float32
 
-cosg_records = pd.DataFrame(cosg_sorted, columns=group_names).to_records(
-    index=False, column_dtypes={name: "float32" for name in group_names}
-)
-rgg["cosg_scores"] = cosg_records
-rgg["scores"] = cosg_records.copy()
-rgg["params"]["ranked_by"] = "cosg"
-rgg["params"]["cosg_mu"] = mu
+# Ranking per group (np.lexsort: stable, the last key is the primary one; descending = negated).
+# The keys are compared as stored, so the stored values explain the order.
+order = np.empty((n_genes, n_groups), dtype=np.intp)
+for g in range(n_groups):
+    if rank_by == "auc":
+        keys = (-fields["cosg_scores"][:, g], -fields["logfoldchanges"][:, g].astype(np.float32),
+                fields["pvals_adj"][:, g], -fields["auc"][:, g])
+    else:
+        keys = (-pts[:, g], -fields["logfoldchanges"][:, g].astype(np.float32), -fields["cosg_scores"][:, g])
+    order[:, g] = np.lexsort(keys)
+
+
+def per_group_records(values: np.ndarray, dtype) -> np.recarray:
+    """genes x groups matrix as scanpy's record array: one field per group, in ranking order."""
+    frame = pd.DataFrame({name: values[order[:, g], g] for g, name in enumerate(group_names)})
+    return frame.to_records(index=False, column_dtypes={name: dtype for name in group_names})
+
+
+gene_names = np.broadcast_to(var_names.to_numpy()[:, np.newaxis], (n_genes, n_groups))
+records = {"names": per_group_records(gene_names, "O")}
+records.update({key: per_group_records(fields[key], dtypes[key]) for key in fields})
+
+if presto_ran:
+    rgg.update(records)
+    rgg["params"]["ranked_by"] = rank_by
+    rgg["params"]["methods"] = "presto,cosg"
+    rgg["params"]["cosg_mu"] = mu
+else:
+    rgg = {
+        "params": {
+            "groupby": obs_key,
+            "reference": "rest",
+            "use_raw": False,
+            "layer": None,
+            "method": "cosg",
+            "ranked_by": "cosg",
+            "methods": "cosg",
+            "cosg_mu": mu,
+        },
+        **records,
+        "pts": pd.DataFrame(pts, index=var_names, columns=group_names),
+        "pts_rest": pd.DataFrame(pts_rest, index=var_names, columns=group_names),
+    }
+
+print(f"Ranked by {rank_by}; methods: {rgg['params']['methods']}")
 
 adata.uns[uns_key] = rgg
 adata.uns.pop(cosg_key, None)

@@ -205,8 +205,14 @@ else:
     pts = nonzero_in / group_size
     pts_rest = (nonzero_in.sum(axis=1, keepdims=True) - nonzero_in) / n_rest
 
-    # Each group sorted by AUC, descending; ties keep the gene order of adata.var_names
-    order = np.argsort(-auc, axis=0, kind="stable")
+    # Each group sorted by AUC (descending), then adjusted p-value (ascending), then log2 fold change
+    # (descending); remaining ties keep the gene order of adata.var_names (np.lexsort is stable, its
+    # last key is the primary one). The fold change is compared as stored (float32), so the stored
+    # values explain the order; MARKERS_COSG re-sorts with the same keys.
+    order = np.column_stack([
+        np.lexsort((-logfoldchanges[:, g].astype(np.float32), pvals_adj[:, g], -auc[:, g]))
+        for g in range(n_groups)
+    ])
     gene_names = adata.var_names.astype(str).to_numpy()
     names = np.broadcast_to(gene_names[:, np.newaxis], (n_genes, n_groups))
 
@@ -224,6 +230,8 @@ else:
             "layer": None,
             "corr_method": "benjamini-hochberg",
             "ranked_by": "auc",
+            # Marker methods that contributed; MARKERS_COSG sets "presto,cosg"
+            "methods": "presto",
         },
         "names": per_group_records(names, "O"),
         "scores": per_group_records(auc, "float32"),

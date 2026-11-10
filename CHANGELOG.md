@@ -18,13 +18,17 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
     are ranked and selected by AUC (`--markers_min_auc`, default 0.7, the usual threshold for
     acceptable discrimination) instead of by adjusted p-value. The filters on the expressing fraction (`--markers_pct_nz`)
     and the fold change (`--markers_min_logfc`) stay.
-  - **Option:** `--markers_method cosg` adds the COSG cosine-similarity score
-    (`--markers_cosg_mu`) and ranks the markers by it; the presto statistics are kept. An optional
-    `--markers_min_cosg_score` filters by that score; it is not used by default.
-  - **Report:** the "Differential genes" tables show the AUC, the COSG score when used, and the raw
+  - **COSG score** (`--markers_cosg_mu`): computed by default too. `--markers_method` (default
+    `presto,cosg`) selects the methods that run. `--markers_rank_by auc|cosg` sets the ranking
+    (AUC → adj. p → log2FC → COSG score, or COSG score → log2FC → pct in; default `auc` when presto
+    runs). With COSG only there is no AUC or p-value. An optional `--markers_min_cosg_score`
+    filters by the COSG score; it is not used by default.
+  - **Report:** the "Differential genes" tables (same order as the JSON) show the AUC, the COSG score, and the raw
     and adjusted p-values. A filter panel (min AUC, log2FC, COSG score, pct in; max pct out, p,
     adj. p) filters all cluster tables in the browser.
-  - **Marker JSON:** has `list_auc` (and `list_cosg_score`).
+  - **Marker JSON:** has `list_auc` (presto) and `list_cosg_score` (COSG).
+  - **Enrichment:** the gene list per cluster is built from the filtered markers (adjusted p < 0.05
+    only when presto ran), so it also works with COSG only.
   - **Removed:**
     - `--markers_thr_adj_pvalue`. Cluster-vs-rest p-values are inflated (cells as replicates,
       clusters from the same data), so they are still reported but no longer used to select

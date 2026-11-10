@@ -8,6 +8,7 @@ import base64
 os.environ["NUMBA_CACHE_DIR"] = "./tmp/numba"
 os.environ["MPLCONFIGDIR"] = "./tmp/matplotlib"
 
+import numpy as np
 import scanpy as sc
 import pandas as pd
 import yaml
@@ -28,7 +29,9 @@ max_out_group_fraction=float("${max_out_group_fraction}")
 
 # TODO: add to parameters/command-line
 uns_key_fil = uns_key + '_filtered'
-
+# Adjusted p-value cutoff for the genes sent to g:Profiler; the default of sc.queries.enrich, which
+# was called on the AnnData before, so the presto results are queried with the same genes
+pval_cutoff = 0.05
 
 
 dict_species = {
@@ -53,10 +56,23 @@ sc.tl.filter_rank_genes_groups(adata_temp, key=uns_key, key_added=uns_key_fil,
 # compute enrichment per group
 dict_enrich = {}
 
-for grp in adata_temp.uns['rank_genes_groups']['names'].dtype.names:
-    
+# Gene list per group from the filtered results: the genes kept by the filter (non-NaN names), in the
+# stored ranking order, and, when presto ran (pvals_adj exists), only those with pvals_adj < pval_cutoff.
+# This is what sc.queries.enrich(adata, group, key=...) selected via sc.get.rank_genes_groups_df, which
+# raises a KeyError on COSG-only results (no p-values).
+filtered = adata_temp.uns[uns_key_fil]
+has_pvals_adj = 'pvals_adj' in filtered
+
+for grp in filtered['names'].dtype.names:
+
+    names = pd.Series(filtered['names'][grp], dtype=object)
+    keep = names.notna().to_numpy()
+    if has_pvals_adj:
+        keep &= np.asarray(filtered['pvals_adj'][grp], dtype=float) < pval_cutoff
+    gene_list = names[keep].astype(str).tolist()
+
     try:
-        enrichment = sc.queries.enrich(adata_temp, grp, key=uns_key_fil, org=species)
+        enrichment = sc.queries.enrich(gene_list, org=species)
         enrichment['significant'] = [str(val) for val in enrichment['significant']]
         enrichment['parents'] = [",".join(golist) for golist in enrichment['parents']]
         dict_enrich[grp] = enrichment.copy()

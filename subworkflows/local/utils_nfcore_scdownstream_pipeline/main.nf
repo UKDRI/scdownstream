@@ -68,7 +68,9 @@ workflow PIPELINE_INITIALISATION {
     if (params.stage == 'annotate') {
         validateAnnotateParameters()
     }
-    validateMarkersParameters()
+    if (params.stage == 'downstream') {
+        validateMarkersParameters()
+    }
 
     //
     // Check config provided to the pipeline
@@ -303,20 +305,40 @@ def validateAnnotateParameters() {
 }
 
 //
+// Check the marker gene parameters of --stage downstream: the methods to run and the score to
+// rank by, which must be computed by one of them
+//
+def validateMarkersParameters() {
+    def supported_methods = ['presto', 'cosg']
+    def markers_methods = params.markers_method != null
+        ? params.markers_method.toString().tokenize(',').collect { method -> method.trim().toLowerCase() }.findAll { method -> method }.unique()
+        : []
+    if (!markers_methods) {
+        throw new Exception("--markers_method must name at least one method (${supported_methods.join(', ')}).")
+    }
+    def unsupported_methods = markers_methods - supported_methods
+    if (unsupported_methods) {
+        throw new Exception("--markers_method: unsupported method(s) ${unsupported_methods.join(', ')}. Supported: ${supported_methods.join(', ')}.")
+    }
+
+    if (params.markers_rank_by == 'auc' && !('presto' in markers_methods)) {
+        throw new Exception("--markers_rank_by auc requires presto in --markers_method (got ${params.markers_method}): only presto computes the AUC.")
+    }
+    if (params.markers_rank_by == 'cosg' && !('cosg' in markers_methods)) {
+        throw new Exception("--markers_rank_by cosg requires cosg in --markers_method (got ${params.markers_method}).")
+    }
+
+    if (params.markers_min_cosg_score != null && !('cosg' in markers_methods)) {
+        throw new Exception("--markers_min_cosg_score requires cosg in --markers_method (got ${params.markers_method}).")
+    }
+}
+
+//
 // Check that the PCA neighbour graph only asks for PCs that SCANPY_PCA computes
 //
 def validatePcaParameters() {
     if (params.neighbors_n_pcs && params.pca_n_comps && params.neighbors_n_pcs > params.pca_n_comps) {
         throw new Exception("--neighbors_n_pcs (${params.neighbors_n_pcs}) cannot be larger than --pca_n_comps (${params.pca_n_comps}): the PCA graph can only use PCs that were computed.")
-    }
-}
-
-//
-// Check that the downstream stage's marker-gene filters fit the chosen ranking method
-//
-def validateMarkersParameters() {
-    if (params.stage == 'downstream' && params.markers_min_cosg_score != null && params.markers_method != 'cosg') {
-        throw new Exception("--markers_min_cosg_score needs --markers_method cosg (COSG scores are only computed with it).")
     }
 }
 
