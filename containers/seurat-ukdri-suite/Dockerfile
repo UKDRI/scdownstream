@@ -13,7 +13,7 @@ COPY --chown=$MAMBA_USER:$MAMBA_USER environment.yml /tmp/environment.yml
 RUN micromamba install -y -n base -f /tmp/environment.yml && \
     micromamba clean -a -y
 
-USER root
+# Runs as the base image's non-root mambauser; Nextflow sets the user anyway (docker -u / apptainer).
 ENV PATH="$MAMBA_ROOT_PREFIX/bin:$PATH"
 
 RUN Rscript -e 'library(anndataR); library(rhdf5); library(celda); library(scds); library(SoupX); library(Seurat); library(glmGamPoi); stopifnot(packageVersion("anndataR") == "1.2.1")'
