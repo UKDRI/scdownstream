@@ -3,9 +3,9 @@ process CELLTYPIST_TRAIN {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    // Built from containers/scdownstream-tools/Dockerfile. Same image as CELLTYPES_CELLTYPIST, so a model
+    // Built from containers/scanpy-ukdri-suite/Dockerfile. Same image as CELLTYPES_CELLTYPIST, so a model
     // is trained and applied with the same versions.
-    container 'docker.io/nhecker/scdownstream-tools:1.11.4-1'
+    container 'docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1'
 
     input:
     tuple val(meta), path(h5ad)

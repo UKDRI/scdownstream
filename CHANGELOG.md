@@ -27,7 +27,7 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
     and adjusted p-values. A filter panel (min AUC, log2FC, COSG score, pct in; max pct out, p,
     adj. p) filters all cluster tables in the browser.
   - **Marker JSON:** has `list_auc` (presto) and `list_cosg_score` (COSG).
-  - **Container:** COSG runs in the pipeline's own tools image (`nhecker/scdownstream-tools`,
+  - **Container:** COSG runs in the pipeline's own image (`nhecker/scanpy-ukdri-suite`,
     scanpy 1.11.4 base + `cosg`), not the BioContainer: its pandas 3 / anndata 0.13 write string
     indices the following steps (anndata 0.12) cannot write back.
   - **LIANA+:** `LIANA_RANKAGGREGATE` runs in the report image (scanpy 1.11.4 base, liana 1.6.1
@@ -130,11 +130,11 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Changed`
 
-- Own container images in `containers/` replace the per-tool images: `scdownstream-tools`
+- Own container images in `containers/` replace the per-tool images: `scanpy-ukdri-suite`
   (scanpy 1.11.4 base + CellTypist, Harmony, upsetplot, mygene, hugo-unifier 0.3.2, COSG, LIANA+,
-  PyDESeq2, Quarto; replaces `scanpy-report`, `scanpy-cosg`, `pydeseq2` and six Seqera images),
-  `scdownstream-r` (R 4.5, anndataR 1.2.1, celda, scds, SoupX, Seurat 5.5.1; replaces the nicotru
-  images) and `scdownstream-scimilarity`. The R templates now name the counts assay/layer
+  PyDESeq2, Quarto; replaces `scanpy-report`, `scanpy-cosg`, `pydeseq2` and six Seqera images) and
+  `seurat-ukdri-suite` (R 4.5, anndataR 1.2.1, celda, scds, SoupX, Seurat 5.5.1; replaces the
+  nicotru images). The R templates now name the counts assay/layer
   explicitly (anndataR 1.2 maps `X` to an assay/layer called `X`).
 - All h5ad-handling processes of the main path run on one anndata generation: 23 more modules
   (input loading and the `adata/*` helpers, normalisation, HVGs, PCA, neighbors, Leiden, UMAP,
@@ -240,6 +240,9 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Removed`
 
+- SCimilarity (`--integration_methods scimilarity`, `--scimilarity_model`), which was never used,
+  together with the unused `PSEUDOBULKING` subworkflow, its inactive `--pseudobulk`,
+  `--pseudobulk_groupby_labels` and `--pseudobulk_min_num_cells`, and the nf-core `untar` module.
 - The `.rds` (SingleCellExperiment) copies of the stage results (`ADATA_TORDS`). The conversion ran
   on anndata 0.11, which cannot read h5ad files written by anndata 0.12, and was best effort anyway
   (failed for matrices over 2^31 non-zeros). Read the h5ad in R with anndataR or zellkonverter.

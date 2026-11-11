@@ -3,8 +3,8 @@ process ADATA_UPSETGENES {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    // Built from containers/scdownstream-tools/Dockerfile.
-    container 'docker.io/nhecker/scdownstream-tools:1.11.4-1'
+    // Built from containers/scanpy-ukdri-suite/Dockerfile.
+    container 'docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1'
 
     input:
     tuple val(meta), val(names), path(h5ads)

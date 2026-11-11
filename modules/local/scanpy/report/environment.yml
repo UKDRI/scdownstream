@@ -1,4 +1,4 @@
-# Same package versions as docker.io/nhecker/scdownstream-tools:1.11.4-1 (containers/scdownstream-tools/Dockerfile).
+# Same package versions as docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1 (containers/scanpy-ukdri-suite/Dockerfile).
 # papermill is required: quarto render -P (Jupyter engine) needs it to inject the parameters.
 # Note: bioconda's liana package pulls more dependencies than the pip install in the image.
 channels:

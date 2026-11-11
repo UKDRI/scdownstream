@@ -172,16 +172,12 @@ def validateInputParameters() {
 
     // Extending --base_adata with the --input samples. Without --input, the base is processed
     // on its own (tests/main_pipeline_sub.nf.test) and these extension checks do not apply.
-    if (params.input && params.base_adata && (integration_methods - ['scvi', 'scanvi', 'scimilarity']).size() > 0) {
-        throw new Exception("Only scvi, scanvi and scimilarity integration methods are supported if base_adata is provided")
+    if (params.input && params.base_adata && (integration_methods - ['scvi']).size() > 0) {
+        throw new Exception("Only scvi integration is supported if base_adata is provided")
     }
 
     if (params.input && params.base_adata && 'scvi' in integration_methods && !params.scvi_model) {
         throw new Exception("If base_adata is provided and scvi is used as integration method, scvi_model must be provided.")
-    }
-
-    if (params.input && params.base_adata && 'scimilarity' in integration_methods && !params.scimilarity_model) {
-        throw new Exception("If base_adata is provided and scimilarity is used as integration method, scimilarity_model must be provided.")
     }
 }
 

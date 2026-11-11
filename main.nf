@@ -20,8 +20,8 @@ include { DOWNSTREAM_ANALYSIS     } from './workflows/downstream'
 include { DIFFERENTIAL_GENES      } from './workflows/differential_genes'
 include { TRAIN_MODELS            } from './workflows/train_models'
 include { ANNOTATE                } from './workflows/annotate'
-include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_scdownstream_pipeline'
-include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_scdownstream_pipeline'
+include { PIPELINE_INITIALISATION } from './subworkflows/local/utils'
+include { PIPELINE_COMPLETION     } from './subworkflows/local/utils'
 include { samplesheetToList       } from 'plugin/nf-schema'
 
 /*

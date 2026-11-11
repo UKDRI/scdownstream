@@ -1,5 +1,5 @@
 ---
-# Environment of docker.io/nhecker/scdownstream-r:4.5-1 (containers/scdownstream-r/Dockerfile).
+# Environment of docker.io/nhecker/seurat-ukdri-suite:5.5.1-1 (containers/seurat-ukdri-suite/Dockerfile).
 channels:
   - conda-forge
   - bioconda

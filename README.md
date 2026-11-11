@@ -296,12 +296,11 @@ they were built from:
 
 | Image (Docker Hub)                                   | Required by                                                                                     | Recipe                                                                                     |
 | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `docker.io/nhecker/scdownstream-tools:1.11.4-1`      | CellTypist, Harmony, doublet removal, UpSet plots, MyGene, HUGO unifier, COSG, LIANA+, enrichment, PyDESeq2, reports | [`containers/scdownstream-tools/Dockerfile`](containers/scdownstream-tools/Dockerfile)           |
-| `docker.io/nhecker/scdownstream-r:4.5-1`             | decontX, scds, SoupX, Seurat integration                                                         | [`containers/scdownstream-r/Dockerfile`](containers/scdownstream-r/Dockerfile)                   |
-| `docker.io/nhecker/scdownstream-scimilarity:0.3.0-1` | SCimilarity                                                                                      | [`containers/scdownstream-scimilarity/Dockerfile`](containers/scdownstream-scimilarity/Dockerfile) |
+| `docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1`      | CellTypist, Harmony, doublet removal, UpSet plots, MyGene, HUGO unifier, COSG, LIANA+, enrichment, PyDESeq2, reports | [`containers/scanpy-ukdri-suite/Dockerfile`](containers/scanpy-ukdri-suite/Dockerfile)           |
+| `docker.io/nhecker/seurat-ukdri-suite:5.5.1-1`       | decontX, scds, SoupX, Seurat integration                                                         | [`containers/seurat-ukdri-suite/Dockerfile`](containers/seurat-ukdri-suite/Dockerfile)                   |
 
-Most other h5ad steps use the public `gcfntnu/scanpy:1.11.4` image directly, which the tools and
-SCimilarity images extend. See [`containers/README.md`](containers/README.md).
+Most other h5ad steps use the public `gcfntnu/scanpy:1.11.4` image directly, which
+`scanpy-ukdri-suite` extends. See [`containers/README.md`](containers/README.md).
 
 > [!IMPORTANT]
 > **We recommend running with `-profile apptainer` (or `singularity`), not `-profile docker`.** These

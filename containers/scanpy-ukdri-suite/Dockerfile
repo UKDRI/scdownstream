@@ -1,7 +1,7 @@
-# Image: docker.io/nhecker/scdownstream-tools:1.11.4-1
+# Image: docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1
 #
 # Build and push (from the repository root):
-#   docker build --platform linux/amd64 -t docker.io/nhecker/scdownstream-tools:1.11.4-1 containers/scdownstream-tools && docker push docker.io/nhecker/scdownstream-tools:1.11.4-1
+#   docker build --platform linux/amd64 -t docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1 containers/scanpy-ukdri-suite && docker push docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1
 #
 # The pipeline's scanpy/anndata generation (docker.io/gcfntnu/scanpy:1.11.4) plus Quarto and the Python
 # tools of the h5ad steps that the base does not ship. See containers/README.md for the modules using it.

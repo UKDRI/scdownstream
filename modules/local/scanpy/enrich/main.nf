@@ -7,8 +7,8 @@ process SCANPY_ENRICH {
     // which imports gprofiler-official, and the base does not ship it. The bare `except:` in
     // the template would swallow the ImportError and write 'empty set' for every group, so the
     // process would exit 0 with silently empty enrichment. Keep the derived image.
-    // Built from containers/scdownstream-tools/Dockerfile.
-    container 'docker.io/nhecker/scdownstream-tools:1.11.4-1'
+    // Built from containers/scanpy-ukdri-suite/Dockerfile.
+    container 'docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1'
 
     input:
     tuple val(meta), path(h5ad)

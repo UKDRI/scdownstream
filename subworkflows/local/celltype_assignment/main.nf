@@ -1,6 +1,6 @@
 include { CELLTYPES_CELLTYPIST  } from '../../../modules/local/celltypes/celltypist'
 include { ADATA_ADD_OBS_OBSM    } from '../../../modules/local/adata/add_obs_obsm'
-include { splitCelltypistModels } from '../utils_nfcore_scdownstream_pipeline'
+include { splitCelltypistModels } from '../utils'
 
 workflow CELLTYPE_ASSIGNMENT {
     take:

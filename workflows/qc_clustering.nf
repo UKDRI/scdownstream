@@ -17,7 +17,7 @@ include { MULTIQC                              } from '../modules/nf-core/multiq
 include { paramsSummaryMap                     } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc                 } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML               } from '../subworkflows/nf-core/utils_nfcore_pipeline'
-include { methodsDescriptionText               } from '../subworkflows/local/utils_nfcore_scdownstream_pipeline'
+include { methodsDescriptionText               } from '../subworkflows/local/utils'
 include { SCANPY_HVGS                          } from '../modules/local/scanpy/hvgs'
 include { SCANPY_PCA                           } from '../modules/local/scanpy/pca'
 include { SCANPY_NEIGHBORS                     } from '../modules/local/scanpy/neighbors'

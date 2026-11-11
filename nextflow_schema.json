@@ -219,7 +219,7 @@
                     "default": "scvi",
                     "description": "Specify the tool to use for integration",
                     "help_text": "If you want to use multiple tools, separate them with a comma. Available methods are: scvi, scanvi, harmony, bbknn, combat, seurat",
-                    "pattern": "^((scvi|scanvi|harmony|bbknn|combat|seurat|scimilarity)(,(scvi|scanvi|harmony|bbknn|combat|seurat|scimilarity))*)?$"
+                    "pattern": "^((scvi|scanvi|harmony|bbknn|combat|seurat)(,(scvi|scanvi|harmony|bbknn|combat|seurat))*)?$"
                 },
                 "integration_hvgs": {
                     "type": "integer",
@@ -242,13 +242,6 @@
                     "help_text": "If provided, the query cells are mapped onto this model (scArches fine-tuning for at most `--scvi_query_max_epochs` epochs) and their labels are predicted. The predictions are written to the obs columns `scanvi:<model>` and `scanvi:<model>:conf`, where `<model>` is the name of the directory containing the model file. Otherwise, a new scANVI model is trained from the scVI model. In `--stage qc_clustering`, scANVI requires scvi in `integration_methods`, and cannot yet be combined with `--base_adata`. In `--stage annotate`, the cells of `--base_adata` are mapped onto the model, with the batches taken from `--annotate_batch_col`, and the file must be named `model.pt` (e.g. `models/scanvi/<name>/model.pt` from `--stage train_models`). The file should be in the .pt format.",
                     "pattern": "^\\S+\\.pt$",
                     "exists": true
-                },
-                "scimilarity_model": {
-                    "type": "string",
-                    "format": "file-path",
-                    "default": "https://zenodo.org/records/10685499/files/model_v1.1.tar.gz",
-                    "description": "Path to a pre-trained scimilarity model, only relevant if scimilarity is selected in `integration_methods`. If provided, the model will be used for integration. Otherwise, a new model will be trained.",
-                    "help_text": "The file can be a .tar.gz file or the corresponding unzipped directory. The official models are shared via [Zenodo](https://zenodo.org/record/10685499)."
                 }
             }
         },
@@ -406,7 +399,7 @@
                     "default": "presto,cosg",
                     "pattern": "^(presto|cosg)(, *(presto|cosg))*$",
                     "description": "Comma-separated marker gene methods to run: presto and/or cosg.",
-                    "help_text": "By default both run. `presto` computes the Wilcoxon rank-sum statistics with AUC, as in the R package presto (AUC, p-values, expressing fractions, log2FC). `cosg` computes the COSG cosine-similarity score (Dai et al. 2022), using the `cosg` package (1.2.1) in the pipeline's own container image `docker.io/nhecker/scdownstream-tools:1.11.4-1` (scanpy 1.11.4 base). Only the listed methods run. With `cosg` alone there are no AUC values or p-values, and `--markers_min_auc` is not applied. The ranking is set by `--markers_rank_by`."
+                    "help_text": "By default both run. `presto` computes the Wilcoxon rank-sum statistics with AUC, as in the R package presto (AUC, p-values, expressing fractions, log2FC). `cosg` computes the COSG cosine-similarity score (Dai et al. 2022), using the `cosg` package (1.2.1) in the pipeline's own container image `docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1` (scanpy 1.11.4 base). Only the listed methods run. With `cosg` alone there are no AUC values or p-values, and `--markers_min_auc` is not applied. The ranking is set by `--markers_rank_by`."
                 },
                 "markers_rank_by": {
                     "type": "string",
@@ -554,10 +547,6 @@
                 "skip_rankgenesgroups": {
                     "type": "boolean",
                     "description": "Skip the rank_genes_groups step. For large datasets, the pipeline might fail due to high memory usage in this step. Use this option to skip it."
-                },
-                "pseudobulk": {
-                    "type": "boolean",
-                    "description": "Perform pseudobulking"
                 }
             }
         },
@@ -615,24 +604,6 @@
                     "type": "string",
                     "description": "Continuous covariates for scVI/scANVI",
                     "help_text": "If you want to use multiple covariates, separate them with a comma."
-                }
-            }
-        },
-        "pseudobulking_options": {
-            "title": "Pseudobulking options",
-            "type": "object",
-            "description": "Options for pseudobulking",
-            "fa_icon": "fas fa-users",
-            "properties": {
-                "pseudobulk_groupby_labels": {
-                    "type": "string",
-                    "description": "Group by labels for pseudobulking. If you want to use multiple labels, separate them with a comma.",
-                    "default": "batch"
-                },
-                "pseudobulk_min_num_cells": {
-                    "type": "integer",
-                    "description": "Minimum number of cells for pseudobulking",
-                    "default": 5
                 }
             }
         },
@@ -1048,9 +1019,6 @@
         },
         {
             "$ref": "#/$defs/scVI_options"
-        },
-        {
-            "$ref": "#/$defs/pseudobulking_options"
         },
         {
             "$ref": "#/$defs/differential_genes_options"

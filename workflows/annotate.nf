@@ -11,7 +11,7 @@ include { ADATA_ADD_OBS_OBSM as ADD_PREDICTIONS       } from '../modules/local/a
 include { SCANPY_GENERATE_REPORT_ANNOTATION           } from '../modules/local/scanpy/report'
 include { FINALIZE_H5AD_SIMPLE as FINALIZE_ANNOTATED  } from '../subworkflows/local/finalize'
 include { softwareVersionsToYAML                      } from '../subworkflows/nf-core/utils_nfcore_pipeline'
-include { splitCelltypistModels                       } from '../subworkflows/local/utils_nfcore_scdownstream_pipeline'
+include { splitCelltypistModels                       } from '../subworkflows/local/utils'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

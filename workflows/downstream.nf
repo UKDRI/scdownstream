@@ -9,7 +9,7 @@ include { MULTIQC                              } from '../modules/nf-core/multiq
 include { paramsSummaryMap                     } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc                 } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML               } from '../subworkflows/nf-core/utils_nfcore_pipeline'
-include { methodsDescriptionText               } from '../subworkflows/local/utils_nfcore_scdownstream_pipeline'
+include { methodsDescriptionText               } from '../subworkflows/local/utils'
 include { MARKERS_PRESTO                       } from '../modules/local/markers/presto'
 include { MARKERS_COSG                         } from '../modules/local/markers/cosg'
 include { SCANPY_ENRICH                        } from '../modules/local/scanpy/enrich'

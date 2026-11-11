@@ -2,8 +2,8 @@ process SCDS {
     tag "${meta.id}"
     label 'process_medium'
 
-    // Built from containers/scdownstream-r/Dockerfile.
-    container 'docker.io/nhecker/scdownstream-r:4.5-1'
+    // Built from containers/seurat-ukdri-suite/Dockerfile.
+    container 'docker.io/nhecker/seurat-ukdri-suite:5.5.1-1'
 
     input:
     tuple val(meta), path(h5ad)

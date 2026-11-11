@@ -390,6 +390,6 @@ troubleshoot failures and to record launch commands, run times and resource usag
 ## Directories referenced elsewhere but not produced
 
 Some publishing rules inherited from upstream target steps that are not part of the curated workflow.
-The three stages do not write them: `cluster_dimred/`, `pseudobulking/`,
+The three stages do not write them: `cluster_dimred/`,
 `per_group/<id>/paga/`, `finalized/`, and the
 `quality_control/doublet_detection/{solo,doubletdetection,scds}/` directories.

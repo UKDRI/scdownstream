@@ -665,8 +665,7 @@ Two consequences of the current tool set are worth knowing before you interpret 
   in `--integration_methods`; if it is omitted, the post-merge steps produce no output and no error.
 
 **Inactive parameters.** The following are accepted but currently have no effect:
-`--skip_liana`, `--skip_rankgenesgroups`,
-`--pseudobulk`, `--pseudobulk_groupby_labels`, `--pseudobulk_min_num_cells`, `--cluster_per_label`,
+`--skip_liana`, `--skip_rankgenesgroups`, `--cluster_per_label`,
 `--cluster_global`, `--base_embeddings`, `--base_label_col`. `--unify_gene_symbols` is no longer
 supported and should be left at its default —
 HUGO-based gene symbol unification only applies to human data and is not reliable enough to
@@ -684,16 +683,15 @@ pulls each image on first use. Under the `singularity` or `apptainer` profile it
 to a `.sif` in `$NXF_SINGULARITY_CACHEDIR`. Most h5ad steps (input loading, the `ADATA_*` helpers,
 normalisation, HVGs, PCA, neighbors, Leiden, UMAP, PAGA, combat, bbknn, filtering, QC plots, presto
 markers, pseudobulk and marker export) use the public `docker.io/gcfntnu/scanpy:1.11.4` image directly.
-Three images are specific to this fork. They are hosted on Docker Hub and pulled the same way; their
+Two images are specific to this fork. They are hosted on Docker Hub and pulled the same way; their
 Dockerfiles in [`containers/`](../containers/README.md) are the recipes they were built from:
 
 | Image (Docker Hub)                                   | Used by                                                                                                                         |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `docker.io/nhecker/scdownstream-tools:1.11.4-1`      | CellTypist (annotation and training), Harmony, doublet removal, UpSet plots, MyGene, HUGO unifier, COSG, LIANA+, enrichment, PyDESeq2 and all reports |
-| `docker.io/nhecker/scdownstream-r:4.5-1`             | decontX, scds, SoupX, Seurat integration                                                                                        |
-| `docker.io/nhecker/scdownstream-scimilarity:0.3.0-1` | SCimilarity (embedding, annotation, pseudobulk)                                                                                 |
+| `docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1`      | CellTypist (annotation and training), Harmony, doublet removal, UpSet plots, MyGene, HUGO unifier, COSG, LIANA+, enrichment, PyDESeq2 and all reports |
+| `docker.io/nhecker/seurat-ukdri-suite:5.5.1-1`       | decontX, scds, SoupX, Seurat integration                                                                                        |
 
-`scdownstream-tools` and `scdownstream-scimilarity` extend `gcfntnu/scanpy:1.11.4`; `scdownstream-r`
+`scanpy-ukdri-suite` extends `gcfntnu/scanpy:1.11.4`; `seurat-ukdri-suite`
 has R 4.5 with anndataR, which reads and writes h5ad itself. scVI/scANVI use the public `scvi-tools`
 image (anndata 0.12.1). The images are published for `linux/amd64` only.
 

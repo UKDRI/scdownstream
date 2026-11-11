@@ -176,10 +176,6 @@ are ready as each is validated and enabled.
 
   > Johnson WE, Li C, Rabinovic A. Adjusting batch effects in microarray expression data using empirical Bayes methods. Biostatistics. 2007 Jan;8(1):118-27. doi: 10.1093/biostatistics/kxj037. PubMed PMID: 16632515.
 
-- [SCimilarity](https://doi.org/10.1101/2023.07.18.549537)
-
-  > Heimberg G, Kuo T, DePianto D, et al. Scalable querying of human cell atlases via a foundational model reveals commonalities across fibrosis-associated macrophages. Published online July 19, 2023:2023.07.18.549537. doi:10.1101/2023.07.18.549537
-
 - [SOLO](https://pubmed.ncbi.nlm.nih.gov/32592658/)
 
   > Bernstein NJ, Fong NL, Lam I, Roy MA, Hendrickson DG, Kelley DR. Solo: Doublet Identification in Single-Cell RNA-Seq via Semi-Supervised Deep Learning. Cell Syst. 2020 Jul 22;11(1):95-101.e5. doi: 10.1016/j.cels.2020.05.010. PubMed PMID: 32592658.
