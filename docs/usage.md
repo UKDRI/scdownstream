@@ -681,20 +681,21 @@ regardless.
 
 Every process runs from a public container image, so nothing has to be built by hand. Nextflow
 pulls each image on first use. Under the `singularity` or `apptainer` profile it converts the image
-to a `.sif` in `$NXF_SINGULARITY_CACHEDIR`. Three images are specific to this fork. They are hosted on
-Docker Hub and pulled the same way; their Dockerfiles are kept in the repository only as the recipe
-they were built from:
+to a `.sif` in `$NXF_SINGULARITY_CACHEDIR`. Most h5ad steps (input loading, the `ADATA_*` helpers,
+normalisation, HVGs, PCA, neighbors, Leiden, UMAP, PAGA, combat, bbknn, filtering, QC plots, presto
+markers, pseudobulk and marker export) use the public `docker.io/gcfntnu/scanpy:1.11.4` image directly.
+Three images are specific to this fork. They are hosted on Docker Hub and pulled the same way; their
+Dockerfiles in [`containers/`](../containers/README.md) are the recipes they were built from:
 
-| Image (Docker Hub)                        | Used by                                                                                            | Recipe                                                 |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4` | `SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`, `SCANPY_ENRICH`, `LIANA_RANKAGGREGATE` | `modules/local/scanpy/report/Dockerfile`               |
-| `docker.io/nhecker/pydeseq2:0.1`                    | `DIFFERENTIAL_GENES_PER_CONTRAST`                                                                  | `modules/local/pydeseq2/differential_genes/Dockerfile` |
-| `docker.io/nhecker/scanpy-cosg:1.11.4-cosg1.2.1`     | `MARKERS_COSG`                                                                                     | `modules/local/markers/cosg/Dockerfile`                |
+| Image (Docker Hub)                                   | Used by                                                                                                                         |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `docker.io/nhecker/scdownstream-tools:1.11.4-1`      | CellTypist (annotation and training), Harmony, doublet removal, UpSet plots, MyGene, HUGO unifier, COSG, LIANA+, enrichment, PyDESeq2 and all reports |
+| `docker.io/nhecker/scdownstream-r:4.5-1`             | decontX, scds, SoupX, Seurat integration                                                                                        |
+| `docker.io/nhecker/scdownstream-scimilarity:0.3.0-1` | SCimilarity (embedding, annotation, pseudobulk)                                                                                 |
 
-All three extend the public `gcfntnu/scanpy:1.11.4` image. Most other h5ad steps (input loading, the
-`ADATA_*` helpers, normalisation, HVGs, PCA, neighbors, Leiden, UMAP, PAGA, combat, bbknn, filtering,
-QC plots, presto markers, pseudobulk and marker export) use that public image directly. The images are published for `linux/amd64`
-only.
+`scdownstream-tools` and `scdownstream-scimilarity` extend `gcfntnu/scanpy:1.11.4`; `scdownstream-r`
+has R 4.5 with anndataR, which reads and writes h5ad itself. scVI/scANVI use the public `scvi-tools`
+image (anndata 0.12.1). The images are published for `linux/amd64` only.
 
 > [!NOTE]
 > **For developers: one anndata/pandas generation.** h5ad files are passed between processes, so every
@@ -704,7 +705,8 @@ only.
 > BioContainers built with unpinned dependencies, must not be mixed in. Upgrading means updating
 > all images together. Older anndata (0.10, 0.11) cannot read `None` values written by
 > anndata ≥ 0.12, which scanpy itself stores (e.g. `uns["log1p"]["base"]`), so no h5ad step may run
-> on an image with older anndata either.
+> on an image with older anndata either. How to add or change an image:
+> [`containers/README.md`](../containers/README.md).
 
 Prefer `-profile apptainer` over `-profile docker`. Docker Hub limits anonymous pulls, and Docker
 pulls on every host, while Apptainer pulls each image once into `$NXF_SINGULARITY_CACHEDIR`. See the

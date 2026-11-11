@@ -3,10 +3,10 @@ process LIANA_RANKAGGREGATE {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    // The pipeline's report image (gcfntnu/scanpy:1.11.4 base, liana 1.6.1), built from
-    // modules/local/scanpy/report/Dockerfile. The old BioContainer liana:1.4.0 had anndata 0.10,
-    // which could not read the h5ad files written by the anndata 0.12 steps.
-    container 'docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4'
+    // Built from containers/scdownstream-tools/Dockerfile (gcfntnu/scanpy:1.11.4 base, liana 1.6.1).
+    // The old BioContainer liana:1.4.0 had anndata 0.10, which could not read the h5ad files written by
+    // the anndata 0.12 steps.
+    container 'docker.io/nhecker/scdownstream-tools:1.11.4-1'
 
     input:
     tuple val(meta), path(h5ad)

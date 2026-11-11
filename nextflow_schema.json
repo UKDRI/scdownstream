@@ -406,7 +406,7 @@
                     "default": "presto,cosg",
                     "pattern": "^(presto|cosg)(, *(presto|cosg))*$",
                     "description": "Comma-separated marker gene methods to run: presto and/or cosg.",
-                    "help_text": "By default both run. `presto` computes the Wilcoxon rank-sum statistics with AUC, as in the R package presto (AUC, p-values, expressing fractions, log2FC). `cosg` computes the COSG cosine-similarity score (Dai et al. 2022), using the `cosg` package (1.2.1) in the pipeline's own container image `docker.io/nhecker/scanpy-cosg:1.11.4-cosg1.2.1` (scanpy 1.11.4 base). Only the listed methods run. With `cosg` alone there are no AUC values or p-values, and `--markers_min_auc` is not applied. The ranking is set by `--markers_rank_by`."
+                    "help_text": "By default both run. `presto` computes the Wilcoxon rank-sum statistics with AUC, as in the R package presto (AUC, p-values, expressing fractions, log2FC). `cosg` computes the COSG cosine-similarity score (Dai et al. 2022), using the `cosg` package (1.2.1) in the pipeline's own container image `docker.io/nhecker/scdownstream-tools:1.11.4-1` (scanpy 1.11.4 base). Only the listed methods run. With `cosg` alone there are no AUC values or p-values, and `--markers_min_auc` is not applied. The ranking is set by `--markers_rank_by`."
                 },
                 "markers_rank_by": {
                     "type": "string",

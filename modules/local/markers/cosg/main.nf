@@ -3,8 +3,8 @@ process MARKERS_COSG {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    // Built from modules/local/markers/cosg/Dockerfile.
-    container 'docker.io/nhecker/scanpy-cosg:1.11.4-cosg1.2.1'
+    // Built from containers/scdownstream-tools/Dockerfile.
+    container 'docker.io/nhecker/scdownstream-tools:1.11.4-1'
 
     input:
     tuple val(meta), path(h5ad)

@@ -3,9 +3,8 @@ process SCIMILARITY_PSEUDOBULK {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    container "${workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container
-        ? 'oras://community.wave.seqera.io/library/gcc_gxx_pyyaml_zarr_pruned:049c63c0e0a999fa'
-        : 'community.wave.seqera.io/library/gcc_gxx_pyyaml_zarr_pruned:8912afd95c57731a'}"
+    // Built from containers/scdownstream-scimilarity/Dockerfile.
+    container 'docker.io/nhecker/scdownstream-scimilarity:0.3.0-1'
 
     input:
     tuple val(meta), path(h5ad)

@@ -2,7 +2,8 @@ process SCDS {
     tag "${meta.id}"
     label 'process_medium'
 
-    container "docker.io/nicotru/scds:7788dbeb87bc7eec"
+    // Built from containers/scdownstream-r/Dockerfile.
+    container 'docker.io/nhecker/scdownstream-r:4.5-1'
 
     input:
     tuple val(meta), path(h5ad)

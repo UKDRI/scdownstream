@@ -3,9 +3,8 @@ process SCANPY_HARMONY {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    container "${workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container
-            ? 'oras://community.wave.seqera.io/library/harmonypy_pyyaml_scanpy:0313a38a736a3dbb'
-            : 'community.wave.seqera.io/library/harmonypy_pyyaml_scanpy:3da6a375ff8a76ed'}"
+    // Built from containers/scdownstream-tools/Dockerfile.
+    container 'docker.io/nhecker/scdownstream-tools:1.11.4-1'
 
     input:
     tuple val(meta), path(h5ad)

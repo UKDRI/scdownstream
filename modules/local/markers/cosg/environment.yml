@@ -1,4 +1,4 @@
-# Same package versions as docker.io/gcfntnu/scanpy:1.11.4 (scipy pin not checked against the image), plus cosg
+# Same package versions as docker.io/nhecker/scdownstream-tools:1.11.4-1 (containers/scdownstream-tools/Dockerfile)
 channels:
   - conda-forge
   - bioconda

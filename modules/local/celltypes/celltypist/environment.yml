@@ -1,10 +1,13 @@
 name: celltypes_celltypist
+# Same package versions as docker.io/nhecker/scdownstream-tools:1.11.4-1 (containers/scdownstream-tools/Dockerfile)
 channels:
   - conda-forge
   - bioconda
 dependencies:
+  - conda-forge::python=3.11.11
+  - conda-forge::scanpy=1.11.4
+  - conda-forge::anndata=0.12.2
+  - conda-forge::pandas=2.3.2
+  # celltypist 1.6.3 training passes LogisticRegression(multi_class=...), which scikit-learn 1.8 removed
+  - conda-forge::scikit-learn=1.7.1
   - bioconda::celltypist=1.6.3
-  - conda-forge::scanpy=1.10.4
-  # Same as celltypes/celltypist_train: celltypist 1.6.3 training passes
-  # LogisticRegression(multi_class=...), which scikit-learn 1.8 removed
-  - conda-forge::scikit-learn<1.8

@@ -3,8 +3,8 @@ process DIFFERENTIAL_GENES_PER_CLUSTER {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    // Built from the Dockerfile in this module directory.
-    container 'docker.io/nhecker/pydeseq2:0.1'
+    // Built from containers/scdownstream-tools/Dockerfile.
+    container 'docker.io/nhecker/scdownstream-tools:1.11.4-1'
 
     input:
     tuple val(meta), path(h5ad)
@@ -37,8 +37,8 @@ process DIFFERENTIAL_GENES_PER_CONTRAST {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    // Built from the Dockerfile in this module directory.
-    container 'docker.io/nhecker/pydeseq2:0.1'
+    // Built from containers/scdownstream-tools/Dockerfile.
+    container 'docker.io/nhecker/scdownstream-tools:1.11.4-1'
 
     input:
     tuple val(meta), path(h5ad), val(contrast)

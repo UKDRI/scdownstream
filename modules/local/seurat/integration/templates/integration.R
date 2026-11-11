@@ -8,7 +8,16 @@ set.seed(0)
 
 adata <- read_h5ad("${h5ad}")
 
-seurat_obj <- adata\$as_Seurat()
+# SCTransform reads the Seurat layer "counts". anndataR 1.2.1 copies each AnnData layer to a Seurat layer of
+# the same name and X to a layer named "X", so without a counts layer X (raw counts when the object is not
+# normalised) becomes "counts".
+if ("counts" %in% adata\$layers_keys()) {
+    message("SCTransform input: raw counts from layers['counts']")
+    seurat_obj <- adata\$as_Seurat()
+} else {
+    message("SCTransform input: raw counts from X")
+    seurat_obj <- adata\$as_Seurat(x_mapping = "counts")
+}
 
 batches <- SplitObject(seurat_obj, split.by = "${batch_col}")
 batches <- lapply(X = batches, FUN = SCTransform, assay = "RNA")

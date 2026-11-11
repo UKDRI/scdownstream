@@ -27,8 +27,8 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
     and adjusted p-values. A filter panel (min AUC, log2FC, COSG score, pct in; max pct out, p,
     adj. p) filters all cluster tables in the browser.
   - **Marker JSON:** has `list_auc` (presto) and `list_cosg_score` (COSG).
-  - **Container:** COSG runs in the pipeline's own image `nhecker/scanpy-cosg:1.11.4-cosg1.2.1`
-    (scanpy 1.11.4 base + `cosg`), not the BioContainer: its pandas 3 / anndata 0.13 write string
+  - **Container:** COSG runs in the pipeline's own tools image (`nhecker/scdownstream-tools`,
+    scanpy 1.11.4 base + `cosg`), not the BioContainer: its pandas 3 / anndata 0.13 write string
     indices the following steps (anndata 0.12) cannot write back.
   - **LIANA+:** `LIANA_RANKAGGREGATE` runs in the report image (scanpy 1.11.4 base, liana 1.6.1
     instead of 1.4.0); the BioContainer's anndata 0.10 could not read the marker output. The
@@ -130,6 +130,12 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Changed`
 
+- Own container images in `containers/` replace the per-tool images: `scdownstream-tools`
+  (scanpy 1.11.4 base + CellTypist, Harmony, upsetplot, mygene, hugo-unifier 0.3.2, COSG, LIANA+,
+  PyDESeq2, Quarto; replaces `scanpy-report`, `scanpy-cosg`, `pydeseq2` and six Seqera images),
+  `scdownstream-r` (R 4.5, anndataR 1.2.1, celda, scds, SoupX, Seurat 5.5.1; replaces the nicotru
+  images) and `scdownstream-scimilarity`. The R templates now name the counts assay/layer
+  explicitly (anndataR 1.2 maps `X` to an assay/layer called `X`).
 - All h5ad-handling processes of the main path run on one anndata generation: 23 more modules
   (input loading and the `adata/*` helpers, normalisation, HVGs, PCA, neighbors, Leiden, UMAP,
   PAGA, combat, bbknn, filtering, QC plots) moved from Seqera/Wave images (scanpy 1.10.4-1.11.2,

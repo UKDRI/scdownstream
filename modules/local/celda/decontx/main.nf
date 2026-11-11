@@ -2,7 +2,8 @@ process CELDA_DECONTX {
     tag "$meta.id"
     label 'process_medium'
 
-    container "docker.io/nicotru/celda:1d48a68e9d534b2b"
+    // Built from containers/scdownstream-r/Dockerfile.
+    container 'docker.io/nhecker/scdownstream-r:4.5-1'
 
     input:
     tuple val(meta), path(h5ad), path(raw)

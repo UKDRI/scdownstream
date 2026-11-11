@@ -1,4 +1,4 @@
-# Same package versions as docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4 (modules/local/scanpy/report/Dockerfile).
+# Same package versions as docker.io/nhecker/scdownstream-tools:1.11.4-1 (containers/scdownstream-tools/Dockerfile).
 # papermill is required: quarto render -P (Jupyter engine) needs it to inject the parameters.
 # Note: bioconda's liana package pulls more dependencies than the pip install in the image.
 channels:
@@ -8,6 +8,9 @@ dependencies:
   - conda-forge::python=3.11.11
   - conda-forge::scanpy=1.11.4
   - conda-forge::anndata=0.12.2
+  - conda-forge::pandas=2.3.2
+  - conda-forge::numpy=2.2.6
+  - conda-forge::matplotlib=3.10.5
   - conda-forge::quarto=1.9.38
   - conda-forge::papermill=2.7.0
   - conda-forge::nbconvert=7.17.1

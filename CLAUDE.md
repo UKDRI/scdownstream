@@ -40,6 +40,6 @@ its definition file changed in the meantime, include the new rule in the message
     listed in PLAN.md. Don't store `None` in an h5ad in our templates anyway; leave the key out.
   - *Rule:* don't use BioContainers / Seqera images with unpinned or newer anndata/pandas for
     h5ad-handling processes. Extend `gcfntnu/scanpy:1.11.4` instead, with
-    `pip install --no-deps <tool>` (see `modules/local/markers/cosg/Dockerfile`), or pin the versions.
+    pinned `pip install` with the base packages as constraints (see `containers/README.md`).
   - *Upgrading:* moving to pandas 3 / anndata 0.13 means updating all images together, then testing
     every stage end to end.

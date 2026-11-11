@@ -4,13 +4,16 @@ library(SoupX)
 library(anndataR)
 library(Seurat)
 
-# Read the AnnData objects and convert directly to Seurat
+# Read the AnnData objects and convert directly to Seurat.
+# anndataR 1.2.1 converts X to a Seurat layer named "X" unless told otherwise; X holds the raw counts here
+# (another input layer replaces the assay below), so it becomes the "counts" layer. The other AnnData
+# layers are not needed and are left out, so that none of them clashes with the name "counts".
 adata <- read_h5ad("${h5ad}")
-seu <- adata\$as_Seurat()
+seu <- adata\$as_Seurat(x_mapping = "counts", layers_mapping = FALSE)
 
 # Read the raw AnnData object
 adata_raw <- read_h5ad("${raw}")
-seu_raw <- adata_raw\$as_Seurat()
+seu_raw <- adata_raw\$as_Seurat(x_mapping = "counts", layers_mapping = FALSE)
 
 # Get layer to use (default to "X" if not specified)
 use_layer <- "${input_layer}"
@@ -37,8 +40,9 @@ seu <- FindClusters(seu, resolution = ${cluster_resolution})
 soupx_groups <- Idents(seu)
 
 # Create SoupChannel
-data <- GetAssayData(seu, slot = "counts")
-data_raw <- GetAssayData(seu_raw, slot = "counts")
+# layer, not slot: SeuratObject >= 5.3 makes GetAssayData(slot = ) defunct (deprecated since 5.0.0)
+data <- GetAssayData(seu, layer = "counts")
+data_raw <- GetAssayData(seu_raw, layer = "counts")
 sc <- SoupChannel(data_raw, data, calcSoupProfile = FALSE)
 
 # Set soup profile - following SoupX vignette approach

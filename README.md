@@ -294,13 +294,14 @@ each image on first use, converting it to a `.sif` in `$NXF_SINGULARITY_CACHEDIR
 Docker Hub and pulled the same way. Their Dockerfiles are kept in the repository only as the recipe
 they were built from:
 
-| Image (Docker Hub)                        | Required by                                                                                        | Recipe                                                                                                          |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4` | `SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`, `SCANPY_ENRICH` | [`modules/local/scanpy/report/Dockerfile`](modules/local/scanpy/report/Dockerfile)                             |
-| `docker.io/nhecker/pydeseq2:0.1`                    | `DIFFERENTIAL_GENES_PER_CONTRAST`                                                                  | [`modules/local/pydeseq2/differential_genes/Dockerfile`](modules/local/pydeseq2/differential_genes/Dockerfile) |
+| Image (Docker Hub)                                   | Required by                                                                                     | Recipe                                                                                     |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `docker.io/nhecker/scdownstream-tools:1.11.4-1`      | CellTypist, Harmony, doublet removal, UpSet plots, MyGene, HUGO unifier, COSG, LIANA+, enrichment, PyDESeq2, reports | [`containers/scdownstream-tools/Dockerfile`](containers/scdownstream-tools/Dockerfile)           |
+| `docker.io/nhecker/scdownstream-r:4.5-1`             | decontX, scds, SoupX, Seurat integration                                                         | [`containers/scdownstream-r/Dockerfile`](containers/scdownstream-r/Dockerfile)                   |
+| `docker.io/nhecker/scdownstream-scimilarity:0.3.0-1` | SCimilarity                                                                                      | [`containers/scdownstream-scimilarity/Dockerfile`](containers/scdownstream-scimilarity/Dockerfile) |
 
-Both extend the public `gcfntnu/scanpy:1.11.4` image, which `DECOUPLER_PSEUDOBULK`, `FILTER_PSEUDOBULK` and
-`SCANPY_EXPORT_MARKERS` use directly. The images are published for `linux/amd64` only.
+Most other h5ad steps use the public `gcfntnu/scanpy:1.11.4` image directly, which the tools and
+SCimilarity images extend. See [`containers/README.md`](containers/README.md).
 
 > [!IMPORTANT]
 > **We recommend running with `-profile apptainer` (or `singularity`), not `-profile docker`.** These

@@ -268,9 +268,9 @@ reads or writes an h5ad must use the pipeline's anndata/pandas generation: the b
 `docker.io/gcfntnu/scanpy:1.11.4` (scanpy 1.11.4, anndata 0.12.2, pandas 2.3.x). Never pick an image
 with pandas ≥ 3 / anndata ≥ 0.13. BioContainers built with unpinned dependencies often have them
 (this broke `SCANPY_ENRICH` after `MARKERS_COSG`). Check the versions of a new image first; if no
-image matches, add a Dockerfile `FROM docker.io/gcfntnu/scanpy:1.11.4` with
-`pip install --no-deps <tool>` (example: `modules/local/markers/cosg/Dockerfile`) for the user to
-build and push.
+image matches, add the tool to `containers/scdownstream-tools/Dockerfile` (or a new Dockerfile
+under `containers/` `FROM docker.io/gcfntnu/scanpy:1.11.4`), following the rules in
+`containers/README.md`, with a new tag for the user to build and push.
 
 Don't store `None` values in an h5ad (e.g. `"layer": None` in `uns[...]["params"]`); leave the key
 out. anndata ≥ 0.12 writes `None` as a `null` element that anndata 0.10 / 0.11 cannot read (this

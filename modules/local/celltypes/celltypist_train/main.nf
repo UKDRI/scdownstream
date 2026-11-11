@@ -3,10 +3,9 @@ process CELLTYPIST_TRAIN {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    // Same image as CELLTYPES_CELLTYPIST, so a model is trained and applied with the same versions
-    container "${workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container
-        ? 'oras://community.wave.seqera.io/library/celltypist_scanpy:89a98f51262cfff4'
-        : 'community.wave.seqera.io/library/celltypist_scanpy:44b604b24dd4cf33'}"
+    // Built from containers/scdownstream-tools/Dockerfile. Same image as CELLTYPES_CELLTYPIST, so a model
+    // is trained and applied with the same versions.
+    container 'docker.io/nhecker/scdownstream-tools:1.11.4-1'
 
     input:
     tuple val(meta), path(h5ad)
