@@ -4,9 +4,7 @@ process ADATA_MERGE {
     label 'process_high_memory'
 
     conda "${moduleDir}/environment.yml"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'oras://community.wave.seqera.io/library/pyyaml_scanpy:158b12038812cf13':
-        'community.wave.seqera.io/library/pyyaml_scanpy:61c9ab8e312bbe0a' }"
+    container 'docker.io/gcfntnu/scanpy:1.11.4'
 
     input:
     tuple val(meta),  path(h5ads)

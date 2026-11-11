@@ -130,6 +130,11 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Changed`
 
+- All h5ad-handling processes of the main path run on one anndata generation: 23 more modules
+  (input loading and the `adata/*` helpers, normalisation, HVGs, PCA, neighbors, Leiden, UMAP,
+  PAGA, combat, bbknn, filtering, QC plots) moved from Seqera/Wave images (scanpy 1.10.4-1.11.2,
+  anndata 0.11) to `gcfntnu/scanpy:1.11.4` (scanpy 1.11.4, anndata 0.12.2). anndata 0.12 writes
+  `None` values as `null` elements that anndata 0.10/0.11 cannot read.
 - The docs now recommend passing analysis parameters in a YAML params file (`-params-file`) and
   keeping the command line for `--stage` and input/output paths: under Nextflow 26 command-line
   values reach the pipeline as text, so `--some_option false` counts as true.
@@ -229,6 +234,9 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Removed`
 
+- The `.rds` (SingleCellExperiment) copies of the stage results (`ADATA_TORDS`). The conversion ran
+  on anndata 0.11, which cannot read h5ad files written by anndata 0.12, and was best effort anyway
+  (failed for matrices over 2^31 non-zeros). Read the h5ad in R with anndataR or zellkonverter.
 - `--mito_genes`. It was accepted and passed to cell filtering but never used: mitochondrial genes
   are always identified by the `mt-` prefix of the gene symbols. Moved to the backlog for
   re-assessment.

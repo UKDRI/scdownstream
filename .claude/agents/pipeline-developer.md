@@ -273,8 +273,9 @@ image matches, add a Dockerfile `FROM docker.io/gcfntnu/scanpy:1.11.4` with
 build and push.
 
 Don't store `None` values in an h5ad (e.g. `"layer": None` in `uns[...]["params"]`); leave the key
-out. anndata ≥ 0.12 writes `None` as a `null` element that anndata 0.10 / 0.11, still used by
-`ADATA_TORDS` and `ADATA_SPLITCOL`, cannot read (this broke `LIANA_RANKAGGREGATE`).
+out. anndata ≥ 0.12 writes `None` as a `null` element that anndata 0.10 / 0.11 cannot read (this
+broke `LIANA_RANKAGGREGATE`). A new or changed module that reads or writes h5ad uses
+`docker.io/gcfntnu/scanpy:1.11.4` or an image built `FROM` it, never an older Seqera/Wave image.
 
 Prefer the nf-core Seqera-container ternary shown above. A hardcoded apptainer image path
 (e.g. `container "/nfsdata/apptainer/scanpy_1.11.4_coreinf_0.3.sif"`) is used by a few

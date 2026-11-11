@@ -3,9 +3,7 @@ process SCANPY_LEIDEN {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    container "${workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container
-            ? 'oras://community.wave.seqera.io/library/leidenalg_python-igraph_scanpy:8b9713e90ca62747'
-            : 'community.wave.seqera.io/library/leidenalg_python-igraph_scanpy:270d93d02d764f1a'}"
+    container 'docker.io/gcfntnu/scanpy:1.11.4'
 
     input:
     tuple val(meta), path(h5ad, arity: 1)

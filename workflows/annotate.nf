@@ -113,7 +113,7 @@ workflow ANNOTATE {
     ch_versions = ch_versions.mix(ADD_PREDICTIONS.out.versions)
 
     //
-    // SUBWORKFLOW: Publish the annotated object as h5ad and rds
+    // SUBWORKFLOW: Publish the annotated object as h5ad
     //
     FINALIZE_ANNOTATED(ADD_PREDICTIONS.out.h5ad)
     ch_versions = ch_versions.mix(FINALIZE_ANNOTATED.out.versions)

@@ -32,11 +32,12 @@ its definition file changed in the meantime, include the new rule in the message
   - *What happened (2026-11-11):* the presto/COSG templates stored `"layer": None` in
     `uns["rank_genes_groups"]["params"]`. `LIANA_RANKAGGREGATE` (BioContainer `liana:1.4.0`, python
     3.9, anndata 0.10) then failed: `No read method registered for IOSpec(encoding_type='null'...)`.
-    `ADATA_TORDS` (anndata 0.11.1) and `ADATA_SPLITCOL` (0.11.4) fail the same way.
-  - *Rule:* don't store `None` in `uns`, `obs` or other elements of an h5ad; leave the key out.
-    scanpy itself does it too (e.g. `sc.pp.log1p` stores `uns["log1p"]["base"] = None`), so such
-    calls in an anndata 0.12 image break the 0.11 steps; the lasting fix is to move `ADATA_TORDS`
-    and `ADATA_SPLITCOL` to anndata 0.12.2.
+    `ADATA_TORDS` (anndata 0.11.1) and `ADATA_SPLITCOL` (0.11.4) failed the same way.
+  - *Rule:* run every h5ad-handling process on the base image or an image built `FROM` it. scanpy
+    itself writes `None` (e.g. `sc.pp.log1p` stores `uns["log1p"]["base"] = None`), so avoiding
+    `None` in our templates is not enough. Since 2026-11-11 (`anndata-0.12-throughout`) the main
+    path is on the base image and `ADATA_TORDS` is removed; the modules still on older images are
+    listed in PLAN.md. Don't store `None` in an h5ad in our templates anyway; leave the key out.
   - *Rule:* don't use BioContainers / Seqera images with unpinned or newer anndata/pandas for
     h5ad-handling processes. Extend `gcfntnu/scanpy:1.11.4` instead, with
     `pip install --no-deps <tool>` (see `modules/local/markers/cosg/Dockerfile`), or pin the versions.

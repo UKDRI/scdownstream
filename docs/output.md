@@ -25,15 +25,15 @@ Produces, at the top level of the results directory:
 
 - `<name>_qc_clustering.h5ad`: the integrated, clustered AnnData object, gzip-compressed, with `X`,
   every layer and `raw.X` stored as sparse CSR matrices. **This is the input to `--stage downstream`.**
-- `<name>_qc_clustering.rds`: a SingleCellExperiment version of the same object.
 
 </details>
 
 `<name>` is the value of `--name` (`scdownstream` if it is not set); the same applies to stage 2.
 
 > [!NOTE]
-> RDS conversion runs with `errorStrategy 'ignore'`, so the `.rds` file is best-effort: if conversion
-> fails the run continues and only the `.h5ad` is produced.
+> The pipeline no longer writes `.rds` copies of its results. To work in R, read the h5ad with
+> [anndataR](https://github.com/scverse/anndataR) (`anndataR::read_h5ad(path, as = "SingleCellExperiment")`
+> or `as = "Seurat"`) or [zellkonverter](https://bioconductor.org/packages/zellkonverter/).
 
 ### Input loading
 
@@ -122,8 +122,7 @@ isoforms are optionally aggregated with `--aggregate_isoforms`.
     - `merged_sample_genes.png`: UpSet plot of gene overlap between samples.
   - `merge_emb/<id>/`: merged embeddings, when embeddings from multiple sources are combined.
   - `integrate/`
-    - `input_hvg/`: the highly-variable-gene subset passed to the integration tools, as `h5ad` and
-      `rds`.
+    - `input_hvg/`: the highly-variable-gene subset passed to the integration tools, as `h5ad`.
     - `scvi/`: the scVI model (`scvi_model/model.pt`, always published) and, with
       `--save_intermediates`, the scVI-integrated object and `X_scvi.pkl`.
     - `scanvi/`: with `scanvi` in `--integration_methods`, the scANVI model
@@ -207,7 +206,7 @@ a `qc_clustering` run.
 <details markdown="1">
 <summary>Output files</summary>
 
-- `<name>_downstream.h5ad` (gzip-compressed, sparse CSR `X`, layers and `raw.X`) / `<name>_downstream.rds`: the
+- `<name>_downstream.h5ad` (gzip-compressed, sparse CSR `X`, layers and `raw.X`): the
   object with marker genes, enrichment results and LIANA+ output added. **This is the input to `--stage differential_genes`.**
 - `<name>_downstream_markers.json.gz`: the marker genes per group (one set per cluster, id
   `genes--cluster--<cluster>`; the separator is `--markers_sep`), in a compact JSON form for
@@ -345,7 +344,7 @@ Adds CellTypist and/or scANVI predictions to a processed object (`--base_adata`)
 <details markdown="1">
 <summary>Output files</summary>
 
-- **`<name>_annotate.h5ad`** (sparse, gzip-compressed) and `<name>_annotate.rds`: the input object
+- **`<name>_annotate.h5ad`** (sparse, gzip-compressed): the input object
   with these additions:
   - `obs` columns `celltypist:<model>` / `celltypist:<model>:conf` and `scanvi:<model>` /
     `scanvi:<model>:conf`: the most probable label and its confidence (0–1);

@@ -1,8 +1,11 @@
-name: scanpy_leiden
+# Same package versions as docker.io/gcfntnu/scanpy:1.11.4 (leidenalg and python-igraph pins not checked against the image)
 channels:
   - conda-forge
   - bioconda
 dependencies:
+  - conda-forge::python=3.11.11
+  - conda-forge::scanpy=1.11.4
+  - conda-forge::anndata=0.12.2
   - conda-forge::leidenalg=0.10.2
   - conda-forge::python-igraph=0.11.8
-  - conda-forge::scanpy=1.10.4
+  - conda-forge::threadpoolctl=3.6.0

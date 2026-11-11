@@ -123,7 +123,7 @@ differential_genes/    ── decoupler pseudobulk → PyDESeq2 per group × con
 2. Gene set enrichment over those markers
 3. Cell–cell communication — [LIANA+](https://liana-py.readthedocs.io/) rank aggregation, using HCOP
    orthologs for non-human species
-4. Marker export to `<name>_downstream_markers.json.gz`, and h5ad/RDS finalisation
+4. Marker export to `<name>_downstream_markers.json.gz`, and h5ad finalisation
 5. A Quarto analysis report
 
 ### Stage 3 — `differential_genes`

@@ -266,7 +266,7 @@ nextflow run UKDRI/scdownstream -r dev_ukdri --stage qc_clustering \
    --outdir results/qc_clustering
 ```
 
-Produces `results/qc_clustering/my_study_qc_clustering.h5ad` (plus `.rds`), a Quarto QC/clustering report
+Produces `results/qc_clustering/my_study_qc_clustering.h5ad`, a Quarto QC/clustering report
 under `report/`, and a MultiQC report.
 
 | Parameter                         | Default          | Description                                                                                                                                                            |
@@ -691,8 +691,9 @@ they were built from:
 | `docker.io/nhecker/pydeseq2:0.1`                    | `DIFFERENTIAL_GENES_PER_CONTRAST`                                                                  | `modules/local/pydeseq2/differential_genes/Dockerfile` |
 | `docker.io/nhecker/scanpy-cosg:1.11.4-cosg1.2.1`     | `MARKERS_COSG`                                                                                     | `modules/local/markers/cosg/Dockerfile`                |
 
-All three extend the public `gcfntnu/scanpy:1.11.4` image. `DECOUPLER_PSEUDOBULK`, `FILTER_PSEUDOBULK` and
-`SCANPY_EXPORT_MARKERS` use that public image directly. The images are published for `linux/amd64`
+All three extend the public `gcfntnu/scanpy:1.11.4` image. Most other h5ad steps (input loading, the
+`ADATA_*` helpers, normalisation, HVGs, PCA, neighbors, Leiden, UMAP, PAGA, combat, bbknn, filtering,
+QC plots, presto markers, pseudobulk and marker export) use that public image directly. The images are published for `linux/amd64`
 only.
 
 > [!NOTE]
@@ -701,8 +702,9 @@ only.
 > pandas 2.3.x). Images with pandas ≥ 3 / anndata ≥ 0.13 write string indices in a form the older
 > anndata cannot write back (`allow_write_nullable_strings is False`). Such images, e.g.
 > BioContainers built with unpinned dependencies, must not be mixed in. Upgrading means updating
-> all images together. Older anndata (0.10, 0.11, still used by `ADATA_TORDS` and `ADATA_SPLITCOL`)
-> cannot read `None` values written by anndata ≥ 0.12, so templates must not store `None` in an h5ad.
+> all images together. Older anndata (0.10, 0.11) cannot read `None` values written by
+> anndata ≥ 0.12, which scanpy itself stores (e.g. `uns["log1p"]["base"]`), so no h5ad step may run
+> on an image with older anndata either.
 
 Prefer `-profile apptainer` over `-profile docker`. Docker Hub limits anonymous pulls, and Docker
 pulls on every host, while Apptainer pulls each image once into `$NXF_SINGULARITY_CACHEDIR`. See the
@@ -911,7 +913,7 @@ nextflow run UKDRI/scdownstream -r dev_ukdri --stage annotate \
   `qc_clustering`.
 
 **Output**
-- **Annotated object:** `<name>_annotate.h5ad` (+ `.rds`) is your object with these additions:
+- **Annotated object:** `<name>_annotate.h5ad` is your object with these additions:
   - `celltypist:<model>` / `celltypist:<model>:conf` and `scanvi:<model>` / `scanvi:<model>:conf`
     columns;
   - the scANVI latent space as `obsm["X_scanvi_<model>"]`.
