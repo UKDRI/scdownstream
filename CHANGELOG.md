@@ -30,6 +30,9 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
   - **Container:** COSG runs in the pipeline's own image `nhecker/scanpy-cosg:1.11.4-cosg1.2.1`
     (scanpy 1.11.4 base + `cosg`), not the BioContainer: its pandas 3 / anndata 0.13 write string
     indices the following steps (anndata 0.12) cannot write back.
+  - **LIANA+:** `LIANA_RANKAGGREGATE` runs in the report image (scanpy 1.11.4 base, liana 1.6.1
+    instead of 1.4.0); the BioContainer's anndata 0.10 could not read the marker output. The
+    marker steps no longer store `"layer": None` in `uns`, which anndata 0.10 / 0.11 cannot read.
   - **Enrichment:** the gene list per cluster is built from the filtered markers (adjusted p < 0.05
     only when presto ran), so it also works with COSG only.
   - **Removed:**

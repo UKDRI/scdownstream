@@ -687,7 +687,7 @@ they were built from:
 
 | Image (Docker Hub)                        | Used by                                                                                            | Recipe                                                 |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4` | `SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`, `SCANPY_ENRICH` | `modules/local/scanpy/report/Dockerfile`               |
+| `docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4` | `SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`, `SCANPY_ENRICH`, `LIANA_RANKAGGREGATE` | `modules/local/scanpy/report/Dockerfile`               |
 | `docker.io/nhecker/pydeseq2:0.1`                    | `DIFFERENTIAL_GENES_PER_CONTRAST`                                                                  | `modules/local/pydeseq2/differential_genes/Dockerfile` |
 | `docker.io/nhecker/scanpy-cosg:1.11.4-cosg1.2.1`     | `MARKERS_COSG`                                                                                     | `modules/local/markers/cosg/Dockerfile`                |
 
@@ -701,7 +701,8 @@ only.
 > pandas 2.3.x). Images with pandas ≥ 3 / anndata ≥ 0.13 write string indices in a form the older
 > anndata cannot write back (`allow_write_nullable_strings is False`). Such images, e.g.
 > BioContainers built with unpinned dependencies, must not be mixed in. Upgrading means updating
-> all images together.
+> all images together. Older anndata (0.10, 0.11, still used by `ADATA_TORDS` and `ADATA_SPLITCOL`)
+> cannot read `None` values written by anndata ≥ 0.12, so templates must not store `None` in an h5ad.
 
 Prefer `-profile apptainer` over `-profile docker`. Docker Hub limits anonymous pulls, and Docker
 pulls on every host, while Apptainer pulls each image once into `$NXF_SINGULARITY_CACHEDIR`. See the

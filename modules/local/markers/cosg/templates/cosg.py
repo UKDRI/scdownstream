@@ -265,7 +265,7 @@ else:
             "groupby": obs_key,
             "reference": "rest",
             "use_raw": False,
-            "layer": None,
+            # No "layer": None here (no None in uns): anndata >= 0.12 writes None as a 'null' element that steps with anndata < 0.12 (ADATA_TORDS, ADATA_SPLITCOL) cannot read
             "method": "cosg",
             "ranked_by": "cosg",
             "methods": "cosg",

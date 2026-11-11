@@ -272,6 +272,10 @@ image matches, add a Dockerfile `FROM docker.io/gcfntnu/scanpy:1.11.4` with
 `pip install --no-deps <tool>` (example: `modules/local/markers/cosg/Dockerfile`) for the user to
 build and push.
 
+Don't store `None` values in an h5ad (e.g. `"layer": None` in `uns[...]["params"]`); leave the key
+out. anndata ≥ 0.12 writes `None` as a `null` element that anndata 0.10 / 0.11, still used by
+`ADATA_TORDS` and `ADATA_SPLITCOL`, cannot read (this broke `LIANA_RANKAGGREGATE`).
+
 Prefer the nf-core Seqera-container ternary shown above. A hardcoded apptainer image path
 (e.g. `container "/nfsdata/apptainer/scanpy_1.11.4_coreinf_0.3.sif"`) is used by a few
 modules — only follow that form when the user asks for it or when extending one of them.
