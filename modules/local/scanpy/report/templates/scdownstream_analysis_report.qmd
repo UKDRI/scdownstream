@@ -461,14 +461,97 @@ function searchTable(inputId, containerId) {
         }
     });
 }
+
+// Number shown in a table cell: plain floats, '1.00e-05', and 'inf' / '-inf' as Python prints them.
+// Anything else (text, empty cells) is NaN. Shared by the column sort and the marker filters.
+function tableCellValue(text) {
+    let t = text.trim().toLowerCase();
+    if (t === 'inf') return Infinity;
+    if (t === '-inf') return -Infinity;
+    return t === '' ? NaN : Number(t);
+}
+
+// Column name of a header cell, without the sort arrow, which sits in its own span.
+function tableHeaderName(th) {
+    let arrow = th.querySelector('.sort-arrow');
+    let name = th.textContent;
+    if (arrow) name = name.replace(arrow.textContent, '');
+    return name.trim();
+}
+
+function sortTable(containerId, colIndex) {
+    let table = document.querySelector('#' + containerId + ' table');
+    if (!table || !table.tBodies.length) return;
+    let tbody = table.tBodies[0];
+    let rows = Array.from(tbody.rows);
+
+    // Clicking the column that is already sorted reverses it, any other column starts ascending.
+    let sorted = table.getAttribute('data-sort-col');
+    let ascending = !(sorted === String(colIndex) && table.getAttribute('data-sort-dir') === 'asc');
+
+    let cell = row => row.cells[colIndex] ? row.cells[colIndex].textContent.trim() : '';
+    let missing = text => ['', 'nan', 'none', '<na>'].includes(text.toLowerCase());
+    let present = rows.map(cell).filter(text => !missing(text));
+    let numeric = present.length > 0 && present.every(text => !Number.isNaN(tableCellValue(text)));
+
+    rows.sort((a, b) => {
+        let x = cell(a);
+        let y = cell(b);
+        // empty and NaN cells go last in either direction
+        if (missing(x) || missing(y)) return missing(x) - missing(y);
+        let order;
+        if (numeric) {
+            // compared, not subtracted: inf - inf is NaN
+            let vx = tableCellValue(x);
+            let vy = tableCellValue(y);
+            order = (vx > vy) - (vx < vy);
+        } else {
+            order = x.localeCompare(y, undefined, {numeric: true});
+        }
+        return ascending ? order : -order;
+    });
+
+    // Moving the rows keeps their style.display, so rows hidden by a search or filter stay hidden.
+    rows.forEach(row => tbody.appendChild(row));
+    table.setAttribute('data-sort-col', colIndex);
+    table.setAttribute('data-sort-dir', ascending ? 'asc' : 'desc');
+}
 </script>
 """
 display(HTML(html))
 ```
 
 ```{python}
-# helper function for creating HTML table
+# helper functions for creating HTML table
+import itertools
+import re
+
 import pandas as pd
+
+def sortable_headers(table_html: str, table_name: str) -> str:
+    """
+    Turn the header cells of a rendered table into sort handles.
+
+    Every `<th>` of the header row gets an onclick calling `sortTable` with its own column
+    index. The arrow goes into its own span, so that `tableHeaderName` (used by the marker
+    filters to find a column by its name) can leave it out.
+    """
+    header = re.search(r'<thead>.*?</thead>', table_html, flags=re.DOTALL)
+    if header is None:
+        return table_html
+
+    index = itertools.count()
+
+    def handle(match):
+        return (
+            "<th style='cursor: pointer' title='Click to sort' onclick=\"sortTable('"
+            + table_name + "', " + str(next(index)) + ")\">" + match.group(1)
+            + "<span class='sort-arrow' aria-hidden='true' style='margin-left: 4px'>&#8645;</span></th>"
+        )
+
+    return table_html.replace(
+        header.group(0), re.sub(r'<th>(.*?)</th>', handle, header.group(0), flags=re.DOTALL), 1
+    )
 
 def create_search_table_html(df: pd.DataFrame, search_text: str, 
                              sbox_name: str, table_name: str, ntop: int=100,
@@ -498,12 +581,14 @@ def create_search_table_html(df: pd.DataFrame, search_text: str,
     """
 
     # input search box
-    table_html = "<input type='text' id='" + box_name + "' onkeyup=\"" + lookupFunction  + "('" + box_name + "', '" + table_name + "')\" "
+    table_html = "<input type='text' id='" + sbox_name + "' onkeyup=\"" + lookupFunction  + "('" + sbox_name + "', '" + table_name + "')\" "
     table_html += "placeholder='"  + search_text + "'"
     table_html += "style='width: 100%; max-width: 300px; padding: 10px; margin-top: 12px; font-family: sans-serif; border: 1px solid #D1D5DB; border-radius: 4px;'>"
 
-    # table
-    table_html += "<div id=" + table_name + " style='overflow-y: scroll; max-height: 400px'>" + df.to_html(index=False, max_rows=ntop) + "</div>"
+    # table of the first ntop rows, with every header cell wired to the sort handler of its own column.
+    # head() instead of to_html(max_rows=...): max_rows puts a '...' row in the middle, which would be sorted too.
+    table_body = sortable_headers(df.head(ntop).to_html(index=False), table_name)
+    table_html += "<div id=" + table_name + " style='overflow-y: scroll; max-height: 400px'>" + table_body + "</div>"
 
     return table_html
 ```
@@ -531,7 +616,8 @@ if has_presto:
     ]
 
 display(HTML(
-    f"<p>Tables show the top {ntop} genes per cluster, in ranking order. Columns:</p><ul>"
+    f"<p>Tables show the top {ntop} genes per cluster, in ranking order. They can be sorted by clicking on a "
+    f"column header (click again to reverse); sorting acts on these top {ntop} genes. Columns:</p><ul>"
     + "".join(f"<li><b>{name}</b>{' (ranking)' if key == marker_ranked_by else ''}: {text}</li>"
               for name, key, text in marker_legend)
     + "</ul>"
@@ -544,13 +630,7 @@ from IPython.display import display, HTML
 
 marker_filter_js = """
 <script>
-function markerCellValue(text) {
-    let t = text.trim().toLowerCase();
-    if (t === 'inf') return Infinity;
-    if (t === '-inf') return -Infinity;
-    return parseFloat(t);
-}
-
+// tableCellValue and tableHeaderName are defined with sortTable above
 function markerFilterValues() {
     let filters = [];
     document.querySelectorAll('.marker-filter').forEach(input => {
@@ -563,7 +643,8 @@ function markerFilterValues() {
 }
 
 function filterMarkerTable(block, filters) {
-    let headers = Array.from(block.querySelectorAll('thead th')).map(th => th.textContent.trim());
+    // column names without the sort arrow, so that data-col of a filter matches its header
+    let headers = Array.from(block.querySelectorAll('thead th')).map(tableHeaderName);
     let search = document.getElementById(block.dataset.search).value.toLowerCase();
     let rows = block.querySelectorAll('tbody tr');
     let shown = 0;
@@ -572,7 +653,7 @@ function filterMarkerTable(block, filters) {
         filters.forEach(f => {
             let idx = headers.indexOf(f.col);
             if (!keep || idx < 0) return;
-            let x = markerCellValue(row.cells[idx].textContent);
+            let x = tableCellValue(row.cells[idx].textContent);
             keep = !Number.isNaN(x) && (f.op === 'min' ? x >= f.value : x <= f.value);
         });
         row.style.display = keep ? '' : 'none';
@@ -703,7 +784,8 @@ g:Profiler gene set enrichment per cluster. Differential genes per cluster are f
 ```{python}
 from IPython.display import display, HTML
 
-display(HTML(f"<p>Results in tables are limited to the top {ntop} terms.</p>"))
+display(HTML(f"<p>Results in tables are limited to the top {ntop} terms. Tables can be sorted by clicking on a "
+             f"column header (click again to reverse); sorting acts on these top {ntop} terms.</p>"))
 ```
 
 ```{python}
@@ -835,7 +917,9 @@ if 'liana_res' in adata.uns:
             html = create_search_table_html(df_liana_clus, text, box_name, table_name, ntop)
             image_html += '<font color="black"><details><summary>Click to expand table</summary>'
             image_html += html
-            image_html += f"<p>Results in tables are limited to the top {ntop} interactions.</p></details></font>"
+            image_html += (f"<p>Results in tables are limited to the top {ntop} interactions. Tables can be sorted by "
+                           f"clicking on a column header (click again to reverse); sorting acts on these top {ntop} "
+                           "interactions.</p></details></font>")
 
             tableid += 1
 
