@@ -26,6 +26,7 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
   - **Report:** the "Differential genes" tables (same order as the JSON) show the AUC, the COSG score, and the raw
     and adjusted p-values. A filter panel (min AUC, log2FC, COSG score, pct in; max pct out, p,
     adj. p) filters all cluster tables in the browser.
+  - A bullet-list legend above the tables explains every column shown: AUC, COSG score, log2FC, pct in/out, p, adj. p.
   - **Marker JSON:** has `list_auc` (presto) and `list_cosg_score` (COSG).
   - **Container:** COSG runs in the pipeline's own image (`nhecker/scanpy-ukdri-suite`,
     scanpy 1.11.4 base + `cosg`), not the BioContainer: its pandas 3 / anndata 0.13 write string

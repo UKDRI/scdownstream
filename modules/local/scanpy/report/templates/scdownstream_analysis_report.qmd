@@ -407,36 +407,28 @@ has_presto = 'auc' in marker_results
 has_cosg = 'cosg_scores' in marker_results
 marker_ranked_by = marker_results['params'].get('ranked_by', 'auc' if has_presto else 'cosg')
 
+# used in the column legend above the marker tables
 cosg_definition = (
-    "the COSG score, a cosine similarity between the expression of a gene and membership of the cluster, "
-    "penalised when the gene is also similar to other clusters (higher means more specific to the cluster)"
+    "cosine similarity between the expression of a gene and membership of the cluster, penalised when the "
+    "gene is also similar to other clusters; higher means more specific to the cluster"
 )
 if marker_ranked_by == 'cosg':
     marker_method_text = (
-        f"Marker genes per cluster are ranked by {cosg_definition}, comparing the cells of a cluster against "
-        "all other cells. Ties are ordered by log2 fold change and then by the fraction of cells of the "
-        "cluster that express the gene."
+        "Marker genes per cluster are found with COSG, comparing the cells of a cluster against all other cells, "
+        "and ranked by the COSG score; ties are ordered by log2FC, then by pct in."
     )
     if has_presto:
-        marker_method_text += (
-            " The Wilcoxon rank-sum test and the AUC (presto statistics) of the same comparison are shown alongside."
-        )
+        marker_method_text += " The Wilcoxon rank-sum test and AUC (presto) of the same comparison are shown too."
 else:
     marker_method_text = (
-        "Marker genes per cluster are identified with a Wilcoxon rank-sum test and the AUC (presto statistics), "
-        "comparing the cells of a cluster against all other cells, and are ranked by AUC; ties are ordered by "
-        "adjusted p-value and then by log2 fold change"
+        "Marker genes per cluster are found with a Wilcoxon rank-sum test and the AUC (presto), comparing the "
+        "cells of a cluster against all other cells, and ranked by AUC; ties are ordered by adj. p, then by log2FC"
         + (", then by the COSG score." if has_cosg else ".")
     )
     if has_cosg:
-        marker_method_text += f" The COSG score is {cosg_definition}; it is shown alongside."
+        marker_method_text += " COSG scores of the same comparison are shown too."
 
-marker_auc_text = (
-    "<p>AUC is the probability that a random cell of the cluster expresses the gene more highly than a random "
-    "other cell; 0.5 means no difference, 1 a perfect marker.</p>"
-    if has_presto else ""
-)
-display(HTML(f"<p>{marker_method_text}</p>" + marker_auc_text))
+display(HTML(f"<p>{marker_method_text}</p>"))
 ```
 
 ```{python}
@@ -519,11 +511,31 @@ def create_search_table_html(df: pd.DataFrame, search_text: str,
 ```{python}
 from IPython.display import display, HTML
 
-display(HTML(f"<p>Results in tables are limited to the top {ntop} genes, in ranking order. "
-             "pct in / pct out: percentage of cells of the cluster / of all other cells in which the gene is detected"
-             + ("; p: p-value of the Wilcoxon test; "
-                "adj. p: Benjamini-Hochberg adjusted p-value of the Wilcoxon test" if has_presto else "")
-             + ".</p>"))
+# column legend, one bullet per table column in the order of marker_table()
+marker_legend = []
+if has_presto:
+    marker_legend.append(('AUC', 'auc', "probability that a random cell of the cluster expresses the gene more "
+                          "highly than a random other cell; 0.5 means no difference, 1 a perfect marker"))
+if has_cosg:
+    marker_legend.append(('COSG score', 'cosg', cosg_definition))
+marker_legend += [
+    ('log2FC', None, "log2 fold change of the cluster over all other cells: the mean log-normalised expression "
+     "of each, converted back with expm1, as in scanpy"),
+    ('pct in', None, "percentage of cells of the cluster in which the gene is detected"),
+    ('pct out', None, "percentage of all other cells in which the gene is detected"),
+]
+if has_presto:
+    marker_legend += [
+        ('p', None, "p-value of the Wilcoxon rank-sum test"),
+        ('adj. p', None, "Benjamini-Hochberg adjusted p-value of the Wilcoxon rank-sum test"),
+    ]
+
+display(HTML(
+    f"<p>Tables show the top {ntop} genes per cluster, in ranking order. Columns:</p><ul>"
+    + "".join(f"<li><b>{name}</b>{' (ranking)' if key == marker_ranked_by else ''}: {text}</li>"
+              for name, key, text in marker_legend)
+    + "</ul>"
+))
 ```
 
 ```{python}
@@ -630,10 +642,13 @@ marker_filter_panel = (
 
 display(HTML(
     marker_filter_js
-    + f"<p>The filters below act on the genes shown in the tables (the top {ntop} genes per cluster, in ranking "
-    "order) and apply to all cluster tables together with each table's gene search; an empty field applies no "
-    "filter. The exported marker JSON is filtered with the pipeline parameters "
-    + ", ".join(marker_export_params[:-1]) + " and " + marker_export_params[-1] + " instead.</p>"
+    + "<ul>"
+    + f"<li>The filters below act on the genes shown (the top {ntop} per cluster) in all cluster tables, "
+    "together with each table's gene search.</li>"
+    + "<li>An empty field applies no filter.</li>"
+    + "<li>The exported marker JSON is filtered with the pipeline parameters "
+    + ", ".join(marker_export_params[:-1]) + " and " + marker_export_params[-1] + " instead.</li>"
+    + "</ul>"
     + marker_filter_panel
 ))
 ```
