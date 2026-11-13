@@ -25,15 +25,15 @@ Produces, at the top level of the results directory:
 
 - `<name>_qc_clustering.h5ad`: the integrated, clustered AnnData object, gzip-compressed, with `X`,
   every layer and `raw.X` stored as sparse CSR matrices. **This is the input to `--stage downstream`.**
-- `<name>_qc_clustering.rds`: a SingleCellExperiment version of the same object.
 
 </details>
 
 `<name>` is the value of `--name` (`scdownstream` if it is not set); the same applies to stage 2.
 
 > [!NOTE]
-> RDS conversion runs with `errorStrategy 'ignore'`, so the `.rds` file is best-effort: if conversion
-> fails the run continues and only the `.h5ad` is produced.
+> The pipeline no longer writes `.rds` copies of its results. To work in R, read the h5ad with
+> [anndataR](https://github.com/scverse/anndataR) (`anndataR::read_h5ad(path, as = "SingleCellExperiment")`
+> or `as = "Seurat"`) or [zellkonverter](https://bioconductor.org/packages/zellkonverter/).
 
 ### Input loading
 
@@ -122,8 +122,7 @@ isoforms are optionally aggregated with `--aggregate_isoforms`.
     - `merged_sample_genes.png`: UpSet plot of gene overlap between samples.
   - `merge_emb/<id>/`: merged embeddings, when embeddings from multiple sources are combined.
   - `integrate/`
-    - `input_hvg/`: the highly-variable-gene subset passed to the integration tools, as `h5ad` and
-      `rds`.
+    - `input_hvg/`: the highly-variable-gene subset passed to the integration tools, as `h5ad`.
     - `scvi/`: the scVI model (`scvi_model/model.pt`, always published) and, with
       `--save_intermediates`, the scVI-integrated object and `X_scvi.pkl`.
     - `scanvi/`: with `scanvi` in `--integration_methods`, the scANVI model
@@ -207,13 +206,24 @@ a `qc_clustering` run.
 <details markdown="1">
 <summary>Output files</summary>
 
-- `<name>_downstream.h5ad` (gzip-compressed, sparse CSR `X`, layers and `raw.X`) / `<name>_downstream.rds`: the
+- `<name>_downstream.h5ad` (gzip-compressed, sparse CSR `X`, layers and `raw.X`): the
   object with marker genes, enrichment results and LIANA+ output added. **This is the input to `--stage differential_genes`.**
 - `<name>_downstream_markers.json.gz`: the marker genes per group (one set per cluster, id
-  `genes--cluster--<cluster>`; the separator is `--markers_sep`), filtered by `--markers_thr_adj_pvalue`,
-  `--markers_n_top`, `--markers_pct_nz` and `--markers_min_logfc`, in a compact JSON form for
+  `genes--cluster--<cluster>`; the separator is `--markers_sep`), in a compact JSON form for
   downstream tooling.
-- `scanpy/<name>/`: the object after `rank_genes_groups` (Wilcoxon) and after gene set enrichment.
+  - **Filters:** at least `--markers_pct_nz` and `--markers_min_logfc`, `--markers_min_auc` when
+    presto ran, and `--markers_min_cosg_score` when it is set.
+  - **Order:** the ranking of `--markers_rank_by` (see [usage](usage.md)), at most
+    `--markers_n_top` genes per set.
+  - **Per gene:** `list_score` (the primary ranking metric), `list_logFC` (log2 fold change), the
+    expressing fractions; with presto `list_auc` and `list_p_value` / `list_p_value_adjusted`
+    (Wilcoxon, reported only, not used for selection); with COSG `list_cosg_score`.
+  - **`params`:** records `methods`, `ranked_by` and the filters.
+- `scanpy/<name>/`: with `--save_intermediates`, the object after the marker genes and after gene
+  set enrichment.
+  - **Marker results:** in `uns["rank_genes_groups"]`, in scanpy's format: `names`, `scores`
+    (the primary ranking metric), `logfoldchanges`, `pts` / `pts_rest`, with presto `auc`, `pvals`,
+    `pvals_adj`, and with COSG `cosg_scores`.
 - `per_group/<name>/liana/`: [LIANA+](https://liana-py.readthedocs.io/) rank-aggregate cell–cell
   communication results.
 - `report/<name>_downstream_report.html`: a Quarto report covering the marker genes per group, the
@@ -222,6 +232,12 @@ a `qc_clustering` run.
   per-cluster summary is not limited: for each cluster it lists up to 5 predicted labels that cover
   at least 5 % of the cluster's cells, with their percentage, whatever their overall rank.
   With `--umap_color_by`, it also has the "Requested UMAP plots" section described for stage 1.
+  - **Marker tables:** the "Differential genes" tables list the top `--report_table_row_limit`
+    genes per cluster, in the same order as the marker JSON. Columns: AUC, COSG score, log2FC, pct
+    in / out, p and adj. p (AUC and p-values only with presto, COSG score only with COSG).
+  - **Filter panel:** filters all tables in the browser (min AUC, log2FC, COSG score, pct in; max
+    pct out, p, adj. p). It works only on the rows shown, independently of the parameters used for
+    the marker JSON.
 
 </details>
 
@@ -328,7 +344,7 @@ Adds CellTypist and/or scANVI predictions to a processed object (`--base_adata`)
 <details markdown="1">
 <summary>Output files</summary>
 
-- **`<name>_annotate.h5ad`** (sparse, gzip-compressed) and `<name>_annotate.rds`: the input object
+- **`<name>_annotate.h5ad`** (sparse, gzip-compressed): the input object
   with these additions:
   - `obs` columns `celltypist:<model>` / `celltypist:<model>:conf` and `scanvi:<model>` /
     `scanvi:<model>:conf`: the most probable label and its confidence (0–1);
@@ -374,6 +390,6 @@ troubleshoot failures and to record launch commands, run times and resource usag
 ## Directories referenced elsewhere but not produced
 
 Some publishing rules inherited from upstream target steps that are not part of the curated workflow.
-The three stages do not write them: `cluster_dimred/`, `pseudobulking/`,
+The three stages do not write them: `cluster_dimred/`,
 `per_group/<id>/paga/`, `finalized/`, and the
 `quality_control/doublet_detection/{solo,doubletdetection,scds}/` directories.

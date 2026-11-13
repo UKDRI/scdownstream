@@ -109,6 +109,17 @@ Upstream nf-core/scdownstream, and therefore this fork, drew on the learnings an
 
   > McInnes L, Healy J, Melville J. UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction. arXiv:1802.03426.
 
+### Marker genes
+
+- [presto](https://doi.org/10.1101/653253): the Wilcoxon rank-sum test and AUC are re-implemented
+  in Python after presto's method (`MARKERS_PRESTO`). presto's code is not used or included.
+
+  > Korsunsky I, Nathan A, Millard N, Raychaudhuri S. Presto scales Wilcoxon and auROC analyses to millions of observations. bioRxiv. 2019. doi: 10.1101/653253.
+
+- [COSG](https://doi.org/10.1093/bib/bbab579): specificity score of the marker genes (`MARKERS_COSG`)
+
+  > Dai M, Pei X, Wang XJ. Accurate and fast cell marker gene identification with COSG. Brief Bioinform. 2022 Mar;23(2):bbab579. doi: 10.1093/bib/bbab579.
+
 ### Cell–cell communication
 
 - [LIANA+](https://pubmed.ncbi.nlm.nih.gov/39223377/)
@@ -164,10 +175,6 @@ are ready as each is validated and enabled.
 - [ComBat](https://pubmed.ncbi.nlm.nih.gov/16632515/)
 
   > Johnson WE, Li C, Rabinovic A. Adjusting batch effects in microarray expression data using empirical Bayes methods. Biostatistics. 2007 Jan;8(1):118-27. doi: 10.1093/biostatistics/kxj037. PubMed PMID: 16632515.
-
-- [SCimilarity](https://doi.org/10.1101/2023.07.18.549537)
-
-  > Heimberg G, Kuo T, DePianto D, et al. Scalable querying of human cell atlases via a foundational model reveals commonalities across fibrosis-associated macrophages. Published online July 19, 2023:2023.07.18.549537. doi:10.1101/2023.07.18.549537
 
 - [SOLO](https://pubmed.ncbi.nlm.nih.gov/32592658/)
 

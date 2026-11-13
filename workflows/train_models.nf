@@ -19,7 +19,7 @@ include { MODEL_EVALUATE as EVALUATE_CELLTYPIST           } from '../modules/loc
 include { MODEL_EVALUATE as EVALUATE_SCANVI               } from '../modules/local/celltypes/evaluate'
 include { SCANPY_GENERATE_REPORT_TRAINING                 } from '../modules/local/scanpy/report'
 include { softwareVersionsToYAML                          } from '../subworkflows/nf-core/utils_nfcore_pipeline'
-include { paramAsBoolean                                  } from '../subworkflows/local/utils_nfcore_scdownstream_pipeline'
+include { paramAsBoolean                                  } from '../subworkflows/local/utils'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

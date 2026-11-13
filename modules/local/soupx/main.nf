@@ -2,7 +2,8 @@ process SOUPX {
     tag "$meta.id"
     label 'process_medium'
 
-    container "docker.io/nicotru/soupx:f6297681695fbfcf"
+    // Built from containers/seurat-ukdri-suite/Dockerfile.
+    container 'docker.io/nhecker/seurat-ukdri-suite:5.5.1-1'
 
     input:
     tuple val(meta), path(h5ad), path(raw)

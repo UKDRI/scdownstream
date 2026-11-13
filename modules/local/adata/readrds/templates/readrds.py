@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+from importlib.metadata import version
 
 os.environ["TMPDIR"] = "."
 
@@ -9,6 +10,9 @@ import anndata2ri
 import rpy2
 import pandas as pd
 import rpy2.robjects as ro
+# Explicit import: rpy2.robjects does not import its packages submodule itself
+import rpy2.robjects.packages
+from rpy2.robjects.conversion import localconverter
 seurat = ro.packages.importr('Seurat')
 # Import SingleCellExperiment to check for class
 sce_pkg = ro.packages.importr('SingleCellExperiment')
@@ -44,7 +48,9 @@ if not is_sce:
 else:
     sce = rds_obj
 
-adata = anndata2ri.rpy2py(sce)
+# anndata2ri >= 2.0 (git main in the image) removed anndata2ri.rpy2py; convert in a converter context
+with localconverter(ro.default_converter + anndata2ri.converter):
+    adata = ro.conversion.get_conversion().rpy2py(sce)
 
 # Convert indices to string
 adata.obs.index = adata.obs.index.astype(str)
@@ -55,8 +61,10 @@ adata.write_h5ad("${prefix}.h5ad")
 versions = {
     "${task.process}": {
         "anndata": ad.__version__,
-        "anndata2ri": anndata2ri.__version__,
-        "rpy2": rpy2.__version__,
+        # anndata2ri >= 2.0 has no __version__ attribute
+        "anndata2ri": version("anndata2ri"),
+        # rpy2 >= 3.6 is a namespace package without a top-level __version__
+        "rpy2": version("rpy2"),
         "pandas": pd.__version__,
         "seurat": seurat.__version__
     }

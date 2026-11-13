@@ -9,8 +9,9 @@ include { MULTIQC                              } from '../modules/nf-core/multiq
 include { paramsSummaryMap                     } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc                 } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML               } from '../subworkflows/nf-core/utils_nfcore_pipeline'
-include { methodsDescriptionText               } from '../subworkflows/local/utils_nfcore_scdownstream_pipeline'
-include { SCANPY_RANKGENESGROUPS               } from '../modules/local/scanpy/rankgenesgroups'
+include { methodsDescriptionText               } from '../subworkflows/local/utils'
+include { MARKERS_PRESTO                       } from '../modules/local/markers/presto'
+include { MARKERS_COSG                         } from '../modules/local/markers/cosg'
 include { SCANPY_ENRICH                        } from '../modules/local/scanpy/enrich'
 include { SCANPY_GENERATE_REPORT               } from '../modules/local/scanpy/report'
 include { LIANA_RANKAGGREGATE                  } from '../modules/local/liana/rankaggregate'
@@ -38,8 +39,30 @@ workflow DOWNSTREAM_ANALYSIS {
 
     ch_h5ad = ch_base
 
-    SCANPY_RANKGENESGROUPS(ch_h5ad, clustering_name)
-    ch_h5ad = SCANPY_RANKGENESGROUPS.out.h5ad
+    // Marker gene methods from --markers_method (presto and/or cosg); the ranking defaults to
+    // AUC when presto runs, else to the COSG score. validateMarkersParameters() checks both.
+    def markers_methods = params.markers_method.toString().tokenize(',').collect { method -> method.trim().toLowerCase() }.findAll { method -> method }.unique()
+    def markers_rank_by = params.markers_rank_by ?: ('presto' in markers_methods ? 'auc' : 'cosg')
+
+    // MODULE: marker genes per group (presto Wilcoxon + AUC)
+    if ('presto' in markers_methods) {
+        MARKERS_PRESTO(ch_h5ad, clustering_name)
+        ch_versions = ch_versions.mix(MARKERS_PRESTO.out.versions)
+        ch_h5ad = MARKERS_PRESTO.out.h5ad
+    }
+
+    // MODULE: COSG score per group, added to the presto results if presto ran
+    if ('cosg' in markers_methods) {
+        MARKERS_COSG(
+            ch_h5ad,
+            clustering_name,
+            params.markers_cosg_mu,
+            markers_rank_by,
+            'presto' in markers_methods
+        )
+        ch_versions = ch_versions.mix(MARKERS_COSG.out.versions)
+        ch_h5ad = MARKERS_COSG.out.h5ad
+    }
     SCANPY_ENRICH(ch_h5ad, "rank_genes_groups", params.species, params.enrich_min_in_group_fraction, params.enrich_min_fold_change, params.enrich_max_out_group_fraction)
     ch_h5ad = SCANPY_ENRICH.out.h5ad
     LIANA_RANKAGGREGATE(

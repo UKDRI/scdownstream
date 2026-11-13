@@ -50,6 +50,34 @@ subworkflows, or the schema here.
   confirm that `dc.pp.pseudobulk` actually accepts `sample_col`, `groups_col`, and `layer`
   in the installed version.
 
+- **Don't re-implement standard functions.** Before writing statistics or data handling
+  yourself, check whether the libraries in the container already provide it, and use their
+  function. Look in `scipy.stats` / `scipy.special`, `numpy`, `pandas`, `scanpy` (`sc.get.*`,
+  `sc.pp.*`, `sc.tl.*`), `statsmodels` (only if installed) or R `stats`. Examples:
+  - multiple-testing correction: `scipy.stats.false_discovery_control`, R `p.adjust`;
+  - rank tests: `scipy.stats.mannwhitneyu`;
+  - ranks: `scipy.stats.rankdata`;
+  - normal tail probabilities: `scipy.special.ndtr`, `scipy.stats.norm.sf`;
+  - per-group means and expressing fractions: `sc.get.aggregate`.
+
+  Write your own code only when the library version really doesn't fit, e.g. it needs
+  dense data and is far too slow or too memory-hungry at the dataset sizes this pipeline
+  handles. In that case:
+  - say in a comment why the library function isn't used;
+  - keep the own code as small as possible;
+  - name the reference implementation it must match, and report how it was checked against it.
+
+- **Raw counts come from `layers["counts"]`.** When a step needs raw counts (normalising
+  itself, count models such as scVI/scANVI, pseudobulk sums, ambient or doublet tools), it
+  reads them from `layers["counts"]`. Never assume `X` holds raw counts: in the stage outputs
+  `X` is log-normalised. Fall back to `X` only where the module documents that inputs may
+  carry the counts in `X` (e.g. objects without a `counts` layer in `--stage annotate`), and
+  print which one is used.
+  - If a tool reads only `X`, put the counts into `X` of a copy inside the template (see
+    `modules/local/celltypes/celltypist/templates/celltypist.py`). Never overwrite the `X` of
+    the object that is written out.
+  - Steps meant for log-normalised data (rank tests and AUC, COSG, plots) use `X` as it is.
+
 - **No hard-coded parameters in function calls.** Values that affect the result (seeds,
   thresholds, numbers of components or neighbours, epochs, cut-offs, ...) come from the
   process inputs or `task.ext.*`, not from literals written into a call. When a fixed value
@@ -234,6 +262,20 @@ process SCANPY_LEIDEN {
 The `stub:` block is a plain shell block — it never calls the template. `touch` every
 declared output, including `versions.yml`, and guard `optional:` outputs behind the same
 condition the template uses. 35 of the 38 stubs in this repo take exactly this form.
+
+**Library versions across containers.** h5ad files pass from process to process, so every image that
+reads or writes an h5ad must use the pipeline's anndata/pandas generation: the base image
+`docker.io/gcfntnu/scanpy:1.11.4` (scanpy 1.11.4, anndata 0.12.2, pandas 2.3.x). Never pick an image
+with pandas ≥ 3 / anndata ≥ 0.13. BioContainers built with unpinned dependencies often have them
+(this broke `SCANPY_ENRICH` after `MARKERS_COSG`). Check the versions of a new image first; if no
+image matches, add the tool to `containers/scanpy-ukdri-suite/Dockerfile` (or a new Dockerfile
+under `containers/` `FROM docker.io/gcfntnu/scanpy:1.11.4`), following the rules in
+`containers/README.md`, with a new tag for the user to build and push.
+
+Don't store `None` values in an h5ad (e.g. `"layer": None` in `uns[...]["params"]`); leave the key
+out. anndata ≥ 0.12 writes `None` as a `null` element that anndata 0.10 / 0.11 cannot read (this
+broke `LIANA_RANKAGGREGATE`). A new or changed module that reads or writes h5ad uses
+`docker.io/gcfntnu/scanpy:1.11.4` or an image built `FROM` it, never an older Seqera/Wave image.
 
 Prefer the nf-core Seqera-container ternary shown above. A hardcoded apptainer image path
 (e.g. `container "/nfsdata/apptainer/scanpy_1.11.4_coreinf_0.3.sif"`) is used by a few

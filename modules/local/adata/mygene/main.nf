@@ -3,9 +3,8 @@ process ADATA_MYGENE {
     label 'process_single'
 
     conda "${moduleDir}/environment.yml"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'oras://community.wave.seqera.io/library/mygene_anndata_pyyaml:b2cb83d7952ecb6f':
-        'community.wave.seqera.io/library/mygene_anndata_pyyaml:1ca543213544b265' }"
+    // Built from containers/scanpy-ukdri-suite/Dockerfile.
+    container 'docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1'
 
     input:
     tuple val(meta), path(h5ad)

@@ -3,9 +3,8 @@ process ADATA_UPSETGENES {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    container "${workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container
-        ? 'oras://community.wave.seqera.io/library/scanpy_upsetplot:962fb86ff4f03aa4'
-        : 'community.wave.seqera.io/library/scanpy_upsetplot:1ce883f3ff369ca8'}"
+    // Built from containers/scanpy-ukdri-suite/Dockerfile.
+    container 'docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1'
 
     input:
     tuple val(meta), val(names), path(h5ads)

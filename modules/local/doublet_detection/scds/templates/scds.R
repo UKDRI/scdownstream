@@ -9,7 +9,15 @@ Sys.setenv(TMP = ".")
 set.seed(0)
 
 adata <- read_h5ad("${h5ad}")
-sce <- adata\$as_SingleCellExperiment()
+# scds reads the assay "counts". anndataR 1.2.1 converts X to the assay "X" and each layer to an assay of the
+# same name, so without a counts layer X (which holds the raw counts before normalisation) becomes "counts".
+if ("counts" %in% adata\$layers_keys()) {
+    message("scds input: raw counts from layers['counts']")
+    sce <- adata\$as_SingleCellExperiment()
+} else {
+    message("scds input: raw counts from X")
+    sce <- adata\$as_SingleCellExperiment(x_mapping = "counts")
+}
 
 ## Annotate doublet using binary classification based doublet scoring:
 sce <- bcds(sce, retRes = TRUE, estNdbl=TRUE)
@@ -29,8 +37,13 @@ if ("cxds_score" %in% colnames(colData(sce))) {
     predictions <- colData(sce)[, 'bcds_call', drop=FALSE]
 }
 
-adata_processed <- as_AnnData(sce)
-write_h5ad(adata_processed, "${prefix}.h5ad")
+# Add the scds scores and calls to the input object. Not as_AnnData(sce): anndataR 1.2.1 copies metadata(sce)
+# to uns, and with retRes = TRUE that holds the xgboost model and xgb.cv result, which write_h5ad() cannot write.
+scds_cols <- grep("^(bcds|cxds|hybrid)_(score|call)\$", colnames(colData(sce)), value = TRUE)
+obs <- adata\$obs
+obs[scds_cols] <- as.data.frame(colData(sce)[, scds_cols, drop = FALSE])
+adata\$obs <- obs
+write_h5ad(adata, "${prefix}.h5ad")
 
 colnames(predictions) <- "${prefix}"
 write.csv(predictions, "${prefix}.csv")

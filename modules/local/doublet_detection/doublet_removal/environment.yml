@@ -1,11 +1,12 @@
 name: doublet_removal
+# Same package versions as docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1 (containers/scanpy-ukdri-suite/Dockerfile)
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - conda-forge::python=3.12
-  - conda-forge::numpy=2.1.3
-  - conda-forge::pandas=2.2.3
-  - conda-forge::matplotlib-base=3.9.4
-  - conda-forge::anndata=0.11.1
+  - conda-forge::python=3.11.11
+  - conda-forge::numpy=2.2.6
+  - conda-forge::pandas=2.3.2
+  - conda-forge::matplotlib-base=3.10.5
+  - conda-forge::anndata=0.12.2
   - conda-forge::upsetplot=0.9.0

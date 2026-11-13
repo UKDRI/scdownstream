@@ -33,7 +33,7 @@ process bodies or templates here.
 - `workflows/` — `scdownstream.nf`, `qc_clustering.nf`, `downstream.nf`. One top-level
   workflow each; these own MultiQC, version collation, and the `emit:` back to `main.nf`.
 - `subworkflows/local/` — either a bare `<name>.nf` (e.g. `integrate.nf`, `combine.nf`) or
-  a directory `<name>/main.nf` with a `tests/` folder (e.g. `cluster/`, `pseudobulking/`).
+  a directory `<name>/main.nf` with a `tests/` folder (e.g. `cluster/`, `load_h5ad/`).
   Use the directory form for anything new that warrants a test.
 - `subworkflows/nf-core/` and `modules/nf-core/` are vendored — do not hand-edit; they are
   managed by `nf-core modules/subworkflows update` and tracked in `modules.json`.
@@ -43,7 +43,7 @@ process bodies or templates here.
 ```groovy
 include { SCANPY_HVGS       } from '../../modules/local/scanpy/hvgs'
 include { SCVITOOLS_SCVI    } from '../../modules/local/scvitools/scvi'
-include { SCIMILARITY       } from './scimilarity'
+include { SCANPY_HARMONY    } from '../../modules/local/scanpy/harmony'
 
 workflow INTEGRATE {
     take:

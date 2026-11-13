@@ -115,12 +115,15 @@ differential_genes/    ── decoupler pseudobulk → PyDESeq2 per group × con
 
 ### Stage 2 — `downstream`
 
-1. Marker genes per cluster — `scanpy.tl.rank_genes_groups` (Wilcoxon) on the clustering named by
-   `--selected_clustering`
+1. Marker genes per cluster on the clustering named by `--selected_clustering`: Wilcoxon rank-sum
+   test with AUC, as in [presto](https://github.com/immunogenomics/presto), and the
+   [COSG](https://github.com/genecell/COSG) specificity score (both by default,
+   `--markers_method`). Markers are ranked by AUC, or by the COSG score with
+   `--markers_rank_by cosg`.
 2. Gene set enrichment over those markers
 3. Cell–cell communication — [LIANA+](https://liana-py.readthedocs.io/) rank aggregation, using HCOP
    orthologs for non-human species
-4. Marker export to `<name>_downstream_markers.json.gz`, and h5ad/RDS finalisation
+4. Marker export to `<name>_downstream_markers.json.gz`, and h5ad finalisation
 5. A Quarto analysis report
 
 ### Stage 3 — `differential_genes`
@@ -291,13 +294,13 @@ each image on first use, converting it to a `.sif` in `$NXF_SINGULARITY_CACHEDIR
 Docker Hub and pulled the same way. Their Dockerfiles are kept in the repository only as the recipe
 they were built from:
 
-| Image (Docker Hub)                        | Required by                                                                                        | Recipe                                                                                                          |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4` | `SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`, `SCANPY_ENRICH` | [`modules/local/scanpy/report/Dockerfile`](modules/local/scanpy/report/Dockerfile)                             |
-| `docker.io/nhecker/pydeseq2:0.1`                    | `DIFFERENTIAL_GENES_PER_CONTRAST`                                                                  | [`modules/local/pydeseq2/differential_genes/Dockerfile`](modules/local/pydeseq2/differential_genes/Dockerfile) |
+| Image (Docker Hub)                                   | Required by                                                                                     | Recipe                                                                                     |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1`      | CellTypist, Harmony, doublet removal, UpSet plots, MyGene, HUGO unifier, COSG, LIANA+, enrichment, PyDESeq2, reports | [`containers/scanpy-ukdri-suite/Dockerfile`](containers/scanpy-ukdri-suite/Dockerfile)           |
+| `docker.io/nhecker/seurat-ukdri-suite:5.5.1-1`       | decontX, scds, SoupX, Seurat integration                                                         | [`containers/seurat-ukdri-suite/Dockerfile`](containers/seurat-ukdri-suite/Dockerfile)                   |
 
-Both extend the public `gcfntnu/scanpy:1.11.4` image, which `DECOUPLER_PSEUDOBULK`, `FILTER_PSEUDOBULK` and
-`SCANPY_EXPORT_MARKERS` use directly. The images are published for `linux/amd64` only.
+Most other h5ad steps use the public `gcfntnu/scanpy:1.11.4` image directly, which
+`scanpy-ukdri-suite` extends. See [`containers/README.md`](containers/README.md).
 
 > [!IMPORTANT]
 > **We recommend running with `-profile apptainer` (or `singularity`), not `-profile docker`.** These

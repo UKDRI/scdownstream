@@ -2,7 +2,8 @@ process SEURAT_INTEGRATION {
     tag "${meta.id}"
     label 'process_medium'
 
-    container "docker.io/nicotru/seurat:b3b12d17271014d9"
+    // Built from containers/seurat-ukdri-suite/Dockerfile.
+    container 'docker.io/nhecker/seurat-ukdri-suite:5.5.1-1'
 
     input:
     tuple val(meta), path(h5ad)

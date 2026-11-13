@@ -1,7 +1,6 @@
 include { SCANPY_HVGS          } from '../../modules/local/scanpy/hvgs'
 include { SCANPY_FILTER        } from '../../modules/local/scanpy/filter'
 include { SCANPY_LOG_NORMALIZE } from '../../modules/local/scanpy/normalization'
-include { ADATA_TORDS          } from '../../modules/local/adata/tords'
 include { SCVITOOLS_SCVI       } from '../../modules/local/scvitools/scvi'
 include { SCVITOOLS_SCANVI     } from '../../modules/local/scvitools/scanvi'
 include { SCANPY_HARMONY       } from '../../modules/local/scanpy/harmony'
@@ -9,7 +8,6 @@ include { INTEGRATION_BBKNN    } from '../../modules/local/integration/bbknn'
 include { SCANPY_COMBAT        } from '../../modules/local/scanpy/combat'
 include { SEURAT_INTEGRATION   } from '../../modules/local/seurat/integration'
 include { ADATA_READRDS        } from '../../modules/local/adata/readrds'
-include { SCIMILARITY          } from './scimilarity'
 include { ADATA_ADD_OBS_OBSM   } from '../../modules/local/adata/add_obs_obsm'
 include { ADATA_ADD_OBS_OBSM as ADD_SCANVI_RESULTS } from '../../modules/local/adata/add_obs_obsm'
 include { SCANPY_NEIGHBORS     } from '../../modules/local/scanpy/neighbors'
@@ -25,7 +23,6 @@ workflow INTEGRATE {
     scanvi_model                // path
     scvi_categorical_covariates // list of string
     scvi_continuous_covariates  // list of string
-    scimilarity_model           // path
 
     main:
     ch_versions = Channel.empty()
@@ -158,17 +155,6 @@ workflow INTEGRATE {
         ch_versions = ch_versions.mix(SCANPY_COMBAT.out.versions)
         ch_integrations = ch_integrations.mix(SCANPY_COMBAT.out.h5ad)
         ch_obsm = ch_obsm.mix(SCANPY_COMBAT.out.obsm)
-    }
-
-    if (methods.contains('scimilarity')) {
-        SCIMILARITY(
-            ch_h5ad.map { _meta, h5ad -> [[id: 'scimilarity'], h5ad] },
-            scimilarity_model,
-        )
-        ch_versions = ch_versions.mix(SCIMILARITY.out.versions)
-        ch_integrations = ch_integrations.mix(SCIMILARITY.out.integrations)
-        ch_obs = ch_obs.mix(SCIMILARITY.out.obs)
-        ch_obsm = ch_obsm.mix(SCIMILARITY.out.obsm)
     }
 
     emit:

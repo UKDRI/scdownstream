@@ -1,0 +1,23 @@
+---
+# Environment of docker.io/nhecker/seurat-ukdri-suite:5.5.1-1 (containers/seurat-ukdri-suite/Dockerfile).
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - conda-forge::r-base=4.5.3
+  # Exactly 1.2.1: 1.2.2+ writes character vectors containing NA as 'nullable-string-array', which
+  # anndata 0.12.2 reads but refuses to write back (allow_write_nullable_strings is False)
+  - bioconda::bioconductor-anndatar=1.2.1
+  # anndataR reads and writes h5ad through rhdf5 (>= 2.52.1), but lists it only under Suggests, so
+  # the bioconda package does not pull it in
+  - bioconda::bioconductor-rhdf5=2.54.1
+  - bioconda::bioconductor-singlecellexperiment=1.32.0
+  - bioconda::bioconductor-celda=1.26.0
+  - bioconda::bioconductor-scds=1.26.1
+  # SCTransform (seurat/integration) uses glmGamPoi when it is installed; the previous seurat image had it
+  - bioconda::bioconductor-glmgampoi=1.22.0
+  - conda-forge::r-soupx=1.6.2
+  - conda-forge::r-seurat=5.5.1
+  - conda-forge::r-seuratobject=5.4.0
+  # Nextflow needs `ps` for the task metrics
+  - conda-forge::procps-ng=4.0.6

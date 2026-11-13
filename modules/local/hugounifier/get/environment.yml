@@ -1,7 +1,11 @@
+# Same package versions as docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1 (containers/scanpy-ukdri-suite/Dockerfile)
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - pip
+  - conda-forge::python=3.11.11
+  - conda-forge::anndata=0.12.2
+  - conda-forge::pandas=2.3.2
+  - conda-forge::pip
   - pip:
-      - hugo-unifier==0.2.8
+      - hugo-unifier==0.3.2

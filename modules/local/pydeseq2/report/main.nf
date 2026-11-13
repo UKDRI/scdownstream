@@ -3,8 +3,8 @@ process PYDESEQ2_GENERATE_REPORT {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    // Built from modules/local/scanpy/report/Dockerfile.
-    container 'docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4'
+    // Built from containers/scanpy-ukdri-suite/Dockerfile.
+    container 'docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1'
 
     input:
     tuple val(meta), path(h5ad)

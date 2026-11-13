@@ -33,7 +33,6 @@ workflow COMBINE {
         params.scanvi_model,
         params.scvi_categorical_covariates,
         params.scvi_continuous_covariates,
-        params.scimilarity_model
     )
     ch_versions      = ch_versions.mix(INTEGRATE.out.versions)
     ch_var           = ch_var.mix(INTEGRATE.out.var)

@@ -9,7 +9,7 @@ include { SCANPY_FILTER                                                         
 include { DOUBLET_DETECTION                                                          } from '../doublet_detection'
 include { SCANPY_PLOTQC as QC_FILTERED                                               } from '../../../modules/local/scanpy/plotqc'
 include { CUSTOM_COLLECTSIZES as COLLECT_SIZES                                       } from '../../../modules/local/custom/collectsizes'
-include { sampleOrGlobal                                                             } from '../utils_nfcore_scdownstream_pipeline'
+include { sampleOrGlobal                                                             } from '../utils'
 
 workflow QUALITY_CONTROL {
     take:

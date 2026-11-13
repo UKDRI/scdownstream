@@ -10,8 +10,10 @@ adata <- read_h5ad("${h5ad}")
 sce <- adata\$as_SingleCellExperiment()
 
 # Prepare parameters for decontX
+# anndataR 1.2.1 converts X to the assay "X" and each layer to an assay of the same name, so the assay is
+# the input layer itself
 params <- list()
-params\$assayName <- "${input_layer == 'X' ? 'counts' : input_layer}"
+params\$assayName <- "${input_layer}"
 
 # Handle batch information if available
 batch_col <- "${batch_col}"
@@ -24,18 +26,24 @@ raw_path <- "${raw}"
 if (file.exists(raw_path)) {
     raw <- read_h5ad(raw_path)
     params\$background <- raw\$as_SingleCellExperiment()
+    # The raw counts are in the same layer as in the filtered object, or else in X
+    bg_assays <- SummarizedExperiment::assayNames(params\$background)
+    params\$bgAssayName <- if (params\$assayName %in% bg_assays) params\$assayName else "X"
+    message("decontX background: raw counts from ", ifelse(params\$bgAssayName == "X", "X", paste0("layers['", params\$bgAssayName, "']")))
 }
 
 # Run decontX with parameters
 corrected <- do.call(decontX, c(list(sce), params))
 
-adata_corrected <- as_AnnData(corrected)
+# The corrected counts as cells x genes. Taken from the assay directly, not through as_AnnData(corrected),
+# which in anndataR 1.2.1 would also convert the input assay "X" and decontX's results in metadata()
+decontx_counts <- Matrix::t(decontXcounts(corrected))
 
-# Convert back to AnnData and update layers
+# Update X or the output layer
 if ("${output_layer}" == "X") {
-    adata\$X <- adata_corrected\$layers[["decontXcounts"]]
+    adata\$X <- decontx_counts
 } else {
-    adata\$layers[["${output_layer}"]] <- adata_corrected\$layers[["decontXcounts"]]
+    adata\$layers[["${output_layer}"]] <- decontx_counts
 }
 
 # Save the output

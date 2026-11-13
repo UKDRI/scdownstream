@@ -3,9 +3,8 @@ process INTEGRATION_BBKNN {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'oras://community.wave.seqera.io/library/bbknn_scanpy:51468e4ffb8f2c02':
-        'community.wave.seqera.io/library/bbknn_scanpy:81e46c935f05bf4f' }"
+    // The base image ships bbknn
+    container 'docker.io/gcfntnu/scanpy:1.11.4'
 
     input:
     tuple val(meta), path(h5ad)

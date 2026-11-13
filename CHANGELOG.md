@@ -12,6 +12,36 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Added`
 
+- `--stage downstream` marker genes:
+  - **New default:** the Wilcoxon rank-sum test with AUC, a Python re-implementation of the
+    method of the R package presto (`wilcoxauc`; results verified against R presto). Markers
+    are ranked and selected by AUC (`--markers_min_auc`, default 0.7, the usual threshold for
+    acceptable discrimination) instead of by adjusted p-value. The filters on the expressing fraction (`--markers_pct_nz`)
+    and the fold change (`--markers_min_logfc`) stay.
+  - **COSG score** (`--markers_cosg_mu`): computed by default too. `--markers_method` (default
+    `presto,cosg`) selects the methods that run. `--markers_rank_by auc|cosg` sets the ranking
+    (AUC → adj. p → log2FC → COSG score, or COSG score → log2FC → pct in; default `auc` when presto
+    runs). With COSG only there is no AUC or p-value. An optional `--markers_min_cosg_score`
+    filters by the COSG score; it is not used by default.
+  - **Report:** the "Differential genes" tables (same order as the JSON) show the AUC, the COSG score, and the raw
+    and adjusted p-values. A filter panel (min AUC, log2FC, COSG score, pct in; max pct out, p,
+    adj. p) filters all cluster tables in the browser.
+  - A bullet-list legend above the tables explains every column shown: AUC, COSG score, log2FC, pct in/out, p, adj. p.
+  - The marker, enrichment and LIANA+ tables can be sorted by clicking a column header (sorting works together with the search and the marker filters); tables with more than `--report_table_row_limit` rows show the first rows instead of first and last around a "..." row.
+  - **Marker JSON:** has `list_auc` (presto) and `list_cosg_score` (COSG).
+  - **Container:** COSG runs in the pipeline's own image (`nhecker/scanpy-ukdri-suite`,
+    scanpy 1.11.4 base + `cosg`), not the BioContainer: its pandas 3 / anndata 0.13 write string
+    indices the following steps (anndata 0.12) cannot write back.
+  - **LIANA+:** `LIANA_RANKAGGREGATE` runs in the report image (scanpy 1.11.4 base, liana 1.6.1
+    instead of 1.4.0); the BioContainer's anndata 0.10 could not read the marker output. The
+    marker steps no longer store `"layer": None` in `uns`, which anndata 0.10 / 0.11 cannot read.
+  - **Enrichment:** the gene list per cluster is built from the filtered markers (adjusted p < 0.05
+    only when presto ran), so it also works with COSG only.
+  - **Removed:**
+    - `--markers_thr_adj_pvalue`. Cluster-vs-rest p-values are inflated (cells as replicates,
+      clusters from the same data), so they are still reported but no longer used to select
+      markers;
+    - the `SCANPY_RANKGENESGROUPS` module.
 - `--stage annotate`: adds cell type predictions from pre-trained models to an object that is
   already processed, without re-running QC, integration and clustering.
   - **Input:** `--base_adata` with raw counts in `layers["counts"]` (or in `X` if there is no
@@ -102,6 +132,17 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Changed`
 
+- Own container images in `containers/` replace the per-tool images: `scanpy-ukdri-suite`
+  (scanpy 1.11.4 base + CellTypist, Harmony, upsetplot, mygene, hugo-unifier 0.3.2, COSG, LIANA+,
+  PyDESeq2, Quarto; replaces `scanpy-report`, `scanpy-cosg`, `pydeseq2` and six Seqera images) and
+  `seurat-ukdri-suite` (R 4.5, anndataR 1.2.1, celda, scds, SoupX, Seurat 5.5.1; replaces the
+  nicotru images). The R templates now name the counts assay/layer
+  explicitly (anndataR 1.2 maps `X` to an assay/layer called `X`).
+- All h5ad-handling processes of the main path run on one anndata generation: 23 more modules
+  (input loading and the `adata/*` helpers, normalisation, HVGs, PCA, neighbors, Leiden, UMAP,
+  PAGA, combat, bbknn, filtering, QC plots) moved from Seqera/Wave images (scanpy 1.10.4-1.11.2,
+  anndata 0.11) to `gcfntnu/scanpy:1.11.4` (scanpy 1.11.4, anndata 0.12.2). anndata 0.12 writes
+  `None` values as `null` elements that anndata 0.10/0.11 cannot read.
 - The docs now recommend passing analysis parameters in a YAML params file (`-params-file`) and
   keeping the command line for `--stage` and input/output paths: under Nextflow 26 command-line
   values reach the pipeline as text, so `--some_option false` counts as true.
@@ -201,6 +242,12 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Removed`
 
+- SCimilarity (`--integration_methods scimilarity`, `--scimilarity_model`), which was never used,
+  together with the unused `PSEUDOBULKING` subworkflow, its inactive `--pseudobulk`,
+  `--pseudobulk_groupby_labels` and `--pseudobulk_min_num_cells`, and the nf-core `untar` module.
+- The `.rds` (SingleCellExperiment) copies of the stage results (`ADATA_TORDS`). The conversion ran
+  on anndata 0.11, which cannot read h5ad files written by anndata 0.12, and was best effort anyway
+  (failed for matrices over 2^31 non-zeros). Read the h5ad in R with anndataR or zellkonverter.
 - `--mito_genes`. It was accepted and passed to cell filtering but never used: mitochondrial genes
   are always identified by the `mt-` prefix of the gene symbols. Moved to the backlog for
   re-assessment.

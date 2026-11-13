@@ -3,9 +3,8 @@ process HUGOUNIFIER_APPLY {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    container "${workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container
-        ? 'https://community-cr-prod.seqera.io/docker/registry/v2/blobs/sha256/18/18d0f190a89f99817c6e1960f547c791483cc48e9eeae50d1b6a4a3a28599479/data'
-        : 'community.wave.seqera.io/library/pip_hugo-unifier:e1e24757bee4a302'}"
+    // Built from containers/scanpy-ukdri-suite/Dockerfile.
+    container 'docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1'
 
     input:
     tuple val(meta), path(h5ad, arity: 1), path(changes, arity: 1)

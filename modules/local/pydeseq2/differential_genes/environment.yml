@@ -1,15 +1,14 @@
 name: differential_genes
+# Same package versions as docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1 (containers/scanpy-ukdri-suite/Dockerfile)
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - python=3.10
-  - pip
-  - pip:
-    - anndata>=0.10
-    - pandas>=2.0
-    - numpy>=1.24
-    - scipy>=1.11
-    - pydeseq2>=0.4
-    - scanpy>=1.10
-    - pyyaml
+  - conda-forge::python=3.11.11
+  - conda-forge::anndata=0.12.2
+  - conda-forge::pandas=2.3.2
+  - conda-forge::numpy=2.2.6
+  - conda-forge::scipy=1.16.1
+  - conda-forge::scikit-learn=1.7.1
+  - conda-forge::pyyaml=6.0.2
+  - bioconda::pydeseq2=0.5.4

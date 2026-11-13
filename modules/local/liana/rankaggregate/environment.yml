@@ -1,5 +1,13 @@
+# Same package versions as docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1 (containers/scanpy-ukdri-suite/Dockerfile),
+# limited to what rank_aggregate.py imports.
+# Note: bioconda's liana package pulls more dependencies than the pip install in the image.
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - bioconda::liana=1.4.0
+  - conda-forge::python=3.11.11
+  - conda-forge::scanpy=1.11.4
+  - conda-forge::anndata=0.12.2
+  - conda-forge::pandas=2.3.2
+  - conda-forge::threadpoolctl=3.6.0
+  - bioconda::liana=1.6.1

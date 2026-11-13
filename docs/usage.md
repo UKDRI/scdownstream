@@ -266,7 +266,7 @@ nextflow run UKDRI/scdownstream -r dev_ukdri --stage qc_clustering \
    --outdir results/qc_clustering
 ```
 
-Produces `results/qc_clustering/my_study_qc_clustering.h5ad` (plus `.rds`), a Quarto QC/clustering report
+Produces `results/qc_clustering/my_study_qc_clustering.h5ad`, a Quarto QC/clustering report
 under `report/`, and a MultiQC report.
 
 | Parameter                         | Default          | Description                                                                                                                                                            |
@@ -507,7 +507,11 @@ nextflow run UKDRI/scdownstream -r dev_ukdri --stage downstream \
 | `--enrich_max_out_group_fraction` | `0.5`                   | Maximum fraction of cells outside the group expressing a gene.                                                                                          |
 | `--ortholog_hcop_directory`       | `null`                  | Directory of HCOP ortholog tables; required for LIANA+ on non-human data — see [Reference data](#reference-data).                                       |
 | `--markers_uns_key`               | `rank_genes_groups`     | `uns` key holding the marker results to export.                                                                                                         |
-| `--markers_thr_adj_pvalue`        | `0.05`                  | Adjusted p-value threshold for the exported markers.                                                                                                    |
+| `--markers_method`                | `presto,cosg`           | Marker methods to run, comma-separated: `presto` (Wilcoxon test + AUC) and/or `cosg` (COSG score). See below.                                          |
+| `--markers_rank_by`               | auto                    | Ranking: `auc` or `cosg`. Default: `auc` when presto runs, otherwise `cosg`.                                                                          |
+| `--markers_min_auc`               | `0.7`                   | Minimum AUC for an exported marker (0.5 = no difference between the group and the other cells; 0.7 is the usual threshold for acceptable discrimination). Only applied when presto runs. |
+| `--markers_cosg_mu`               | `1`                     | COSG's `mu`: penalty for genes also expressed in other groups. Only used when cosg runs.                                                               |
+| `--markers_min_cosg_score`        | —                       | Minimum COSG score (0–1) for an exported marker, with either ranking; needs cosg in `--markers_method`. Not used by default. The scores of the top genes vary a lot between groups, so a fixed threshold removes many more markers from some groups than from others. |
 | `--markers_n_top`                 | `100`                   | Number of top markers per group to export.                                                                                                              |
 | `--markers_pct_nz`                | `0.1`                   | Minimum fraction of non-zero expressing cells for an exported marker.                                                                                   |
 | `--markers_min_logfc`             | `0`                     | Minimum log fold change for an exported marker.                                                                                                         |
@@ -518,7 +522,37 @@ nextflow run UKDRI/scdownstream -r dev_ukdri --stage downstream \
 | `--umap_color_by`                 | `''`                    | Comma-separated `obs` columns to plot on the UMAPs in both reports, e.g. `sex,diagnosis`. See [UMAP colourings](#umap-colourings-in-the-reports). |
 | `--umap_color_by_embeddings`      | `X_umap_pca,X_umap_scvi`| UMAPs the `--umap_color_by` columns are plotted on, one block each: before (PCA) and after (scVI) integration. |
 
-Marker genes are computed with `scanpy.tl.rank_genes_groups` using the **Wilcoxon** test.
+**Marker genes.** Each group of `--selected_clustering` is compared with all other cells, on the
+log-normalised `X`.
+Two methods, both run by default (`--markers_method presto,cosg`); setting `--markers_method` runs
+only the listed ones.
+- **`presto`:** the Wilcoxon rank-sum test with the **AUC**, a Python re-implementation
+  of the method of the R package [presto](https://github.com/immunogenomics/presto) (`wilcoxauc`);
+  the results match R presto.
+  - **AUC:** the probability that a random cell of the group expresses the gene more highly than a
+    random other cell. 0.5 means no difference, 1 a perfect marker.
+  - **Filter:** the exported markers need at least `--markers_min_auc` (besides `--markers_pct_nz`
+    and `--markers_min_logfc`).
+  - **Why not p-values:** p-values of a group against the rest are inflated (cells count as
+    replicates, and the groups come from the same data), so they are reported but not used to
+    select markers.
+- **`cosg`:** the [COSG](https://github.com/genecell/COSG) score (cosine similarity to an ideal
+  marker of the group; Dai et al. 2022), which favours genes specific to one group. It runs in the
+  pipeline's own `scanpy-cosg` image (see [Container images](#container-images)), and can filter the exported markers (`--markers_min_cosg_score`).
+- **COSG only (`--markers_method cosg`):** there is no AUC and no p-value. `--markers_min_auc` is
+  not applied, and the marker JSON and report have no AUC or p-value columns. log2FC and the
+  expressing fractions are still computed.
+
+**Ranking** (`--markers_rank_by`; the same order in the marker JSON and the report tables):
+- **`auc`** (default when presto runs): AUC, then adjusted p-value, then log2FC, then COSG score.
+- **`cosg`** (default with COSG only; needs cosg): COSG score, then log2FC, then the fraction of
+  expressing cells in the group.
+
+Later keys only break ties of the earlier ones. With `auc`, the adjusted p-value follows almost
+directly from the AUC, so in practice the order is by AUC, with log2FC and COSG deciding between
+genes of equal AUC (e.g. AUC 1.0).
+
+`--markers_thr_adj_pvalue` was removed: markers are no longer selected by p-value.
 
 ## `differential_genes`
 
@@ -631,8 +665,7 @@ Two consequences of the current tool set are worth knowing before you interpret 
   in `--integration_methods`; if it is omitted, the post-merge steps produce no output and no error.
 
 **Inactive parameters.** The following are accepted but currently have no effect:
-`--skip_liana`, `--skip_rankgenesgroups`,
-`--pseudobulk`, `--pseudobulk_groupby_labels`, `--pseudobulk_min_num_cells`, `--cluster_per_label`,
+`--skip_liana`, `--skip_rankgenesgroups`, `--cluster_per_label`,
 `--cluster_global`, `--base_embeddings`, `--base_label_col`. `--unify_gene_symbols` is no longer
 supported and should be left at its default —
 HUGO-based gene symbol unification only applies to human data and is not reliable enough to
@@ -647,18 +680,31 @@ regardless.
 
 Every process runs from a public container image, so nothing has to be built by hand. Nextflow
 pulls each image on first use. Under the `singularity` or `apptainer` profile it converts the image
-to a `.sif` in `$NXF_SINGULARITY_CACHEDIR`. Two images are specific to this fork. They are hosted on
-Docker Hub and pulled the same way; their Dockerfiles are kept in the repository only as the recipe
-they were built from:
+to a `.sif` in `$NXF_SINGULARITY_CACHEDIR`. Most h5ad steps (input loading, the `ADATA_*` helpers,
+normalisation, HVGs, PCA, neighbors, Leiden, UMAP, PAGA, combat, bbknn, filtering, QC plots, presto
+markers, pseudobulk and marker export) use the public `docker.io/gcfntnu/scanpy:1.11.4` image directly.
+Two images are specific to this fork. They are hosted on Docker Hub and pulled the same way; their
+Dockerfiles in [`containers/`](../containers/README.md) are the recipes they were built from:
 
-| Image (Docker Hub)                        | Used by                                                                                            | Recipe                                                 |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `docker.io/nhecker/scanpy-report:1.11.4-coreinf0.4` | `SCANPY_GENERATE_REPORT`, `SCANPY_GENERATE_REPORT_QC`, `PYDESEQ2_GENERATE_REPORT`, `SCANPY_ENRICH` | `modules/local/scanpy/report/Dockerfile`               |
-| `docker.io/nhecker/pydeseq2:0.1`                    | `DIFFERENTIAL_GENES_PER_CONTRAST`                                                                  | `modules/local/pydeseq2/differential_genes/Dockerfile` |
+| Image (Docker Hub)                                   | Used by                                                                                                                         |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1`      | CellTypist (annotation and training), Harmony, doublet removal, UpSet plots, MyGene, HUGO unifier, COSG, LIANA+, enrichment, PyDESeq2 and all reports |
+| `docker.io/nhecker/seurat-ukdri-suite:5.5.1-1`       | decontX, scds, SoupX, Seurat integration                                                                                        |
 
-Both extend the public `gcfntnu/scanpy:1.11.4` image. `DECOUPLER_PSEUDOBULK`, `FILTER_PSEUDOBULK` and
-`SCANPY_EXPORT_MARKERS` use that public image directly. The images are published for `linux/amd64`
-only.
+`scanpy-ukdri-suite` extends `gcfntnu/scanpy:1.11.4`; `seurat-ukdri-suite`
+has R 4.5 with anndataR, which reads and writes h5ad itself. scVI/scANVI use the public `scvi-tools`
+image (anndata 0.12.1). The images are published for `linux/amd64` only.
+
+> [!NOTE]
+> **For developers: one anndata/pandas generation.** h5ad files are passed between processes, so every
+> image that reads or writes them uses the versions of `gcfntnu/scanpy:1.11.4` (anndata 0.12.2,
+> pandas 2.3.x). Images with pandas ≥ 3 / anndata ≥ 0.13 write string indices in a form the older
+> anndata cannot write back (`allow_write_nullable_strings is False`). Such images, e.g.
+> BioContainers built with unpinned dependencies, must not be mixed in. Upgrading means updating
+> all images together. Older anndata (0.10, 0.11) cannot read `None` values written by
+> anndata ≥ 0.12, which scanpy itself stores (e.g. `uns["log1p"]["base"]`), so no h5ad step may run
+> on an image with older anndata either. How to add or change an image:
+> [`containers/README.md`](../containers/README.md).
 
 Prefer `-profile apptainer` over `-profile docker`. Docker Hub limits anonymous pulls, and Docker
 pulls on every host, while Apptainer pulls each image once into `$NXF_SINGULARITY_CACHEDIR`. See the
@@ -867,7 +913,7 @@ nextflow run UKDRI/scdownstream -r dev_ukdri --stage annotate \
   `qc_clustering`.
 
 **Output**
-- **Annotated object:** `<name>_annotate.h5ad` (+ `.rds`) is your object with these additions:
+- **Annotated object:** `<name>_annotate.h5ad` is your object with these additions:
   - `celltypist:<model>` / `celltypist:<model>:conf` and `scanvi:<model>` / `scanvi:<model>:conf`
     columns;
   - the scANVI latent space as `obsm["X_scanvi_<model>"]`.

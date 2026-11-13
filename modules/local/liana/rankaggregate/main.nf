@@ -3,9 +3,10 @@ process LIANA_RANKAGGREGATE {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/liana:1.4.0--pyhdfd78af_0':
-        'biocontainers/liana:1.4.0--pyhdfd78af_0' }"
+    // Built from containers/scanpy-ukdri-suite/Dockerfile (gcfntnu/scanpy:1.11.4 base, liana 1.6.1).
+    // The old BioContainer liana:1.4.0 had anndata 0.10, which could not read the h5ad files written by
+    // the anndata 0.12 steps.
+    container 'docker.io/nhecker/scanpy-ukdri-suite:1.11.4-1'
 
     input:
     tuple val(meta), path(h5ad)

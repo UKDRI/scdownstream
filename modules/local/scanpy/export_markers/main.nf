@@ -12,10 +12,11 @@ process SCANPY_EXPORT_MARKERS {
     tuple val(meta), path(h5ad)
     val(project_name)
     val(uns_key)
-    val(thr_adj_pvalue)
+    val(min_auc)
     val(n_top)
     val(pct_nz_group)
     val(min_logfc)
+    val(min_cosg_score)
     val(sep)
 
     output:
