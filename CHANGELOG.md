@@ -132,6 +132,11 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Changed`
 
+- `--max_genes` and `--max_counts` are now unset by default (no upper limit) instead of `false`, and
+  accept only a number. Remove `max_genes: false` / `max_counts: false` from params files; the
+  schema rejects `false`. Behaviour is unchanged. This also fixes `nf-core pipelines lint`, which
+  stopped on the old mixed integer/boolean type. Without `--automatic_cell_filtering`, check the
+  qc_clustering QC plots and set these thresholds for your data (see usage, "Upper thresholds").
 - Own container images in `containers/` replace the per-tool images: `scanpy-ukdri-suite`
   (scanpy 1.11.4 base + CellTypist, Harmony, upsetplot, mygene, hugo-unifier 0.3.2, COSG, LIANA+,
   PyDESeq2, Quarto; replaces `scanpy-report`, `scanpy-cosg`, `pydeseq2` and six Seqera images) and
