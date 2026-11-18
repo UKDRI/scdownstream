@@ -295,6 +295,8 @@ under `report/`, and a MultiQC report.
 | `--duplicate_var_resolution`      | `sum`            | How to resolve duplicate gene symbols: `mean`, `sum`, `max` or `make_unique`.                                                                                          |
 | `--aggregate_isoforms`            | `false`          | Aggregate isoform-level features.                                                                                                                                      |
 | `--n_hvgs`                        | `3000`           | Highly variable genes used for the PCA/UMAP embedding.                                                                                                                 |
+| `--hvg_flavor`                    | `seurat_v3`      | HVG method for `--n_hvgs` (over all cells) and `--integration_hvgs` (per batch): `seurat_v3` (Seurat's `vst`, on the raw counts), `seurat` (older dispersion method on log data; the default before) or `pearson_residuals`. See [Highly variable genes](#highly-variable-genes). |
+| `--hvg_span`                      | `0.3`            | Loess span of `seurat_v3` (as in Seurat). Raise it (e.g. `1`) if small or sparse batches make the fit fail. |
 | `--pca_n_comps`                   | `50`             | Principal components computed and stored in `X_pca`. |
 | `--neighbors_n_pcs`               | all              | Principal components used as input for the PCA neighbour graph (and the PCA UMAP), the first N of `X_pca`. See [Choosing the number of PCs](#choosing-the-number-of-pcs). |
 | `--integration_methods`           | `scvi`           | Integration method. Keep `scvi` — see [Supported tool choices](#supported-tool-choices).                                                                               |
@@ -305,6 +307,35 @@ under `report/`, and a MultiQC report.
 | `--scvi_model` / `--scanvi_model` | `null`           | Pre-trained model for reference mapping — see [Reference mapping](#reference-mapping).                                                                                 |
 | `--scvi_query_max_epochs`         | `100`            | Fine-tuning epochs when mapping new cells onto `--scvi_model` / `--scanvi_model`. See [Reference mapping](#reference-mapping). |
 | `--save_intermediates`            | `false`          | Publish intermediate objects as well as the final ones.                                                                                                                |
+
+### Highly variable genes
+
+`qc_clustering` selects highly variable genes (HVGs) twice:
+
+- **`--n_hvgs`** (default 3000) for the PCA and the PCA UMAP, over all cells. This UMAP is the
+  "before integration" view, so batch effects stay visible in it.
+- **`--integration_hvgs`** (default 5000) as the input of the integration methods, selected per
+  batch (the samplesheet's batch column): genes are ranked by in how many batches they are variable,
+  as in Seurat's `SelectIntegrationFeatures` and the scVI tutorials.
+
+Both use `--hvg_flavor`:
+
+- **`seurat_v3`** (default): Seurat's `vst` method (`FindVariableFeatures`), on the raw counts in
+  `layers['counts']`. Those are the counts the integration uses: the input counts, or the
+  ambient-corrected counts with `--ambient_corrected_integration`. Non-integer counts (decontX,
+  SoupX) make scanpy warn that it expects raw counts; that is expected and harmless here.
+- **`seurat`:** the older dispersion method on the log-normalised data (the default before). The
+  integration HVGs are still selected per batch, so earlier runs are not reproduced exactly.
+- **`pearson_residuals`:** analytic Pearson residuals on the raw counts.
+
+`0` HVGs (choose the number automatically) only works with `seurat`; a negative number keeps all
+genes.
+
+> [!NOTE]
+> `seurat_v3` fits a loess curve per batch. On small or sparse batches (seen from a few hundred cells
+> down) the fit can fail; the pipeline then stops with a message listing the cells per batch. Rerun
+> with `-resume` and `--hvg_span 1` (a smoother trend), or with `--hvg_flavor seurat`. A batch with a
+> single cell is always an error.
 
 scVI itself is tuned with `--scvi_n_latent` (30), `--scvi_n_hidden` (128), `--scvi_n_layers` (2),
 `--scvi_dispersion` (`gene`), `--scvi_gene_likelihood` (`zinb`), `--scvi_max_epochs`,
@@ -764,8 +795,8 @@ Two methods are trained (`--train_methods celltypist,scanvi` by default):
 
 - **CellTypist:** a logistic-regression model on log-normalised counts.
 - **scANVI:** a scVI model, then a scANVI model initialised from it, on the reference's highly
-  variable genes (`--train_hvgs`, default 5000, selected per batch on raw counts with scanpy's Pearson
-  residuals). The architecture and epochs come from the `--scvi_*` parameters.
+  variable genes (`--train_hvgs`, default 5000, selected per batch on the raw counts with
+  `--train_hvg_flavor`, by default Seurat's `vst` method, scanpy's `seurat_v3`). The architecture and epochs come from the `--scvi_*` parameters.
 
 **Preparing the reference.** The reference is used as given, not passed through the
 `qc_clustering` preparation:
@@ -844,6 +875,8 @@ trained with (the pipeline's containers: CellTypist 1.6.3, scvi-tools 1.3.3).
 | `--train_evaluate`                     | `true`              | Run the held-out evaluation.                                                |
 | `--train_final_on_all`                 | `true`              | Refit the final models on all cells; `false` keeps the training-split ones. |
 | `--train_hvgs`                         | `5000`              | Highly variable genes for the scVI/scANVI reference.                        |
+| `--train_hvg_flavor`                   | `seurat_v3`         | HVG method for the reference genes (per batch): `seurat_v3`, `seurat` or `pearson_residuals` (the default before). |
+| `--train_hvg_span`                     | `0.3`               | Loess span of `seurat_v3` for the reference genes.                          |
 | `--train_celltypist_feature_selection` | `true`              | CellTypist's two-pass feature selection.                                    |
 | `--train_celltypist_use_sgd`           | `false`             | Train CellTypist with stochastic gradient descent, for large references.    |
 | `--train_celltypist_mini_batch`        | `false`             | Mini-batch SGD (requires `--train_celltypist_use_sgd`).                     |

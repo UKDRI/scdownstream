@@ -23,6 +23,8 @@ process SCANPY_HVGS {
     batch_key = task.ext.batch_key ?: ""
     // 'seurat' (log data), or 'pearson_residuals' / 'seurat_v3' (raw counts)
     flavor = task.ext.flavor ?: 'seurat'
+    // loess span of the seurat_v3 mean-variance fit (scanpy default 0.3)
+    span = task.ext.span ?: 0.3
 
     template('hvgs.py')
 

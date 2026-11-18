@@ -20,6 +20,8 @@ n_hvgs = int("${n_hvgs}")
 batch_key = "${batch_key}"
 subset_to_hvgs = "${subset_to_hvgs}" == "true"
 flavor = "${flavor}"
+# Fraction of the genes in each loess fit of flavor 'seurat_v3' (ignored by the other flavours)
+span = float("${span}")
 
 # Layer with the raw counts, which the count-based flavours read (X if the layer is missing)
 counts_layer = "counts"
@@ -55,12 +57,47 @@ elif flavor in ("pearson_residuals", "seurat_v3"):
                 raise ValueError("SCANPY_HVGS: flavor 'pearson_residuals' needs a number of HVGs greater than 0.")
             sc.experimental.pp.highly_variable_genes(adata, flavor=flavor, **kwargs)
     else:
+        # Without n_top_genes scanpy silently selects 2000 genes for seurat_v3, so '0 = automatic'
+        # is refused. Without selection it still runs, for the statistics the reports plot.
+        if select_hvgs and "n_top_genes" not in kwargs:
+            raise ValueError("SCANPY_HVGS: flavor 'seurat_v3' needs a number of HVGs greater than 0.")
         if importlib.util.find_spec("skmisc") is None:
             raise ImportError(
                 "SCANPY_HVGS: flavor 'seurat_v3' needs the scikit-misc package, which this container does not "
                 "have. Use flavor 'pearson_residuals', or a container with scikit-misc."
             )
-        sc.pp.highly_variable_genes(adata, flavor=flavor, **kwargs)
+
+        # scikit-misc fits one loess per batch; it crashes the interpreter (segfault, no exception)
+        # on a batch with a single cell, so such batches are refused before the call
+        if batch_key:
+            cells_per_batch = adata.obs[batch_key].value_counts(ascending=True)
+            cells_per_batch = cells_per_batch[cells_per_batch > 0]
+            tiny_batches = cells_per_batch[cells_per_batch < 2]
+            if len(tiny_batches) > 0:
+                tiny_list = ", ".join(f"{name} ({count} cell)" for name, count in tiny_batches.items())
+                raise ValueError(
+                    f"SCANPY_HVGS: flavor 'seurat_v3' needs at least 2 cells per batch ('{batch_key}'), "
+                    f"but these batches have fewer: {tiny_list}. Remove or merge them in the samplesheet, "
+                    "or use flavour 'seurat' (--hvg_flavor seurat, or --train_hvg_flavor seurat for --stage train_models)."
+                )
+            cells_text = "cells per batch (smallest first): " + ", ".join(
+                f"{name}: {count}" for name, count in cells_per_batch.items()
+            )
+        else:
+            cells_text = f"cells: {adata.n_obs}"
+
+        try:
+            sc.pp.highly_variable_genes(adata, flavor=flavor, span=span, **kwargs)
+        except ValueError as err:
+            raise ValueError(
+                f"SCANPY_HVGS: the seurat_v3 loess fit failed ({err}), typically on small or sparse batches. "
+                f"Span {span:g}; {cells_text}. "
+                "Fix: raise the span (--hvg_span 1, or --train_hvg_span 1 for --stage train_models) "
+                "or use flavour 'seurat' (--hvg_flavor seurat / --train_hvg_flavor seurat), and rerun with -resume."
+            ) from err
+
+        # Recorded for the reports; uns["hvg"] is set by scanpy, setdefault in case it is not
+        adata.uns.setdefault("hvg", {})["span"] = span
 
 else:
     raise ValueError(

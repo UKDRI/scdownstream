@@ -224,8 +224,8 @@
                 "integration_hvgs": {
                     "type": "integer",
                     "default": 5000,
-                    "description": "Number of highly variable genes to use for integration. If set to 0, the number of highly variable genes will be automatically determined. If set to a negative number, all genes will be used.",
-                    "help_text": "If a reference model is provided, this does not have any effect. This is because the reference model defines the set of genes that will be used for integration."
+                    "description": "Number of highly variable genes to use for integration, selected per batch with `--hvg_flavor`. 0 = automatic (only with `--hvg_flavor seurat`); a negative number = all genes.",
+                    "help_text": "The genes are selected per batch with the method set by `--hvg_flavor`. An automatic number (0) is only possible with `--hvg_flavor seurat`; the other methods need a number. If a reference model is provided, this does not have any effect. This is because the reference model defines the set of genes that will be used for integration."
                 },
                 "scvi_model": {
                     "type": "string",
@@ -252,8 +252,23 @@
                 "n_hvgs": {
                     "type": "integer",
                     "default": 3000,
-                    "description": "Number of highly variable genes to use for data processing. If set to 0, the number of highly variable genes will be automatically determined. If set to a negative number, all genes will be used.",
-                    "help_text": "This is the number of HVGs for single sample processing and after data integration."
+                    "description": "Number of highly variable genes to use for data processing (PCA/UMAP), selected over all cells with `--hvg_flavor`. 0 = automatic (only with `--hvg_flavor seurat`); a negative number = all genes.",
+                    "help_text": "This is the number of HVGs for single sample processing and after data integration. The genes are selected with the method set by `--hvg_flavor`. An automatic number (0) is only possible with `--hvg_flavor seurat`; the other methods need a number."
+                },
+                "hvg_flavor": {
+                    "type": "string",
+                    "default": "seurat_v3",
+                    "enum": ["seurat_v3", "seurat", "pearson_residuals"],
+                    "description": "HVG method for `--stage qc_clustering`: the PCA/UMAP genes (`--n_hvgs`, over all cells) and the integration input (`--integration_hvgs`, selected per batch).",
+                    "help_text": "`seurat_v3` = Seurat's vst method (the `FindVariableFeatures` default) on the raw counts; `seurat` = the older dispersion method on log-normalised data (the default before this option was added); `pearson_residuals` = analytic Pearson residuals on the raw counts (Lause et al. 2021). The count-based methods read `layers['counts']`, which the pipeline fills from the input counts (or the ambient-corrected counts with `--ambient_corrected_integration`). With non-integer counts (e.g. from decontX or SoupX), scanpy warns that it expects raw counts; that is expected. An automatic number of HVGs (`--n_hvgs 0` / `--integration_hvgs 0`) is only possible with `seurat`."
+                },
+                "hvg_span": {
+                    "type": "number",
+                    "default": 0.3,
+                    "exclusiveMinimum": 0,
+                    "maximum": 1,
+                    "description": "Loess span of the `seurat_v3` HVG method in `--stage qc_clustering` (default 0.3, as in Seurat).",
+                    "help_text": "Only used with `--hvg_flavor seurat_v3`. The fit of a batch can fail on small or sparse batches (scikit-misc's loess stops on many genes with identical means; seen for batches of a few hundred cells); the pipeline then stops with a message listing the batch sizes. Raise the span (e.g. `--hvg_span 1`) or use `--hvg_flavor seurat`, and rerun with `-resume`. A larger span gives a smoother mean-variance trend for all batches."
                 },
                 "pca_n_comps": {
                     "type": "integer",
@@ -779,7 +794,22 @@
                     "default": 5000,
                     "minimum": 1,
                     "description": "Number of highly variable genes for the scVI/scANVI reference model.",
-                    "help_text": "Selected with the `seurat_v3` flavour on the raw counts, per batch. The reference model is trained on these genes, and every query mapped onto it is reduced to them. A number larger than the number of genes keeps all genes."
+                    "help_text": "Selected per batch on the raw counts, with the method set by `--train_hvg_flavor`. The reference model is trained on these genes, and every query mapped onto it is reduced to them. A number larger than the number of genes keeps all genes."
+                },
+                "train_hvg_flavor": {
+                    "type": "string",
+                    "default": "seurat_v3",
+                    "enum": ["seurat_v3", "seurat", "pearson_residuals"],
+                    "description": "HVG method for the scVI/scANVI reference genes of `--stage train_models`, selected per batch on the raw counts.",
+                    "help_text": "`seurat_v3` = Seurat's vst method (the `FindVariableFeatures` default) on the raw counts; `seurat` = the older dispersion method on log-normalised data; `pearson_residuals` = analytic Pearson residuals on the raw counts (Lause et al. 2021), the default before this option was added. The number of genes is set by `--train_hvgs`."
+                },
+                "train_hvg_span": {
+                    "type": "number",
+                    "default": 0.3,
+                    "exclusiveMinimum": 0,
+                    "maximum": 1,
+                    "description": "Loess span of the `seurat_v3` HVG method for the scVI/scANVI reference genes of `--stage train_models` (default 0.3, as in Seurat).",
+                    "help_text": "Only used with `--train_hvg_flavor seurat_v3`. The fit of a batch can fail on small or sparse batches (scikit-misc's loess stops on many genes with identical means; seen for batches of a few hundred cells); the pipeline then stops with a message listing the batch sizes. Raise the span (e.g. `--train_hvg_span 1`) or use `--train_hvg_flavor seurat`, and rerun with `-resume`. A larger span gives a smoother mean-variance trend for all batches."
                 },
                 "train_celltypist_feature_selection": {
                     "type": "boolean",
