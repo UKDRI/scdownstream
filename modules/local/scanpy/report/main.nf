@@ -167,6 +167,9 @@ process SCANPY_GENERATE_REPORT_TRAINING {
 
     script:
     prefix = task.ext.prefix ?: "${meta.id}"
+    // HVG flavour of the scVI/scANVI reference genes, for the report text and citations; unset, the
+    // report names both selectable methods
+    hvg_flavor_arg = task.ext.hvg_flavor ? "-P \"HVG_FLAVOR:${task.ext.hvg_flavor}\"" : ''
     """
     export NUMBA_CACHE_DIR=./tmp/numba
     export MPLCONFIGDIR=./tmp/matplotlib
@@ -180,6 +183,7 @@ process SCANPY_GENERATE_REPORT_TRAINING {
         -P EVALUATION_DIR:evaluation \\
         -P "MODEL_NAME:${meta.id}" \\
         -P VERSIONS_FILE:${versions_yaml} \\
+        ${hvg_flavor_arg} \\
         --to html
 
     cat <<-END_VERSIONS > versions.yml

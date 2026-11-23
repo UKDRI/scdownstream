@@ -122,7 +122,7 @@ workflow TRAIN_MODELS {
     if (methods.contains('scanvi')) {
         if (evaluate) {
             //
-            // MODULE: Reference genes of the training split (Pearson residuals on counts, per batch; see conf/modules.config)
+            // MODULE: Reference genes of the training split (per batch on the raw counts with --train_hvg_flavor; see conf/modules.config)
             //
             HVGS_EVAL(
                 ADATA_TRAINSPLIT.out.train.map { meta, h5ad -> [meta + [id: eval_name], h5ad] },

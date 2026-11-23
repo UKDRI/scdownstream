@@ -12,6 +12,10 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Added`
 
+- `--hvg_flavor` and `--train_hvg_flavor` (`seurat_v3` | `seurat` | `pearson_residuals`) choose the
+  highly-variable-gene method, and `--hvg_span` / `--train_hvg_span` the loess span of `seurat_v3`.
+  `seurat_v3` with a batch key stops with a message listing the cells per batch when its loess fit
+  fails on small or sparse batches, instead of an unexplained scikit-misc error or a crash.
 - `--stage downstream` marker genes:
   - **New default:** the Wilcoxon rank-sum test with AUC, a Python re-implementation of the
     method of the R package presto (`wilcoxauc`; results verified against R presto). Markers
@@ -132,6 +136,12 @@ Forked from [nf-core/scdownstream](https://github.com/nf-core/scdownstream) at u
 
 ### `Changed`
 
+- **Highly variable genes now use Seurat's `vst` method** (scanpy `seurat_v3`, on the raw counts)
+  by default. **Results of `qc_clustering` differ from earlier runs** (PCA/UMAP, integration input,
+  clusters); `--hvg_flavor seurat` restores the previous method. The integration HVGs are now
+  selected per batch with every method; the PCA HVGs stay over all cells. `--stage train_models` moves from Pearson
+  residuals to `seurat_v3` (per batch) as well; `--train_hvg_flavor pearson_residuals` restores it.
+  The qc_clustering and training reports name the method used and cite it.
 - `--max_genes` and `--max_counts` are now unset by default (no upper limit) instead of `false`, and
   accept only a number. Remove `max_genes: false` / `max_counts: false` from params files; the
   schema rejects `false`. Behaviour is unchanged. This also fixes `nf-core pipelines lint`, which

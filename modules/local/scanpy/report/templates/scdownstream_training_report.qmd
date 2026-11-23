@@ -24,6 +24,8 @@ MODEL_NAME = "reference"
 VERSIONS_FILE = "versions.yml"
 # Confusion matrices with more true labels show the labels with the most test cells
 MAX_CONFUSION_LABELS = 50
+# HVG flavour of the scVI/scANVI reference genes (--train_hvg_flavor); empty if not passed
+HVG_FLAVOR = ""
 ```
 
 ```{python}
@@ -287,6 +289,22 @@ for method in methods:
 
 The models are written to `models/` in the output directory: the CellTypist model to `models/celltypist/<name>.pkl`, the scVI and scANVI models to `models/scvi/<name>/model.pt` and `models/scanvi/<name>/model.pt`, and the reference cells with the scANVI latent space and labels to `models/<name>_reference.h5ad`. To annotate new data in the `qc_clustering` stage, pass `--celltypist_model models/celltypist/<name>.pkl` and/or `--scanvi_model models/scanvi/<name>/model.pt` with `--integration_methods scvi,scanvi`.
 
+```{python}
+#| output: asis
+
+hvg_flavor = str(HVG_FLAVOR or '').strip()
+hvg_methods = {
+    'seurat': "Seurat's dispersion-based method (flavor <code>seurat</code>)",
+    'seurat_v3': 'the Seurat v3 method, the variance of standardised raw counts (flavor <code>seurat_v3</code>)',
+    'pearson_residuals': 'the variance of analytic Pearson residuals of the raw counts (flavor <code>pearson_residuals</code>)',
+}
+hvg_method = hvg_methods.get(
+    hvg_flavor,
+    'the method set by <code>--train_hvg_flavor</code> (Seurat v3 or analytic Pearson residuals on the raw counts)')
+print(f"\n<p>The scVI and scANVI models use the highly variable genes of the reference "
+      f"(<code>--train_hvgs</code>), selected per batch with {hvg_method}.</p>\n")
+```
+
 ---
 
 ## <font color='green'>Citations</font>
@@ -304,9 +322,19 @@ _Ewels PA, Peltzer A, Fillinger S, Patel H, Alneberg J, Wilm A, Garcia MU, Di To
 
 _Wolf FA, Angerer P, & Theis, FJ. (2018). SCANPY: large-scale single-cell gene expression data analysis. Genome Biol., 19(1):15._
 
-### <font color='green'>[Analytic Pearson residuals](https://scanpy.readthedocs.io/en/stable/generated/scanpy.experimental.pp.highly_variable_genes.html)</font>
+```{python}
+#| output: asis
 
-_Lause J, Berens P, & Kobak D. (2021). Analytic Pearson residuals for normalization of single-cell RNA-seq UMI data. Genome Biol., 22(1):258._
+# Highly variable genes: the method that was used, or both selectable ones if the flavour is unknown
+if hvg_flavor not in ('seurat', 'pearson_residuals'):
+    print("\n### <font color='green'>[Seurat v3](https://scanpy.readthedocs.io/en/stable/generated/scanpy.pp.highly_variable_genes.html)</font>\n")
+    print("\n_Stuart T, Butler A, Hoffman P, Hafemeister C, Papalexi E, Mauck WM 3rd, Hao Y, Stoeckius M, Smibert P, "
+          "Satija R. (2019). Comprehensive Integration of Single-Cell Data. Cell, 177(7):1888-1902.e21._\n")
+if hvg_flavor not in ('seurat', 'seurat_v3'):
+    print("\n### <font color='green'>[Analytic Pearson residuals](https://scanpy.readthedocs.io/en/stable/generated/scanpy.experimental.pp.highly_variable_genes.html)</font>\n")
+    print("\n_Lause J, Berens P, & Kobak D. (2021). Analytic Pearson residuals for normalization of single-cell "
+          "RNA-seq UMI data. Genome Biol., 22(1):258._\n")
+```
 
 ### <font color='green'>[Celltypist](https://www.celltypist.org/)</font>
 _Domínguez Conde C, Xu C, Jarvis LB, Rainbow DB, Wells SB, Gomes T, ... & Teichmann, SA (2022). Cross-tissue immune cell analysis reveals tissue-specific features in humans. Science, 376(6594):eabl5197._

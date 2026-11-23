@@ -82,7 +82,31 @@ adata.obs.value_counts('sample').rename_axis('samples').reset_index(name='number
 ## <font color='green'>Highly variable genes</font>
 
 ```{python}
-sc.pl.highly_variable_genes(adata)
+# Method of SCANPY_HVGS (--hvg_flavor), as recorded by scanpy; also selects the citation below
+hvg_flavor = adata.uns["hvg"].get("flavor", "") if "hvg" in adata.uns else ""
+# Loess span of the seurat_v3 fit (--hvg_span), stored by SCANPY_HVGS; absent in older objects
+hvg_span = adata.uns["hvg"].get("span") if "hvg" in adata.uns else None
+hvg_span_text = f", loess span {float(hvg_span):g}" if hvg_span is not None else ""
+hvg_methods = {
+    "seurat": "Seurat's dispersion-based method on the log-normalised data (flavor <code>seurat</code>)",
+    "seurat_v3": f"the Seurat v3 method, the variance of standardised raw counts (flavor <code>seurat_v3</code>{hvg_span_text})",
+    "pearson_residuals": "the variance of analytic Pearson residuals of the raw counts (flavor <code>pearson_residuals</code>)",
+}
+# Columns sc.pl.highly_variable_genes reads; pearson_residuals output has none of the two sets
+hvg_plot_columns = {
+    "seurat": ["means", "dispersions", "dispersions_norm"],
+    "seurat_v3": ["means", "variances", "variances_norm"],
+}
+
+if "highly_variable" in adata.var:
+    hvg_method = hvg_methods.get(hvg_flavor, f"flavor <code>{hvg_flavor or 'unknown'}</code>")
+    display(HTML(f"<p>{int(adata.var['highly_variable'].sum())} highly variable genes, selected over all cells "
+                 f"with {hvg_method}. They are used for the PCA and the PCA-based UMAP.</p>"))
+
+if hvg_flavor in hvg_plot_columns and all(col in adata.var for col in hvg_plot_columns[hvg_flavor]):
+    sc.pl.highly_variable_genes(adata)
+else:
+    display(HTML("<p>No plot: scanpy has no dispersion plot for this method, or the statistics are missing.</p>"))
 ```
 
 ## <font color='green'>PCA</font>
@@ -532,6 +556,20 @@ _Ewels PA, Peltzer A, Fillinger S, Patel H, Alneberg J, Wilm A, Garcia MU, Di To
 ### <font color='green'>[Scanpy](https://scanpy.readthedocs.io/en/stable/)</font>
 
 _Wolf FA, Angerer P, & Theis, FJ. (2018). SCANPY: large-scale single-cell gene expression data analysis. Genome Biol., 19(1):15._
+
+```{python}
+#| output: asis
+
+# Highly variable genes: only the method that was used (hvg_flavor, read above)
+if hvg_flavor == "seurat_v3":
+    print("\n### <font color='green'>[Seurat v3](https://scanpy.readthedocs.io/en/stable/generated/scanpy.pp.highly_variable_genes.html)</font>\n")
+    print("\n_Stuart T, Butler A, Hoffman P, Hafemeister C, Papalexi E, Mauck WM 3rd, Hao Y, Stoeckius M, Smibert P, "
+          "Satija R. (2019). Comprehensive Integration of Single-Cell Data. Cell, 177(7):1888-1902.e21._\n")
+elif hvg_flavor == "pearson_residuals":
+    print("\n### <font color='green'>[Analytic Pearson residuals](https://scanpy.readthedocs.io/en/stable/generated/scanpy.experimental.pp.highly_variable_genes.html)</font>\n")
+    print("\n_Lause J, Berens P, & Kobak D. (2021). Analytic Pearson residuals for normalization of single-cell "
+          "RNA-seq UMI data. Genome Biol., 22(1):258._\n")
+```
 
 ### <font color='green'>[scVI](https://scvi-tools.org/)</font>
 _Lopez R, Regier J, Cole MB, Jordan MI, & Yosef N. (2018). Deep generative modeling for single-cell transcriptomics. Nature methods, 15(12):1053-1058._
