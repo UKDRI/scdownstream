@@ -83,15 +83,17 @@ workflow QUALITY_CONTROL {
     ch_h5ad = AMBIENT_CORRECTION.out.h5ad
     ch_versions = ch_versions.mix(AMBIENT_CORRECTION.out.versions)
 
-    // Per-sample thresholds: the samplesheet value if set, otherwise the global parameter
+    // Per-sample thresholds: the samplesheet value if set, otherwise the global parameter.
+    // max_genes / max_counts unset (null) -> false, which SCANPY_FILTER reads as "no upper limit".
+    // `?:` would also map 0 to false; both schemas require a minimum of 1, so 0 cannot occur.
     ch_filtering = ch_h5ad.multiMap { meta, h5ad ->
         h5ad: [meta, h5ad]
         symbol_col: meta.symbol_col ?: 'index'
         min_cells: sampleOrGlobal(meta, 'min_cells', params.min_cells)
         min_genes: sampleOrGlobal(meta, 'min_genes', params.min_genes)
-        max_genes: sampleOrGlobal(meta, 'max_genes', params.max_genes)
+        max_genes: sampleOrGlobal(meta, 'max_genes', params.max_genes) ?: false
         min_counts: sampleOrGlobal(meta, 'min_counts_cell', params.min_counts)
-        max_counts: sampleOrGlobal(meta, 'max_counts', params.max_counts)
+        max_counts: sampleOrGlobal(meta, 'max_counts', params.max_counts) ?: false
         min_counts_gene: sampleOrGlobal(meta, 'min_counts_gene', params.min_counts_gene)
         max_mito_percentage: sampleOrGlobal(meta, 'max_mito_percentage', params.max_mito_percentage)
         automatic_cell_filtering: sampleOrGlobal(meta, 'automatic_cell_filtering', params.automatic_cell_filtering)
