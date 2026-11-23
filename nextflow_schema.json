@@ -180,10 +180,10 @@
                     "help_text": "Cells with fewer expressed genes are removed. With `--automatic_cell_filtering`, this is the floor for the automatic lower bound on genes per cell."
                 },
                 "max_genes": {
-                    "type": ["integer", "boolean"],
-                    "default": false,
-                    "description": "Maximum number of genes that are expressed in cell.",
-                    "help_text": "Cells with more expressed genes are removed. Use 'false' to not filter by maximum number of genes."
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Maximum number of genes expressed per cell; unset means no upper limit.",
+                    "help_text": "Unset (the default) means no upper limit on genes per cell. Set a number to remove cells with more expressed genes. Can be set per sample with the `max_genes` samplesheet column. Without `--automatic_cell_filtering`, check the QC plots of the `qc_clustering` run and set a value that fits your data: cells far above the bulk of a sample are often doublets or multiplets. Not used with `--automatic_cell_filtering`."
                 },
                 "min_counts": {
                     "type": "integer",
@@ -193,10 +193,10 @@
                     "help_text": "Cells with fewer counts are removed. With `--automatic_cell_filtering`, this is the floor for the automatic lower bound on counts per cell."
                 },
                 "max_counts": {
-                    "type": ["integer", "boolean"],
-                    "default": false,
-                    "description": "Maximum number of counts per cell.",
-                    "help_text": "Cells with more counts are removed. Use 'false' to not filter by maximum counts."
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Maximum number of counts per cell; unset means no upper limit.",
+                    "help_text": "Unset (the default) means no upper limit on counts per cell. Set a number to remove cells with more counts. Can be set per sample with the `max_counts` samplesheet column. Without `--automatic_cell_filtering`, check the QC plots of the `qc_clustering` run and set a value that fits your data: cells far above the bulk of a sample are often doublets or multiplets. Not used with `--automatic_cell_filtering`."
                 },
                 "max_mito_percentage": {
                     "type": "number",

@@ -286,10 +286,10 @@ under `report/`, and a MultiQC report.
 | `--automatic_cell_filtering`      | `false`          | Derive per-sample thresholds from N-MAD outlier detection instead of the fixed thresholds below. `--min_genes` / `--min_counts` still apply as lower floors; consider setting them very low in this mode. See [Automatic thresholds](#automatic-thresholds). Can be set per sample in the samplesheet. |
 | `--filtering_keep_outliers`       | `false`          | Keep cells that fail the QC thresholds and mark them in `obs["outlier"]` instead of removing them. Cells left with no counts after gene filtering are removed regardless. See [Doublets and QC outliers](#doublets-and-qc-outliers). |
 | `--min_genes`                     | `200`            | Minimum genes per cell. Also the floor for the automatic lower bound with `--automatic_cell_filtering`. Can be set per sample in the samplesheet. |
-| `--max_genes`                     | `false`          | Maximum genes per cell (`false` disables). Can be set per sample in the samplesheet. |
+| `--max_genes`                     | unset            | Maximum genes per cell; unset means no upper limit. Can be set per sample in the samplesheet. See [Upper thresholds](#upper-thresholds). |
 | `--min_cells`                     | `5`              | Minimum cells per gene. Can be set per sample in the samplesheet. |
 | `--min_counts`                    | `0`              | Minimum counts per cell. Also the floor for the automatic lower bound with `--automatic_cell_filtering`. Can be set per sample in the samplesheet. |
-| `--max_counts`                    | `false`          | Maximum counts per cell (`false` disables). Can be set per sample in the samplesheet. |
+| `--max_counts`                    | unset            | Maximum counts per cell; unset means no upper limit. Can be set per sample in the samplesheet. See [Upper thresholds](#upper-thresholds). |
 | `--min_counts_gene`               | `0`              | Minimum counts per gene. Can be set per sample in the samplesheet. |
 | `--max_mito_percentage`           | `25`             | Maximum percentage of mitochondrial counts per cell. Can be set per sample in the samplesheet. |
 | `--duplicate_var_resolution`      | `sum`            | How to resolve duplicate gene symbols: `mean`, `sum`, `max` or `make_unique`.                                                                                          |
@@ -370,6 +370,16 @@ filtering on the QC thresholds (fixed, or automatic N-MAD thresholds with
   `uns["cell_filtering"]["n_empty_after_gene_filtering"]`.
 
 The two options are independent: you can, for example, remove doublets and keep QC outliers.
+
+#### Upper thresholds
+
+`--max_genes` and `--max_counts` are unset by default, so the fixed thresholds remove no cells at the
+upper end; only `--max_mito_percentage` limits it. If you set the thresholds yourself (no
+`--automatic_cell_filtering`), check the QC plots of the `qc_clustering` run: the MultiQC report and
+`quality_control/custom_thresholds/` (genes and counts per cell, per sample). Cells far above the bulk
+of a sample are often doublets or multiplets. Set `--max_genes` / `--max_counts` (or the `max_genes` /
+`max_counts` samplesheet columns, per sample) to a value that fits your data, and re-run the stage
+with `-resume`.
 
 #### Automatic thresholds
 
